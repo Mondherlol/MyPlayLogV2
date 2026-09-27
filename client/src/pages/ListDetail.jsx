@@ -1129,8 +1129,10 @@ function PoolZone({
     const n = scrollRef.current;
     if (!n) return setScrollState({ left: false, right: false });
     setScrollState({
-      left: n.scrollLeft > 2,
-      right: n.scrollLeft + n.clientWidth < n.scrollWidth - 2,
+      // Une marge de quelques pixels : l'accroche (scroll-snap) peut laisser
+      // la rangée à 1 ou 2 px de son bord sans qu'il y ait rien à voir.
+      left: n.scrollLeft > 8,
+      right: n.scrollLeft + n.clientWidth < n.scrollWidth - 8,
     });
   }, []);
 

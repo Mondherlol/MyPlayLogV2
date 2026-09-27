@@ -6,7 +6,6 @@ import TierIdea from "./TierIdea";
 import { ListTileSkeleton } from "./ListTile";
 import { apiFetch } from "../../lib/api";
 import { apiCached, peekApi } from "../../lib/query";
-import { DEFAULT_BOARD, boardOf } from "../../lib/boards";
 
 // ======================================================================
 //  La page Listes, onglet « Découvrir » : des rayons d'images
@@ -18,8 +17,6 @@ import { DEFAULT_BOARD, boardOf } from "../../lib/boards";
 // La grille complète, avec sa recherche et ses filtres, suit en dessous (cf.
 // pages/Lists).
 
-// Une carte de joueur sans une seule image n'a rien à montrer dans un rayon.
-const hasImages = (l) => (l.boardItems || []).some((it) => it.image);
 
 /**
  * Charge un rayon de listes ; `null` tant que ça charge. Le cache s'affiche
@@ -115,27 +112,6 @@ function TierRail({ token, render }) {
 }
 
 export default function ListsDiscover({ token, renderCard }) {
-  const board = boardOf(DEFAULT_BOARD);
-  const [mine, setMine] = useState(undefined); // ma carte : undefined = en cours
-
-  useEffect(() => {
-    if (!token) {
-      setMine(null);
-      return undefined;
-    }
-    let alive = true;
-    apiCached(`/lists?scope=mine&board=${board.key}&limit=1`, { token, maxAge: 60000 })
-      .then((d) => alive && setMine(d?.lists?.[0] || null))
-      .catch(() => alive && setMine(null));
-    return () => {
-      alive = false;
-    };
-  }, [token, board.key]);
-
-  // Ma carte ouvre le rayon des cartes de joueur — seulement si elle montre
-  // déjà quelque chose : les cartes vides n'y ont pas leur place.
-  const lead = mine && hasImages(mine) ? renderCard(mine) : null;
-
   return (
     <div className="lx">
       <ListRail
@@ -146,15 +122,6 @@ export default function ListsDiscover({ token, renderCard }) {
         render={renderCard}
       />
       <TierRail token={token} render={renderCard} />
-      <ListRail
-        path={`/lists?board=${board.key}&sort=likes&limit=16`}
-        token={token}
-        title="Cartes de joueur"
-        lead={lead}
-        skipId={mine?.id}
-        keep={hasImages}
-        render={renderCard}
-      />
       <ListRail
         path="/lists?scope=events&limit=14"
         token={token}

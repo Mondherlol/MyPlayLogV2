@@ -238,35 +238,34 @@ export default function Lists() {
 
   return (
     <div className="lists-page">
-      {/* Un titre, les onglets, un bouton : le reste se voit dans les cartes. */}
+      {/* Le titre, la recherche globale, le bouton : une seule ligne. La
+          recherche est au-dessus des onglets parce qu'elle ne dépend d'aucun
+          d'eux. */}
       <header className="lists-header">
         <h1 className="lists-title">Listes</h1>
+        <div className="lists-search lists-search-global">
+          <Search size={17} className="lists-search-icon" />
+          <input
+            type="text"
+            placeholder="Chercher dans toutes les listes : titre, jeu, pseudo…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          {searchInput && (
+            <button
+              type="button"
+              className="lists-search-clear clickable"
+              onClick={() => setSearchInput("")}
+              aria-label="Effacer"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
         <button className="btn btn-primary" onClick={() => setCreating(true)}>
           <Plus size={18} /> Créer
         </button>
       </header>
-
-      {/* La recherche globale : au-dessus des onglets, parce qu'elle ne dépend
-          d'aucun d'eux. */}
-      <div className="lists-search lists-search-global">
-        <Search size={17} className="lists-search-icon" />
-        <input
-          type="text"
-          placeholder="Chercher dans toutes les listes : titre, jeu, pseudo…"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        {searchInput && (
-          <button
-            type="button"
-            className="lists-search-clear clickable"
-            onClick={() => setSearchInput("")}
-            aria-label="Effacer"
-          >
-            <X size={15} />
-          </button>
-        )}
-      </div>
 
       <div className="lists-tabs">
         {SCOPES.map((s) => (

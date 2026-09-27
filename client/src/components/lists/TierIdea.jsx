@@ -7,11 +7,11 @@ import { DEFAULT_TIERS } from "../../lib/lists";
 // ======================================================================
 //  Une tier list à faire : « Tier list des jeux Pokémon »
 // ======================================================================
-// Ça ne doit PAS ressembler à une liste qui existe : contour pointillé, pas
-// de fond d'image, des paliers vides et, en dessous, les jaquettes du joueur
-// « à ranger ». Un bouton « Créer » dit que c'est à faire. Un clic crée la
-// tier list avec les jeux de la saga que le joueur a joués, et l'ouvre en
-// édition — il ne reste qu'à ranger (cf. GET /lists/suggest/tiers).
+// Ça ne doit PAS ressembler à une liste qui existe : contour pointillé doré,
+// un grand « + » au centre, et derrière, très pâles, des paliers vides et
+// trois jaquettes de la saga. Un clic crée la tier list avec les jeux de la
+// saga (les siens d'abord, puis le reste — cf. GET /lists/suggest/tiers) et
+// l'ouvre en édition : il ne reste qu'à ranger.
 export default function TierIdea({ idea, token }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -44,12 +44,15 @@ export default function TierIdea({ idea, token }) {
     }
   }
 
-  const pool = idea.games.filter((g) => g.cover).slice(0, 5);
+  // Trois jaquettes de la saga en éventail, estompées derrière le « + » : on
+  // devine de quoi on parle sans que ça ressemble à une liste déjà faite.
+  const fan = idea.games.filter((g) => g.cover).slice(0, 3);
 
   return (
     <button type="button" className="ti clickable" onClick={create} disabled={busy}>
-      <span className="ti-tiers" aria-hidden="true">
-        {DEFAULT_TIERS.slice(0, 3).map((t) => (
+      {/* Le fond : des paliers vides (S, A, B…) et l'éventail, très pâles. */}
+      <span className="ti-ghost" aria-hidden="true">
+        {DEFAULT_TIERS.slice(0, 4).map((t) => (
           <span className="ti-row" key={t.id}>
             <span className="ti-label" style={{ "--tier": t.color }}>
               {t.label}
@@ -58,21 +61,20 @@ export default function TierIdea({ idea, token }) {
           </span>
         ))}
       </span>
-      <span className="ti-pool" aria-hidden="true">
-        {pool.map((g) => (
-          <img key={g.gameId} src={g.cover} alt="" loading="lazy" draggable="false" />
-        ))}
-        {idea.count > pool.length && <span className="ti-more">+{idea.count - pool.length}</span>}
-      </span>
-      <span className="ti-foot">
-        <span className="ti-text">
-          <span className="ti-title">{idea.saga}</span>
-          <span className="ti-sub">{idea.count} jeux à classer</span>
+      {fan.length > 0 && (
+        <span className="ti-fan" aria-hidden="true">
+          {fan.map((g, i) => (
+            <img key={g.gameId} src={g.cover} alt="" loading="lazy" draggable="false" style={{ "--i": i }} />
+          ))}
         </span>
-        <span className="ti-cta">
-          {busy ? <Loader2 size={14} className="spin" /> : <Plus size={14} strokeWidth={3} />}
-          Créer
+      )}
+
+      <span className="ti-center">
+        <span className="ti-plus">
+          {busy ? <Loader2 size={24} className="spin" /> : <Plus size={28} strokeWidth={2.8} />}
         </span>
+        <span className="ti-title">Tier list {idea.saga}</span>
+        <span className="ti-sub">{idea.count} jeux à classer</span>
       </span>
     </button>
   );

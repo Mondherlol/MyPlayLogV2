@@ -763,6 +763,11 @@
   overflow-y: hidden;
   min-height: 96px;
   scroll-snap-type: x proximity;
+  /* ⚠️ L'ACCROCHE TIENT COMPTE DU PADDING. Sans ça, la première carte
+     s'accrochait au bord de la zone de défilement : au repos, la rangée était
+     déjà décalée de 2rem (scrollLeft ≈ 32) et la flèche « vers la gauche »
+     s'affichait alors qu'on était tout au début. */
+  scroll-padding-inline: 2rem;
   /* Padding vertical généreux : laisse respirer le relief au survol des cartes
      sans qu'elles soient rognées par overflow (overflow-x force overflow-y). */
   padding: 0.5rem 2rem;
@@ -876,8 +881,17 @@
 }
 
 .ic-card.compact .ic-cover {
+  position: relative;
   aspect-ratio: 1 / 1;
   border-radius: 0;
+}
+/* ⚠️ LA JAQUETTE EST CENTRÉE DANS LE CARRÉ. Laissée dans la grille, l'image
+   (3:4) imposait sa hauteur à la rangée : le carré n'en montrait que le haut.
+   Posée en absolu, elle remplit le carré et `cover` la recadre au milieu. */
+.ic-card.compact .ic-cover img {
+  position: absolute;
+  inset: 0;
+  object-position: center;
 }
 
 .ic-card.compact .ic-actions {

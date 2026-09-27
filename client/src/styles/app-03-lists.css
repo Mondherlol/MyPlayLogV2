@@ -1165,10 +1165,22 @@
 
 /* La recherche globale, en haut de la page : toute la largeur, un cran plus
    haute que les filtres — c'est la porte d'entrée de toutes les listes. */
+/* Entre le titre et « Créer », elle prend toute la place du milieu. Sur un
+   téléphone, elle passe sous le titre, sur toute la largeur. */
 .lists-search.lists-search-global {
-  flex: none;
-  width: 100%;
-  margin: 0.2rem 0 0.9rem;
+  flex: 1 1 auto;
+  max-width: 720px;
+  margin: 0 auto;
+}
+@media (max-width: 640px) {
+  .lists-header {
+    flex-wrap: wrap;
+  }
+  .lists-search.lists-search-global {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
 }
 .lists-search-global .lists-search-icon {
   left: 0.95rem;
@@ -3021,7 +3033,10 @@
 .lt-nine {
   position: absolute;
   inset: 0;
-  display: block;
+  /* La phrase au centre de l'affiche. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 14px 16px;
   overflow: hidden;
   background: var(--surface-2);
@@ -3053,6 +3068,13 @@
 }
 .lt-nine .nine-phrase {
   position: relative;
+  align-items: center;
+  text-align: center;
+}
+.lt-nine .nine-phrase-key {
+  align-items: center;
+  margin-left: 0;
+  transform-origin: center bottom;
 }
 .lt-nine ~ .lt-caption {
   background: none;
@@ -3528,45 +3550,55 @@
 }
 
 /* Une tier list à faire (components/lists/TierIdea) : une proposition, pas une
-   liste — contour pointillé, paliers vides, jaquettes à ranger, bouton Créer. */
+   liste — cadre pointillé doré, grand « + » au centre, et derrière, très
+   pâles, des paliers vides et trois jaquettes de la saga en éventail. */
 .ti {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
+  position: relative;
+  display: grid;
+  place-items: center;
   width: 100%;
   aspect-ratio: 4 / 3;
-  padding: 0.7rem;
+  padding: 0;
+  overflow: hidden;
   border-radius: 12px;
-  border: 1.5px dashed var(--border-strong, var(--border));
-  background: transparent;
+  border: 2px dashed color-mix(in srgb, #f2b70b 55%, var(--border-strong, var(--border)));
+  background: color-mix(in srgb, #f2b70b 4%, var(--surface));
   color: var(--text);
   font: inherit;
-  text-align: left;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.2s ease;
 }
 .ti:hover {
   border-color: #f2b70b;
-  background: color-mix(in srgb, #f2b70b 5%, transparent);
+  background: color-mix(in srgb, #f2b70b 9%, var(--surface));
+  transform: translateY(-3px);
 }
-.ti-tiers {
-  flex: 1;
-  min-height: 0;
+.ti:disabled {
+  opacity: 0.8;
+}
+
+/* Les paliers vides, en filigrane sur toute la carte. */
+.ti-ghost {
+  position: absolute;
+  inset: 10px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+  opacity: 0.35;
+  pointer-events: none;
 }
 .ti-row {
   flex: 1;
   display: flex;
-  gap: 3px;
+  gap: 4px;
 }
 .ti-label {
   flex: none;
-  width: 22px;
+  width: 24px;
   display: grid;
   place-items: center;
   border-radius: 5px;
-  background: color-mix(in srgb, var(--tier) 30%, transparent);
+  background: color-mix(in srgb, var(--tier) 35%, transparent);
   color: var(--tier);
   font-family: var(--font-display);
   font-weight: 800;
@@ -3575,62 +3607,83 @@
 .ti-slot {
   flex: 1;
   border-radius: 5px;
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--border-strong, var(--border));
 }
-.ti-pool {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 44px;
-}
-.ti-pool img {
-  height: 100%;
+
+/* L'éventail, derrière le « + », qui s'ouvre au survol. */
+.ti-fan {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22%;
   aspect-ratio: 3 / 4;
-  border-radius: 4px;
+  transform: translate(-50%, -88%);
+  pointer-events: none;
+}
+.ti-fan img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  transition: transform 0.2s ease;
+  border-radius: 6px;
+  opacity: 0.85;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transform-origin: 50% 120%;
+  transform: rotate(calc((var(--i) - 1) * 16deg));
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.25s ease;
 }
-.ti:hover .ti-pool img {
-  transform: translateY(-3px);
+.ti-fan img:nth-child(2) {
+  z-index: 1;
 }
-.ti-more {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-soft);
-  padding-left: 2px;
+.ti:hover .ti-fan img {
+  opacity: 1;
+  transform: rotate(calc((var(--i) - 1) * 24deg)) translateY(-4px);
 }
-.ti-foot {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.ti-text {
-  flex: 1;
-  min-width: 0;
+
+/* Le centre : le « + » et ce qu'on va créer. */
+.ti-center {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 26%;
+  padding: 0 0.8rem;
+  max-width: 100%;
+}
+.ti-plus {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-top: -24px;
+  border-radius: 999px;
+  border: 3px solid var(--surface);
+  background: #f2b70b;
+  color: #1a1204;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.ti:hover .ti-plus {
+  transform: scale(1.08) rotate(90deg);
 }
 .ti-title {
+  max-width: 100%;
+  margin-top: 0.2rem;
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.92rem;
+  font-weight: 800;
+  font-size: 0.98rem;
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-shadow: 0 1px 8px var(--surface);
 }
 .ti-sub {
-  font-size: 0.74rem;
+  font-size: 0.76rem;
+  font-weight: 600;
   color: var(--text-soft);
 }
-.ti-cta {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 999px;
-  background: #f2b70b;
-  color: #161618;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
+
