@@ -353,6 +353,12 @@
   "year": 1997,
   "exact": true
  },
+ "American Truck Simulator": {
+  "id": 9667,
+  "name": "American Truck Simulator",
+  "year": 2016,
+  "exact": true
+ },
  "Amnesia: The Bunker": {
   "id": 228258,
   "name": "Amnesia: The Bunker",
@@ -411,6 +417,12 @@
   "id": 2687,
   "name": "Animal Crossing: New Leaf",
   "year": 2012,
+  "exact": true
+ },
+ "Animal Crossing: Wild World": {
+  "id": 2645,
+  "name": "Animal Crossing: Wild World",
+  "year": 2005,
   "exact": true
  },
  "Animal Crossing: Wild World #20": {
@@ -531,6 +543,12 @@
   "id": 123395,
   "name": "Arknights",
   "year": 2019,
+  "exact": true
+ },
+ "Arma 3": {
+  "id": 1881,
+  "name": "Arma 3",
+  "year": 2013,
   "exact": true
  },
  "Armello": {
@@ -681,6 +699,12 @@
   "id": 537,
   "name": "Assassin's Creed Revelations",
   "year": 2011,
+  "exact": true
+ },
+ "Assetto Corsa Competizione": {
+  "id": 89444,
+  "name": "Assetto Corsa Competizione",
+  "year": 2019,
   "exact": true
  },
  "Astal #32": {
@@ -1251,6 +1275,12 @@
   "id": 228528,
   "name": "Bayonetta Origins: Cereza and the Lost Demon",
   "year": 2023,
+  "exact": true
+ },
+ "BeamNG.drive": {
+  "id": 17131,
+  "name": "BeamNG.drive",
+  "year": 2015,
   "exact": true
  },
  "Beat Saber": {
@@ -1997,6 +2027,12 @@
   "year": 2001,
   "exact": true
  },
+ "Car Mechanic Simulator 2021": {
+  "id": 152604,
+  "name": "Car Mechanic Simulator 2021",
+  "year": 2018,
+  "exact": true
+ },
  "Carcassonne": {
   "id": 75582,
   "name": "Carcassonne",
@@ -2457,6 +2493,12 @@
   "id": 6347,
   "name": "ChuChu Rocket!",
   "year": 1999,
+  "exact": true
+ },
+ "Cities: Skylines": {
+  "id": 9066,
+  "name": "Cities: Skylines",
+  "year": 2015,
   "exact": true
  },
  "Citizen Sleeper": {
@@ -3285,6 +3327,12 @@
   "id": 177619,
   "name": "Daytona USA",
   "year": 1995,
+  "exact": true
+ },
+ "DCS World": {
+  "id": 3769,
+  "name": "DCS World",
+  "year": 2008,
   "exact": true
  },
  "de Blob #5": {
@@ -5159,6 +5207,12 @@
   "year": 2013,
   "exact": true
  },
+ "Euro Truck Simulator 2": {
+  "id": 3070,
+  "name": "Euro Truck Simulator 2",
+  "year": 2012,
+  "exact": true
+ },
  "Europa Universalis IV #6": {
   "id": 1904,
   "name": "Europa Universalis IV",
@@ -5475,6 +5529,18 @@
   "id": 6801,
   "name": "Far Cry 4",
   "year": 2014,
+  "exact": true
+ },
+ "Farming Simulator 22": {
+  "id": 146112,
+  "name": "Farming Simulator 22",
+  "year": 2021,
+  "exact": true
+ },
+ "Farming Simulator 25": {
+  "id": 306822,
+  "name": "Farming Simulator 25",
+  "year": 2024,
   "exact": true
  },
  "Fatal Frame #8": {
@@ -6159,6 +6225,12 @@
   "id": 1354,
   "name": "Flower",
   "year": 2009,
+  "exact": true
+ },
+ "Football Manager 2024": {
+  "id": 266382,
+  "name": "Football Manager 2024",
+  "year": 2023,
   "exact": true
  },
  "Fortnite": {
@@ -7805,6 +7877,12 @@
   "year": 2012,
   "exact": true
  },
+ "House Flipper": {
+  "id": 27744,
+  "name": "House Flipper",
+  "year": 2018,
+  "exact": true
+ },
  "Human Resource Machine": {
   "id": 14545,
   "name": "Human Resource Machine",
@@ -8063,6 +8141,18 @@
   "year": 2015,
   "exact": true
  },
+ "inZOI": {
+  "id": 279051,
+  "name": "Inzoi",
+  "year": 2025,
+  "exact": true
+ },
+ "iRacing": {
+  "id": 8204,
+  "name": "iRacing",
+  "year": 2008,
+  "exact": true
+ },
  "Iron Lung": {
   "id": 190361,
   "name": "Iron Lung",
@@ -8283,6 +8373,12 @@
   "id": 40263,
   "name": "Jump Ultimate Stars",
   "year": 2006,
+  "exact": true
+ },
+ "Jurassic World Evolution 2": {
+  "id": 152064,
+  "name": "Jurassic World Evolution 2",
+  "year": 2021,
   "exact": true
  },
  "Just Cause 2": {
@@ -8895,6 +8991,12 @@
   "id": 22958,
   "name": "Last Window: The Secret of Cape West",
   "year": 2010,
+  "exact": true
+ },
+ "Lawn Mowing Simulator": {
+  "id": 145134,
+  "name": "Lawn Mowing Simulator",
+  "year": 2021,
   "exact": true
  },
  "Layers of Fear @2016": {
@@ -10661,6 +10763,12 @@
   "year": 2020,
   "exact": true
  },
+ "Microsoft Flight Simulator 2024": {
+  "id": 252830,
+  "name": "Microsoft Flight Simulator 2024",
+  "year": 2024,
+  "exact": true
+ },
  "Middle-earth: Shadow of Mordor": {
   "id": 3025,
   "name": "Middle-earth: Shadow of Mordor",
@@ -11265,6 +11373,12 @@
   "id": 140427,
   "name": "My Time at Sandrock",
   "year": 2023,
+  "exact": true
+ },
+ "MySims": {
+  "id": 2689,
+  "name": "MySims",
+  "year": 2007,
   "exact": true
  },
  "Myst": {
@@ -12281,6 +12395,12 @@
   "year": 2020,
   "exact": true
  },
+ "Paralives": {
+  "id": 126547,
+  "name": "Paralives",
+  "year": 2026,
+  "exact": true
+ },
  "Paranormasight: The Seven Mysteries of Honjo": {
   "id": 236694,
   "name": "Paranormasight: The Seven Mysteries of Honjo",
@@ -12381,6 +12501,12 @@
   "id": 133227,
   "name": "Patrick's Parabox",
   "year": 2022,
+  "exact": true
+ },
+ "PC Building Simulator": {
+  "id": 27792,
+  "name": "PC Building Simulator",
+  "year": 2019,
   "exact": true
  },
  "Peglin": {
@@ -12803,6 +12929,12 @@
   "year": 1999,
   "exact": true
  },
+ "Planet Coaster": {
+  "id": 18829,
+  "name": "Planet Coaster",
+  "year": 2016,
+  "exact": true
+ },
  "Planet of Lana": {
   "id": 152071,
   "name": "Planet of Lana",
@@ -12813,6 +12945,12 @@
   "id": 23093,
   "name": "Planet Puzzle League",
   "year": 2007,
+  "exact": true
+ },
+ "Planet Zoo": {
+  "id": 117717,
+  "name": "Planet Zoo",
+  "year": 2019,
   "exact": true
  },
  "Planetarian: The Reverie of a Little Planet": {
@@ -13269,6 +13407,12 @@
   "id": 13106,
   "name": "Power Stone 2",
   "year": 2000,
+  "exact": true
+ },
+ "PowerWash Simulator": {
+  "id": 138590,
+  "name": "PowerWash Simulator",
+  "year": 2022,
   "exact": true
  },
  "Prey": {
@@ -14429,12 +14573,6 @@
   "year": 2019,
   "exact": true
  },
- "Rise of the Golden Idol": {
-  "id": 279614,
-  "name": "The Rise of the Golden Idol",
-  "year": 2024,
-  "exact": false
- },
  "Rise of the Ronin": {
   "id": 217594,
   "name": "Rise of the Ronin",
@@ -14661,6 +14799,12 @@
   "id": 8332,
   "name": "Rollcage",
   "year": 1999,
+  "exact": true
+ },
+ "RollerCoaster Tycoon 2": {
+  "id": 331,
+  "name": "RollerCoaster Tycoon 2",
+  "year": 2002,
   "exact": true
  },
  "RollerCoaster Tycoon 2 #6": {
@@ -15527,6 +15671,12 @@
   "year": 1991,
   "exact": true
  },
+ "SimCity 4": {
+  "id": 1275,
+  "name": "SimCity 4",
+  "year": 2003,
+  "exact": true
+ },
  "SimCity 4 #6": {
   "id": 1275,
   "name": "SimCity 4",
@@ -15723,6 +15873,12 @@
   "id": 26774,
   "name": "Snipperclips: Cut It Out, Together!",
   "year": 2017,
+  "exact": true
+ },
+ "SnowRunner": {
+  "id": 107215,
+  "name": "SnowRunner",
+  "year": 2020,
   "exact": true
  },
  "Solar Ash": {
@@ -17597,6 +17753,12 @@
   "year": 2019,
   "exact": true
  },
+ "Supermarket Simulator": {
+  "id": 274920,
+  "name": "Supermarket Simulator",
+  "year": 2025,
+  "exact": true
+ },
  "Surgeon Simulator": {
   "id": 2974,
   "name": "Surgeon Simulator 2013",
@@ -18425,12 +18587,6 @@
   "year": 2017,
   "exact": true
  },
- "The Great Ace Attorney Chronicles": {
-  "id": 146075,
-  "name": "The Great Ace Attorney Chronicles",
-  "year": 2021,
-  "exact": true
- },
  "The Great Ace Attorney: Adventures": {
   "id": 76244,
   "name": "The Great Ace Attorney: Adventures",
@@ -18965,6 +19121,12 @@
   "year": 2022,
   "exact": true
  },
+ "The Movies": {
+  "id": 2995,
+  "name": "The Movies",
+  "year": 2005,
+  "exact": true
+ },
  "The Orange Box #12": {
   "id": 339,
   "name": "The Orange Box",
@@ -19055,10 +19217,52 @@
   "year": 2003,
   "exact": true
  },
+ "The Sims @2000": {
+  "id": 223,
+  "name": "The Sims",
+  "year": 2000,
+  "exact": true
+ },
+ "The Sims 2": {
+  "id": 224,
+  "name": "The Sims 2",
+  "year": 2004,
+  "exact": true
+ },
  "The Sims 2 #6": {
   "id": 224,
   "name": "The Sims 2",
   "year": 2004,
+  "exact": true
+ },
+ "The Sims 2: Castaway": {
+  "id": 5156,
+  "name": "The Sims 2: Castaway",
+  "year": 2007,
+  "exact": true
+ },
+ "The Sims 3": {
+  "id": 260,
+  "name": "The Sims 3",
+  "year": 2009,
+  "exact": true
+ },
+ "The Sims 4": {
+  "id": 3212,
+  "name": "The Sims 4",
+  "year": 2014,
+  "exact": true
+ },
+ "The Sims Bustin' Out": {
+  "id": 4151,
+  "name": "The Sims Bustin' Out",
+  "year": 2003,
+  "exact": true
+ },
+ "The Sims Medieval": {
+  "id": 10632,
+  "name": "The Sims Medieval",
+  "year": 2011,
   "exact": true
  },
  "The Sinking City": {
@@ -19113,6 +19317,12 @@
   "id": 8352,
   "name": "The Unfinished Swan",
   "year": 2012,
+  "exact": true
+ },
+ "The Urbz: Sims in the City": {
+  "id": 2158,
+  "name": "The Urbz: Sims in the City",
+  "year": 2004,
   "exact": true
  },
  "The Walking Dead": {
@@ -19841,6 +20051,12 @@
   "year": 2017,
   "exact": true
  },
+ "Train Sim World 4": {
+  "id": 262582,
+  "name": "Train Sim World 4",
+  "year": 2023,
+  "exact": true
+ },
  "Transistor": {
   "id": 3022,
   "name": "Transistor",
@@ -19941,6 +20157,12 @@
   "id": 4696,
   "name": "Twisted Metal 2",
   "year": 1996,
+  "exact": true
+ },
+ "Two Point Hospital": {
+  "id": 82117,
+  "name": "Two Point Hospital",
+  "year": 2018,
   "exact": true
  },
  "Tyranny": {
@@ -20421,6 +20643,12 @@
   "id": 18020,
   "name": "Visage",
   "year": 2020,
+  "exact": true
+ },
+ "Viscera Cleanup Detail": {
+  "id": 6009,
+  "name": "Viscera Cleanup Detail",
+  "year": 2015,
   "exact": true
  },
  "Visions of Mana": {

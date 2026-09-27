@@ -137,7 +137,9 @@ async function purgeLegacyTrivia({ dryRun }) {
 // Phrase de bilan commune aux deux publications de listes officielles.
 function publishSummary(s, noun, dryRun) {
   return (
-    `${s.created} ${noun} créé(s), ${s.updated} mis à jour, ${s.skipped} inchangé(s) — ` +
+    `${s.created} ${noun} créé(s), ${s.updated} mis à jour, ${s.skipped} inchangé(s)` +
+    (s.removed ? `, ${s.removed} retiré(s)` : "") +
+    ` — ` +
     `${s.games} jeux au total` +
     (dryRun ? " (simulation : rien n'a été écrit)." : ".")
   );
@@ -150,7 +152,8 @@ export const SCRIPTS = [
     description:
       "Crée ou met à jour les listes classées du compte MyPlayLog (Top 100 Switch, " +
       "meilleurs JRPG, tous les Zelda classés…) à partir de server/src/data/officialLists. " +
-      "Les likes et commentaires sont conservés ; une liste inchangée n'est pas touchée.",
+      "Les likes et commentaires sont conservés ; une liste inchangée n'est pas touchée. " +
+      "Un top retiré des définitions (fusionné, supprimé) est retiré du site.",
     run: async ({ dryRun }) => {
       const log = [];
       const s = await publishOfficialTops({ dryRun, log: (l) => log.push(l) });

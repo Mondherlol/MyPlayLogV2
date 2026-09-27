@@ -22,35 +22,29 @@
 // la palette par défaut et l'éventail : il reste présentable.
 
 const ART = new Set([
-  "top-3ds", "top-assassins-creed", "top-atelier", "top-castlevania", "top-crash",
-  "top-danganronpa", "top-devil-may-cry", "top-donkey-kong", "top-dragon-ball",
-  "top-dragon-quest", "top-dreamcast", "top-ds", "top-fallout", "top-final-fantasy",
-  "top-fire-emblem", "top-gameboy", "top-gamecube", "top-gba", "top-god-of-war", "top-gta",
-  "top-halo", "top-kingdom-hearts", "top-kirby", "top-mario", "top-mega-man",
+  "top-3ds", "top-ace-attorney", "top-assassins-creed", "top-atelier", "top-castlevania",
+  "top-crash", "top-danganronpa", "top-devil-may-cry", "top-donkey-kong",
+  "top-dragon-ball", "top-dragon-quest", "top-dreamcast", "top-ds", "top-elder-scrolls",
+  "top-fallout", "top-final-fantasy", "top-fire-emblem", "top-fromsoftware", "top-gacha",
+  "top-gameboy", "top-gamecube", "top-gba", "top-god-of-war", "top-gta", "top-halo",
+  "top-kingdom-hearts", "top-kirby", "top-mana", "top-mario", "top-mega-man",
   "top-megadrive", "top-metal-gear", "top-metal-slug", "top-metroid", "top-monster-hunter",
   "top-mortal-kombat", "top-n64", "top-nes", "top-persona", "top-pokemon",
   "top-professor-layton", "top-ps1", "top-ps2", "top-ps3", "top-ps4", "top-ps5", "top-psp",
   "top-ratchet", "top-resident-evil", "top-saturn", "top-silent-hill", "top-smt",
   "top-snes", "top-sonic", "top-star-wars", "top-street-fighter", "top-suikoden",
-  "top-switch", "top-tekken", "top-tomb-raider", "top-touhou", "top-trails",
-  "top-uncharted", "top-vita", "top-wii", "top-wiiu", "top-xbox", "top-xbox360",
-  "top-xeno", "top-yakuza", "top-ys", "top-zelda",
+  "top-switch", "top-tales-of", "top-tekken", "top-tomb-raider", "top-touhou",
+  "top-trails", "top-uncharted", "top-vita", "top-wii", "top-wiiu", "top-xbox",
+  "top-xbox360", "top-xeno", "top-yakuza", "top-ys", "top-zelda",
 ]);
 
-// Une icône (SVG) plutôt qu'un personnage : les thèmes, les genres, et les
-// sagas sans héros détourable (FromSoftware, Tales of, Elder Scrolls…).
+// Une icône (SVG) plutôt qu'un personnage — SEULEMENT pour la courte liste
+// retenue (enquête, drôles, espace…). Ailleurs, pas d'emoji : un visuel
+// détouré, ou à défaut l'éventail de jaquettes.
 const ICONS = new Set([
-  "top-ace-attorney", "top-ace-attorney-like", "top-action-rpg", "top-art", "top-beatemup",
-  "top-board", "top-character-action", "top-couch-coop", "top-cozy", "top-crpg",
-  "top-detective", "top-elder-scrolls", "top-emotional", "top-escape", "top-fighting",
-  "top-fps", "top-free-to-play", "top-fromsoftware", "top-funny", "top-gacha", "top-hard",
-  "top-immersive-sim", "top-indie", "top-jrpg", "top-mana", "top-manga-anime",
-  "top-mario-rpg", "top-metroidvania", "top-monster-collecting", "top-monster-hunting",
-  "top-mystery-dungeon", "top-narrative", "top-open-world", "top-pc", "top-persona-like",
-  "top-platformer", "top-point-and-click", "top-postapo", "top-puzzle", "top-racing",
-  "top-remakes", "top-rhythm", "top-roguelike", "top-scary", "top-shmup", "top-short",
-  "top-soulslike", "top-soundtrack", "top-space", "top-stealth", "top-survival-horror",
-  "top-tactical-rpg", "top-tales-of", "top-visual-novel", "top-zelda-like",
+  "top-art", "top-beatemup", "top-board", "top-detective", "top-fighting", "top-funny",
+  "top-hard", "top-monster-collecting", "top-postapo", "top-remakes", "top-scary",
+  "top-short", "top-soundtrack", "top-space", "top-stealth", "top-visual-novel",
 ]);
 
 // Un aplat par top : la couleur de la console ou celle qu'on associe à la
@@ -163,7 +157,6 @@ const COLORS = {
   "top-mystery-dungeon": "#7048e8",
   "top-manga-anime": "#f03e3e",
   "top-persona-like": "#c2255c",
-  "top-ace-attorney-like": "#1864ab",
   "top-point-and-click": "#2f9e44",
   "top-tactical-rpg": "#495057",
   "top-monster-hunting": "#a16207",
@@ -181,7 +174,14 @@ const COLORS = {
   "top-immersive-sim": "#3b5bdb",
   "top-action-rpg": "#9c36b5",
   "top-character-action": "#e8590c",
+  "top-sims-like": "#37b24d",
+  "top-simulators": "#1c7ed6",
 };
+
+// Les images coupées net en bas (un buste, un personnage sans ses pieds) :
+// posées sur le bord bas de la carte, la coupe s'y confond. Centrées comme les
+// autres, elles flottaient avec une tranche bien droite sous elles.
+const BLEED = new Set(["top-elder-scrolls", "top-fromsoftware", "top-mortal-kombat", "top-star-wars"]);
 
 // Les tops sans couleur attitrée (les genres, surtout) : une teinte de cette
 // palette, toujours la même pour un même top.
@@ -204,6 +204,7 @@ export function topTheme(key) {
     color: COLORS[k] || FALLBACK[hash(k) % FALLBACK.length],
     art: icon ? `/tops/${k}.svg` : ART.has(k) ? `/tops/${k}.webp` : null,
     icon,
+    bleed: BLEED.has(k),
   };
 }
 

@@ -156,51 +156,6 @@ Ever Oasis
 `,
   },
   {
-    key: "top-ace-attorney-like",
-    group: "genre",
-    title: "Top {n} des meilleurs Ace Attorney-like & jeux d'enquête",
-    size: 25,
-    tags: ["Ace Attorney-like", "Enquête", "Narratif"],
-    games: `
-Phoenix Wright: Ace Attorney - Trials and Tribulations
-Phoenix Wright: Ace Attorney
-The Great Ace Attorney Chronicles
-Ghost Trick: Phantom Detective
-Phoenix Wright: Ace Attorney - Justice for All
-Ace Attorney Investigations 2: Prosecutor's Gambit
-Phoenix Wright: Ace Attorney - Spirit of Justice
-Apollo Justice: Ace Attorney
-Phoenix Wright: Ace Attorney - Dual Destinies
-Ace Attorney Investigations: Miles Edgeworth
-Professor Layton vs. Phoenix Wright: Ace Attorney
-Danganronpa 2: Goodbye Despair
-Danganronpa: Trigger Happy Havoc
-Danganronpa V3: Killing Harmony
-AI: The Somnium Files
-Master Detective Archives: Rain Code
-Paranormasight: The Seven Mysteries of Honjo
-Famicom Detective Club: The Missing Heir
-Famicom Detective Club: Emio - The Smiling Man
-Return of the Obra Dinn
-The Case of the Golden Idol
-Rise of the Golden Idol
-Her Story
-Disco Elysium
-L.A. Noire
-Hotel Dusk: Room 215
-Tangle Tower
-Aviary Attorney
-Pentiment
-Duck Detective: The Secret Salami
-Shadows of Doubt
-Chaos;Head Noah
-Unheard
-Overboard!
-Paradise Killer
-Murder by Numbers
-`,
-  },
-  {
     key: "top-point-and-click",
     group: "genre",
     title: "Top {n} des meilleurs point & click et jeux d'aventure",

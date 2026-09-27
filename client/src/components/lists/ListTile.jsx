@@ -148,7 +148,7 @@ function NinePoster({ list }) {
  *
  * Rend la boîte en % de la carte (4:3), prête pour `style`.
  */
-function artBox(ratio, icon) {
+function artBox(ratio, icon, bleed = false) {
   const H = 0.75; // hauteur de la carte, en largeurs
   const area = icon ? 0.13 : 0.3;
   let h = Math.sqrt(area / ratio);
@@ -159,7 +159,8 @@ function artBox(ratio, icon) {
   // Le centre : les trois quarts de la largeur, sans déborder de plus de 5 %
   // à droite ; à mi-hauteur (un peu plus bas pour ce qui est tout en largeur).
   const cx = Math.min(0.73, 1.05 - w / 2);
-  const cy = (ratio > 1.3 ? 0.6 : 0.53) * H;
+  // Une image coupée net en bas se pose SUR le bord bas (cf. topThemes BLEED).
+  const cy = bleed ? H - h / 2 + 0.005 : (ratio > 1.3 ? 0.6 : 0.53) * H;
   return {
     width: `${w * 100}%`,
     height: `${(h / H) * 100}%`,
@@ -169,7 +170,7 @@ function artBox(ratio, icon) {
 }
 
 /** Le visuel d'un top : mesuré au chargement, puis placé par `artBox`. */
-function TopArt({ src, icon }) {
+function TopArt({ src, icon, bleed }) {
   // Une icône de thème est carrée : inutile d'attendre de la mesurer.
   const [ratio, setRatio] = useState(icon ? 1 : null);
   return (
@@ -179,7 +180,7 @@ function TopArt({ src, icon }) {
       alt=""
       loading="lazy"
       draggable="false"
-      style={ratio ? artBox(ratio, icon) : { opacity: 0 }}
+      style={ratio ? artBox(ratio, icon, bleed) : { opacity: 0 }}
       onLoad={(e) => {
         const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
         if (!icon && w && h) setRatio(w / h);
@@ -224,7 +225,7 @@ function TopPoster({ list }) {
       )}
       <span className="lt-top-dots" aria-hidden="true" />
       {art ? (
-        <TopArt src={art} icon={icon} />
+        <TopArt src={art} icon={icon} bleed={!list.cover && theme.bleed} />
       ) : (
         fan.length > 0 && (
           <span className="lt-top-fan" aria-hidden="true">
@@ -285,6 +286,25 @@ function BoardId({ list }) {
             <span key={s.key} />
           )
         )}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * La carte en attente : même cadre 4:3 que la vraie (elle prend exactement sa
+ * place à l'arrivée, rien ne saute), le bandeau du titre en deux barres.
+ * Le reflet est celui des squelettes de l'accueil (`.mh-skel`).
+ */
+export function ListTileSkeleton() {
+  return (
+    <span className="lt lt-skel" aria-hidden="true">
+      <span className="lt-media">
+        <span className="lt-skel-img mh-skel" />
+        <span className="lt-skel-cap">
+          <span className="mh-skel" style={{ width: "72%", height: 12 }} />
+          <span className="mh-skel" style={{ width: "38%", height: 9 }} />
+        </span>
       </span>
     </span>
   );

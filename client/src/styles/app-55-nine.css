@@ -214,14 +214,13 @@
   transform: none;
 }
 
-/* L'emoji du thème, qui flotte au centre du pied de la carte. */
+/* L'emoji du thème, au centre du pied de la carte. */
 .nine-card-emoji {
   position: relative;
   align-self: center;
   margin: auto 0 6px;
   width: 38px;
   height: 38px;
-  animation: nine-float 3.2s ease-in-out infinite;
   filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.22));
   pointer-events: none;
 }
@@ -230,8 +229,9 @@
   height: 100%;
   display: block;
 }
+/* Immobile au repos : il ne flotte que sous la souris. */
 .nine-card:hover .nine-card-emoji {
-  animation-duration: 1.6s;
+  animation: nine-float 1.8s ease-in-out infinite;
 }
 @keyframes nine-float {
   0%,

@@ -829,4 +829,71 @@ Puzzle & Dragons
 Summoners War
 `,
   },
+  {
+    key: "top-sims-like",
+    group: "theme",
+    title: "Top {n} des meilleurs Sims-like",
+    size: 20,
+    tags: ["Sims-like", "Simulation de vie", "Thème"],
+    games: `
+The Sims 2
+The Sims 3
+The Sims @2000
+The Sims 4
+Animal Crossing: New Horizons
+Tomodachi Life
+Animal Crossing: New Leaf
+The Sims Medieval
+MySims
+inZOI
+Animal Crossing: Wild World
+Disney Dreamlight Valley
+The Urbz: Sims in the City
+The Sims Bustin' Out
+The Sims 2: Castaway
+Paralives
+The Movies
+`,
+  },
+  {
+    key: "top-simulators",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de simulation",
+    size: 40,
+    tags: ["Simulation", "Thème"],
+    games: `
+Microsoft Flight Simulator @2020
+Euro Truck Simulator 2
+Kerbal Space Program
+DCS World
+Cities: Skylines
+Assetto Corsa Competizione
+PowerWash Simulator
+BeamNG.drive
+iRacing
+American Truck Simulator
+Football Manager 2024
+SimCity 4
+Planet Coaster
+RollerCoaster Tycoon 2
+Two Point Hospital
+Farming Simulator 22
+SnowRunner
+Arma 3
+Gran Turismo 7
+House Flipper
+Car Mechanic Simulator 2021
+Planet Zoo
+Hardspace: Shipbreaker
+Microsoft Flight Simulator 2024
+Farming Simulator 25
+Train Sim World 4
+Jurassic World Evolution 2
+Elite Dangerous
+Supermarket Simulator
+PC Building Simulator
+Viscera Cleanup Detail
+Lawn Mowing Simulator
+`,
+  },
 ];

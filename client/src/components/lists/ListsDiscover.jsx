@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Section from "../home/Rail";
 import NineRail from "../home/NineRail";
 import TierIdea from "./TierIdea";
+import { ListTileSkeleton } from "./ListTile";
 import { apiFetch } from "../../lib/api";
 import { apiCached, peekApi } from "../../lib/query";
 import { DEFAULT_BOARD, boardOf } from "../../lib/boards";
@@ -39,11 +40,26 @@ function useRail(path, token) {
   return lists;
 }
 
+/** Un rayon en attente : son titre et quatre cartes squelettes. */
+function SkeletonRail({ title }) {
+  return (
+    <Section title={title} className="lx-sec">
+      {Array.from({ length: 4 }, (_, i) => (
+        <div key={i} className="lx-rail-item">
+          <ListTileSkeleton />
+        </div>
+      ))}
+    </Section>
+  );
+}
+
 /** Un rayon de listes ; rien à l'écran s'il est vide. */
 function ListRail({ path, token, title, moreTo, render, lead = null, skipId = null, keep = null, order = null }) {
-  const lists = (useRail(path, token) || []).filter(
-    (l) => l.id !== skipId && (!keep || keep(l))
-  );
+  const raw = useRail(path, token);
+  // Pas encore de réponse : le rayon s'affiche déjà, avec des cartes en
+  // attente — au lieu d'apparaître d'un coup en poussant la page.
+  if (raw === null) return <SkeletonRail title={title} />;
+  const lists = raw.filter((l) => l.id !== skipId && (!keep || keep(l)));
   if (order) lists.sort(order);
   if (!lead && !lists.length) return null;
   return (

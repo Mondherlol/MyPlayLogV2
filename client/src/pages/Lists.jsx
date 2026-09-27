@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus,
-  Loader2,
   Layers,
   Search,
   X,
@@ -21,7 +20,7 @@ import {
 } from "../lib/lists";
 import CreateListModal from "../components/CreateListModal";
 import PlaylistCard from "../components/PlaylistCard";
-import ListTile from "../components/lists/ListTile";
+import ListTile, { ListTileSkeleton } from "../components/lists/ListTile";
 import ListsDiscover from "../components/lists/ListsDiscover";
 
 const SCOPES = [
@@ -330,8 +329,11 @@ export default function Lists() {
       )}
 
       {loading ? (
-        <div className="lists-loading">
-          <Loader2 size={20} className="spin" /> Chargement…
+        // Des cartes en attente plutôt qu'une roue : la page a déjà sa forme.
+        <div className="lists-grid">
+          {Array.from({ length: 12 }, (_, i) => (
+            <ListTileSkeleton key={i} />
+          ))}
         </div>
       ) : error ? (
         <div className="explorer-error card">

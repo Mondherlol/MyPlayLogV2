@@ -290,7 +290,7 @@ export async function publishOfficialTops({ dryRun = false, log = () => {} } = {
     plans.flatMap((p) => p.pairs.map(({ key }) => resolved[key]?.id).filter(Boolean))
   );
 
-  const summary = { created: 0, updated: 0, skipped: 0, games: 0 };
+  const summary = { created: 0, updated: 0, skipped: 0, removed: 0, games: 0 };
   for (const { def, order, pairs } of plans) {
     const seen = new Set();
     const items = [];
@@ -350,6 +350,17 @@ export async function publishOfficialTops({ dryRun = false, log = () => {} } = {
     summary.created += 1;
     log(`  + ${doc.title}`);
   }
+
+  // ⚠️ UN TOP RETIRÉ DES DÉFINITIONS DISPARAÎT AUSSI DU SITE. Sans ça, un
+  // top fusionné dans un autre (Ace Attorney-like → Ace Attorney) restait
+  // publié pour toujours, en doublon.
+  const keys = TOP_DEFINITIONS.map((d) => d.key);
+  const orphans = await List.find({ "official.kind": "top", "official.key": { $nin: keys } })
+    .select("title")
+    .lean();
+  for (const o of orphans) log(`  - ${o.title} (retiré des définitions)`);
+  if (orphans.length && !dryRun) await List.deleteMany({ _id: { $in: orphans.map((o) => o._id) } });
+  summary.removed = orphans.length;
 
   if (!dryRun) persistResolved(resolved);
   return summary;
