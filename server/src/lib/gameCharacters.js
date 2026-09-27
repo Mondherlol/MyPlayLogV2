@@ -132,13 +132,67 @@ const smashName = (s) =>
     // « Dresseur de Pokémon », pas « Dresseur De Pokémon ».
     .replace(/ (De|Du|Des|La|Le|Les|Et) /g, (m) => m.toLowerCase());
 
+// ⚠️ LES IMAGES NE VIENNENT PAS DU SITE DE NINTENDO. Ses vignettes sont soit
+// un gros plan du visage (`thumb_a` : un œil et une moustache sur une carte
+// en portrait), soit des bandeaux, soit le rendu complet à 1 Mo pièce. Le wiki
+// Smash a ce même rendu complet, et Fandom le sert REDIMENSIONNÉ (~300 px) :
+// le combattant en entier, léger. On garde le gros plan officiel en secours
+// quand la page du wiki n'est pas trouvée.
+const SSB_WIKI = "https://supersmashbros.fandom.com/api.php?format=json";
+
+// Les rendus du wiki, par titre de page demandé (lots de 50, redirections
+// suivies : « Mario (SSBU) » mène à « Mario (Super Smash Bros. Ultimate) »).
+async function wikiRenders(titles) {
+  const out = new Map();
+  for (let i = 0; i < titles.length; i += 50) {
+    const batch = titles.slice(i, i + 50);
+    const d = await getJson(
+      `${SSB_WIKI}&action=query&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=300` +
+        `&titles=${encodeURIComponent(batch.join("|"))}`
+    ).catch(() => null);
+    if (!d?.query) continue;
+    // Titre demandé → titre final (normalisation puis redirection).
+    const hop = new Map();
+    for (const n of d.query.normalized || []) hop.set(n.from, n.to);
+    for (const r of d.query.redirects || []) hop.set(r.from, r.to);
+    const final = (t) => {
+      let x = t;
+      for (let k = 0; k < 3 && hop.has(x); k += 1) x = hop.get(x);
+      return x;
+    };
+    const byTitle = new Map(Object.values(d.query.pages || {}).map((p) => [p.title, p]));
+    for (const t of batch) {
+      const src = byTitle.get(final(t))?.thumbnail?.source;
+      if (src) out.set(t, src);
+    }
+  }
+  return out;
+}
+
 async function smashFighters() {
   const d = await getJson(`${SMASH}/data/fighter.json`);
-  return (d?.fighters || []).map((f) => ({
+  const fighters = d?.fighters || [];
+  // Plusieurs titres possibles par combattant : « Pyra / Mythra » s'appelle
+  // « Pyra and Mythra » sur le wiki, « Steve / Alex » juste « Steve ».
+  // Les combattants arrivés en DLC n'ont pas la redirection « (SSBU) » : on
+  // demande aussi le titre long. Les Mii ont une page par style, on prend le
+  // Mii Boxeur.
+  const candidates = (f) => {
+    const en = smashName(f.displayName?.en_US || f.displayNameEn);
+    const names = /^mii/i.test(en)
+      ? ["Mii Brawler"]
+      : [en, en.replace(/\s*\/\s*/g, "/"), en.replace(/\s*\/\s*/g, " and "), en.split("/")[0].trim()];
+    return [...new Set(names)].flatMap((n) => [`${n} (SSBU)`, `${n} (Super Smash Bros. Ultimate)`]);
+  };
+  const renders = await wikiRenders([...new Set(fighters.flatMap(candidates))]).catch(() => new Map());
+
+  return fighters.map((f) => ({
     key: f.file,
     name: smashName(f.displayName?.fr_FR || f.displayNameEn),
-    // `thumb_a` : le visage, cadré serré — lisible en petite vignette.
-    image: `${SMASH}/img/fighter/thumb_a/${f.file}.png`,
+    image:
+      candidates(f)
+        .map((t) => renders.get(t))
+        .find(Boolean) || `${SMASH}/img/fighter/thumb_a/${f.file}.png`,
   }));
 }
 

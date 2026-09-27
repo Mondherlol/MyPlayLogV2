@@ -853,7 +853,7 @@ export default function ListDetail() {
         {list.cover && (
           <div className="ld-cover">
             <img src={list.cover} alt="" draggable="false" />
-            {(editable || adminCover) && (
+            {adminCover && (
               <div className="ld-cover-actions">
                 <button
                   type="button"
@@ -892,44 +892,18 @@ export default function ListDetail() {
             ) : (
               <h1 className="ld-title">{list.title}</h1>
             )}
-            {editable ? (
-              <div className="ld-typeswitch" role="group" aria-label="Type de liste">
-                {GAME_LIST_TYPES.map((t) => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    className={`ld-type-opt clickable ${list.type === t.value ? "active" : ""}`}
-                    onClick={() => changeType(t.value)}
-                    title={t.desc}
-                  >
-                    <t.Icon size={13} /> {t.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <span className={`list-type-badge t-${list.type}`}>
-                <meta.Icon size={13} /> {meta.long}
-              </span>
-            )}
+            <span className={`list-type-badge t-${list.type}`}>
+              <meta.Icon size={13} /> {meta.long}
+            </span>
           </div>
 
-          {editable ? (
-            <textarea
-              className="ld-desc-input"
-              value={list.description}
-              maxLength={2000}
-              rows={2}
-              placeholder="Ajoute une description…"
-              onChange={(e) => patchList({ description: e.target.value })}
-            />
-          ) : (
-            list.description && <p className="ld-desc">{list.description}</p>
-          )}
+          {/* ⚠️ EN ÉDITION AUSSI, L'EN-TÊTE RESTE EN LECTURE. Le sélecteur de
+              type, la zone de description et l'éditeur de tags doublaient sa
+              hauteur : tout ça vit maintenant dans la fenêtre « Réglages »
+              (cf. ListSettingsSheet), et seul le titre s'édite sur place. */}
+          {list.description && <p className="ld-desc">{list.description}</p>}
 
-          {editable ? (
-            <TagEditor tags={list.tags || []} onChange={(tags) => patchList({ tags })} />
-          ) : (
-            list.tags?.length > 0 && (
+          {list.tags?.length > 0 && (
               <div className="ld-tags">
                 {list.tags.map((t) => (
                   <Link
@@ -944,7 +918,6 @@ export default function ListDetail() {
                   </Link>
                 ))}
               </div>
-            )
           )}
 
           <div className="ld-meta">
@@ -1058,42 +1031,12 @@ export default function ListDetail() {
           )}
           {editable && (
             <>
-              {!list.cover && !list.draft && (
-                <button
-                  className="ld-vis clickable"
-                  onClick={() => coverInputRef.current?.click()}
-                  disabled={coverBusy}
-                  title="Ajouter une couverture"
-                >
-                  {coverBusy ? (
-                    <Loader2 size={16} className="spin" />
-                  ) : (
-                    <ImagePlus size={16} />
-                  )}
-                  Couverture
-                </button>
-              )}
               <button
                 className="ld-vis clickable"
-                onClick={() =>
-                  patchList({
-                    visibility: list.visibility === "public" ? "private" : "public",
-                  })
-                }
-                title="Changer la visibilité"
+                onClick={() => setSettingsOpen(true)}
+                title="Type, description, tags, couverture, visibilité…"
               >
-                {list.visibility === "public" ? (
-                  <><Globe size={16} /> Publique</>
-                ) : (
-                  <><Lock size={16} /> Privée</>
-                )}
-              </button>
-              <button
-                className="ld-del clickable"
-                onClick={deleteList}
-                title={list.draft ? "Abandonner cette tier list" : "Supprimer"}
-              >
-                <Trash2 size={16} />
+                <SlidersHorizontal size={16} /> Réglages
               </button>
               {!list.draft && (
                 <button
@@ -1747,26 +1690,28 @@ function PoolZone({
 
       {!collapsed && (
         <div className="tier-pool-scroll-wrap">
-          {scrollState.left && (
-            <button
-              type="button"
-              className="tier-pool-arrow tier-pool-arrow-left"
-              onClick={() => scrollByCards(-1)}
-              aria-label="Faire défiler vers la gauche"
-            >
-              <ArrowLeft size={15} />
-            </button>
-          )}
-          {scrollState.right && (
-            <button
-              type="button"
-              className="tier-pool-arrow tier-pool-arrow-right"
-              onClick={() => scrollByCards(1)}
-              aria-label="Faire défiler vers la droite"
-            >
-              <ArrowLeft size={15} />
-            </button>
-          )}
+          {/* ⚠️ LES FLÈCHES SONT À CÔTÉ DE LA RANGÉE, PAS DESSUS. Posées sur
+              les cartes, un clic un peu à côté saisissait le perso dessous.
+              Toujours présentes (grisées en bout de course) : la rangée ne
+              change pas de largeur, rien ne bouge sous le pointeur. */}
+          <button
+            type="button"
+            className="tier-pool-arrow tier-pool-arrow-left"
+            onClick={() => scrollByCards(-1)}
+            disabled={!scrollState.left}
+            aria-label="Faire défiler vers la gauche"
+          >
+            <ArrowLeft size={17} />
+          </button>
+          <button
+            type="button"
+            className="tier-pool-arrow tier-pool-arrow-right"
+            onClick={() => scrollByCards(1)}
+            disabled={!scrollState.right}
+            aria-label="Faire défiler vers la droite"
+          >
+            <ArrowLeft size={17} />
+          </button>
 
           <SortableContext items={visibleItems.map((i) => i.key)} strategy={horizontalListSortingStrategy}>
             <div

@@ -32,6 +32,9 @@ import {
 const PAGE_SIZE = 24;
 
 const SORT_OPTIONS = [
+  // « Tendances » : ce dont on parle aujourd'hui (cf. server lib/trending) ;
+  // « Popularité » reste là pour le classement de tous les temps.
+  { value: "trending", label: "Tendances" },
   { value: "popularity", label: "Popularité" },
   { value: "rating", label: "Note" },
   { value: "release", label: "Date de sortie" },
@@ -108,7 +111,7 @@ export default function Explorer() {
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") || "";
 
-  const [sort, setSort] = useState(() => searchParams.get("sort") || "popularity");
+  const [sort, setSort] = useState(() => searchParams.get("sort") || "trending");
   const [dir, setDir] = useState(() =>
     searchParams.get("dir") === "asc" ? "asc" : "desc"
   );
@@ -199,7 +202,7 @@ export default function Explorer() {
       (prev) => {
         const p = new URLSearchParams(prev);
         const set = (k, v) => (v ? p.set(k, v) : p.delete(k));
-        set("sort", sort !== "popularity" ? sort : "");
+        set("sort", sort !== "trending" ? sort : "");
         set("dir", dir !== "desc" ? dir : "");
         const typesChanged =
           filters.type.ids.length !== DEFAULT_TYPES.length ||
@@ -347,7 +350,7 @@ export default function Explorer() {
       theme: { ...EMPTY },
       language: { ...EMPTY },
     });
-    setSort("popularity");
+    setSort("trending");
     setDir("desc");
     setSearchInput("");
     setSearchParams(new URLSearchParams());
@@ -375,7 +378,7 @@ export default function Explorer() {
     activeCount > 0 ||
     typeChanged ||
     q ||
-    sort !== "popularity" ||
+    sort !== "trending" ||
     dir !== "desc";
 
   return (

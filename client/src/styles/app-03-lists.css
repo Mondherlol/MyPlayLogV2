@@ -4412,3 +4412,33 @@
   -webkit-user-drag: none;
   pointer-events: none;
 }
+
+/* Les flèches du vivier : de part et d'autre de la rangée, plus sur les
+   cartes (cf. PoolZone). Au doigt, elles restent masquées (≤ 899 px). */
+.tier-pool-scroll-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.tier-pool-scroll-wrap > .tier-pool-items {
+  order: 1;
+  flex: 1;
+  min-width: 0;
+}
+.tier-pool-scroll-wrap > .tier-pool-arrow {
+  position: static;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  transform: none;
+}
+.tier-pool-scroll-wrap > .tier-pool-arrow-right {
+  order: 2;
+  transform: rotate(180deg);
+}
+.tier-pool-scroll-wrap > .tier-pool-arrow:disabled {
+  opacity: 0.25;
+  filter: grayscale(1);
+  box-shadow: none;
+  cursor: default;
+}

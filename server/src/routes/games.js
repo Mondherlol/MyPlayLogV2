@@ -62,6 +62,7 @@ import { ensureGameScores } from "../lib/gameScores.js";
 // Le cache serveur d'IGDB : toutes les lectures « ce que sait IGDB du jeu X »
 // passent par ici et sont partagées par tous les visiteurs (cf. lib/gameIgdb.js).
 import { createTtlCache } from "../lib/ttlCache.js";
+import { trendingIds } from "../lib/trending.js";
 // « Vouliez-vous dire… » : IGDB ne tolère aucune faute de frappe, c'est donc
 // nous qui rattrapons (cf. lib/gameSpell.js).
 import {
@@ -181,6 +182,9 @@ const FIELDS =
 
 // Champs de tri disponibles
 const SORT_FIELDS = {
+  // « trending » ne trie pas chez IGDB : l'ordre vient de lib/trending, le
+  // champ ne sert qu'à garder une requête valide.
+  trending: "total_rating_count",
   popularity: "total_rating_count",
   rating: "total_rating",
   release: "first_release_date",
@@ -520,10 +524,12 @@ const BROWSE_TTL = 30 * 60 * 1000;
 const searchCache = createTtlCache({ name: "games:search", max: 600, ttl: SEARCH_TTL });
 
 function buildQuery(opts) {
-  const { search, sort, dir, limit, offset, filters, typeIds, release } = opts;
+  const { search, sort, dir, limit, offset, filters, typeIds, release, ids } = opts;
   // version_parent = null : exclut les éditions/remasters "version de" (Deluxe,
   // Collector's, Ellie Edition…) qu'IGDB classe pourtant en game_type = 0.
   const where = ["cover != null", "version_parent = null"];
+  // Tendances : on ne cherche que parmi les jeux du moment (cf. lib/trending).
+  if (ids?.length) where.push(`id = (${ids.join(",")})`);
 
   // Type de jeu (game_type) : un jeu n'a qu'un type -> toujours en OU.
   if (typeIds && typeIds.length) {
@@ -609,7 +615,9 @@ function buildQuery(opts) {
   // heurterait à la clause `first_release_date <= maintenant` posée ici pour le
   // tri par date, et la recherche ne rendrait rien du tout.
   const windowed = !!(release?.upcoming || release?.from || release?.to);
-  if (!search && !windowed) {
+  // Pas de filtre « qualité » sur les tendances : un jeu sorti hier n'a pas
+  // encore d'avis, et c'est justement lui qu'on veut voir.
+  if (!search && !windowed && sort !== "trending") {
     if (sort === "rating")
       where.push("total_rating != null", "total_rating_count > 80");
     else if (sort === "release") {
@@ -683,7 +691,41 @@ router.get("/", requireAuth, async (req, res) => {
         },
         s ? SEARCH_TTL : BROWSE_TTL
       );
-    let games = await fetchGames(search);
+    // --- Tendances : l'ordre vient de lib/trending, les filtres d'IGDB ---
+    // On demande à IGDB les jeux tendance QUI PASSENT LES FILTRES (genre,
+    // plateforme…), puis on les remet dans l'ordre des tendances. Une
+    // recherche par nom, elle, se trie comme avant.
+    const fetchTrending = () =>
+      searchCache.remember(
+        JSON.stringify(["trending", dir, typeIds, filters, release]),
+        async () => {
+          const ids = await trendingIds();
+          const out = [];
+          for (let i = 0; i < ids.length; i += 500) {
+            const chunk = ids.slice(i, i + 500);
+            const query = buildQuery({
+              search: "",
+              sort,
+              dir,
+              limit: 500,
+              offset: 0,
+              filters,
+              typeIds,
+              release,
+              ids: chunk,
+            });
+            out.push(...(await igdbQuery("games", query)).map(mapGame));
+          }
+          const rank = new Map(ids.map((id, i) => [id, i]));
+          out.sort((a, b) => rank.get(a.id) - rank.get(b.id));
+          return dir === "asc" ? out.reverse() : out;
+        },
+        BROWSE_TTL
+      );
+    let games =
+      sort === "trending" && !search
+        ? (await fetchTrending()).slice(offset, offset + limit)
+        : await fetchGames(search);
 
     // ZÉRO RÉSULTAT ET UN MOT MAL ÉCRIT : on cherche la version corrigée TOUT
     // DE SUITE, au lieu de rendre une page vide avec une proposition. Comme
