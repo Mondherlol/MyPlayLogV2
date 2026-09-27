@@ -896,4 +896,381 @@ Viscera Cleanup Detail
 Lawn Mowing Simulator
 `,
   },
+  {
+    key: "top-parkour",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de parcours",
+    size: 30,
+    tags: ["Parcours", "Free running", "Thème"],
+    games: `
+Mirror's Edge
+Titanfall 2
+Dying Light
+Ghostrunner
+Neon White
+Marvel's Spider-Man 2
+Assassin's Creed Unity
+Mirror's Edge Catalyst
+Assassin's Creed II
+Dying Light 2 Stay Human
+Sunset Overdrive
+Bomb Rush Cyberfunk
+Prince of Persia: The Sands of Time
+Marvel's Spider-Man
+Jet Set Radio Future
+Prince of Persia: The Lost Crown
+Infamous Second Son
+Prototype
+Ghostrunner 2
+Crackdown
+Pseudoregalia
+Marvel's Spider-Man: Miles Morales
+Clustertruck
+SEUM: Speedrunners from Hell
+Titanfall
+SpeedRunners
+`,
+  },
+  {
+    key: "top-survival",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de survie",
+    size: 30,
+    tags: ["Survie", "Craft", "Thème"],
+    games: `
+The Long Dark
+Subnautica
+Don't Starve
+Project Zomboid
+Valheim
+The Forest
+Minecraft
+Terraria
+Green Hell
+Sons of the Forest
+Grounded
+This War of Mine
+Raft
+Subnautica: Below Zero
+Rust
+DayZ
+7 Days to Die
+Stranded Deep
+Enshrouded
+The Flame in the Flood
+Abiotic Factor
+Core Keeper
+Palworld
+ARK: Survival Evolved
+Conan Exiles
+Don't Starve Together
+Kenshi
+No Man's Sky
+`,
+  },
+  {
+    key: "top-city-builder",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de gestion & city-builders",
+    size: 40,
+    tags: ["Gestion", "City-builder", "Thème"],
+    games: `
+Factorio
+RimWorld
+Cities: Skylines
+Anno 1800
+Frostpunk
+Dwarf Fortress
+SimCity 4
+Theme Hospital
+Against the Storm
+Oxygen Not Included
+Pharaoh
+Caesar III
+Satisfactory
+RollerCoaster Tycoon 2
+Banished
+Dungeon Keeper
+Tropico 4
+Prison Architect
+Planet Coaster
+Two Point Hospital
+Manor Lords
+Anno 1404
+SimCity 2000
+The Settlers II
+Stronghold
+Theme Park
+Zoo Tycoon
+Frostpunk 2
+Timberborn
+Tropico 6
+Dorfromantik
+Islanders
+Townscaper
+Planet Zoo
+Jurassic World Evolution 2
+`,
+  },
+  {
+    key: "top-strategy",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de stratégie",
+    size: 40,
+    tags: ["Stratégie", "RTS", "4X", "Thème"],
+    games: `
+StarCraft
+Age of Empires II: The Age of Kings
+Sid Meier's Civilization IV
+Warcraft III: Reign of Chaos
+XCOM 2
+Total War: Shogun 2
+Crusader Kings III
+Europa Universalis IV
+Heroes of Might and Magic III
+Command & Conquer: Red Alert 2
+Company of Heroes
+Into the Breach
+Advance Wars 2: Black Hole Rising
+Stellaris
+Homeworld
+StarCraft II: Wings of Liberty
+Sid Meier's Civilization V
+Medieval II: Total War
+Rome: Total War
+Hearts of Iron IV
+Warhammer 40,000: Dawn of War
+Total War: Warhammer II
+Sid Meier's Alpha Centauri
+Master of Orion II: Battle at Antares
+Age of Mythology
+Supreme Commander
+Endless Legend
+Northgard
+Old World
+Humankind
+`,
+  },
+  {
+    key: "top-sports",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de sport",
+    size: 30,
+    tags: ["Sport", "Thème"],
+    games: `
+Rocket League
+Tony Hawk's Pro Skater 1 + 2
+Wii Sports
+Skate 3
+NBA Street Vol. 2
+SSX Tricky
+Punch-Out!!
+NBA Jam @1993
+Fight Night Round 3
+Mario Tennis @2000
+Mario Golf @1999
+SSX 3
+Sensible World of Soccer
+NHL '94
+Wii Sports Resort
+OlliOlli World
+Golf Story
+Windjammers
+Top Spin 4
+FIFA 12
+NBA 2K11
+Football Manager 2024
+Inazuma Eleven
+Mario Strikers Charged
+Super Mega Baseball 3
+Captain Tsubasa: Rise of New Champions
+Session: Skate Sim
+`,
+  },
+  {
+    key: "top-superheroes",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de super-héros",
+    size: 30,
+    tags: ["Super-héros", "Comics", "Thème"],
+    games: `
+Batman: Arkham City
+Marvel's Spider-Man 2
+Batman: Arkham Asylum
+Marvel's Spider-Man
+Marvel's Guardians of the Galaxy
+Batman: Arkham Knight
+Spider-Man 2 @2004
+Marvel's Spider-Man: Miles Morales
+Injustice 2
+Marvel vs. Capcom 2: New Age of Heroes
+Marvel Ultimate Alliance
+X-Men Origins: Wolverine
+Infamous 2
+Marvel's Midnight Suns
+Viewtiful Joe
+The Wonderful 101
+Ultimate Marvel vs. Capcom 3
+Infamous Second Son
+Prototype
+Lego Marvel Super Heroes
+Freedom Force
+Marvel Rivals
+Spider-Man: Shattered Dimensions
+X-Men @1992
+The Punisher @2005
+`,
+  },
+  {
+    key: "top-samurai",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de samouraïs & de ninjas",
+    size: 30,
+    tags: ["Samouraï", "Ninja", "Japon féodal", "Thème"],
+    games: `
+Sekiro: Shadows Die Twice
+Ghost of Tsushima
+Nioh 2
+Tenchu: Stealth Assassins
+Ninja Gaiden Black
+Onimusha 2: Samurai's Destiny
+Nioh
+Ghost of Yōtei
+Shadow Tactics: Blades of the Shogun
+Mark of the Ninja
+The Messenger
+Katana Zero
+Way of the Samurai
+Shinobi III: Return of the Ninja Master
+Rise of the Ronin
+Assassin's Creed Shadows
+Bushido Blade
+Muramasa: The Demon Blade
+Samurai Shodown II
+Shinobi @2002
+Trek to Yomi
+Samurai Warriors 2
+Tenchu 2: Birth of the Assassins
+The Revenge of Shinobi
+Aragami
+`,
+  },
+  {
+    key: "top-pirates",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de pirates",
+    size: 20,
+    tags: ["Pirates", "Thème"],
+    games: `
+Assassin's Creed IV: Black Flag
+Monkey Island 2: LeChuck's Revenge
+The Secret of Monkey Island
+Sea of Thieves
+Skies of Arcadia
+Sid Meier's Pirates! @2004
+The Legend of Zelda: The Wind Waker
+The Curse of Monkey Island
+Pillars of Eternity II: Deadfire
+Return to Monkey Island
+Like a Dragon: Pirate Yakuza in Hawaii
+Sid Meier's Pirates! @1987
+Uncharted 4: A Thief's End
+One Piece Odyssey
+Risen 2: Dark Waters
+`,
+  },
+  {
+    key: "top-mechas",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de mechas",
+    size: 25,
+    tags: ["Mecha", "Robots", "Thème"],
+    games: `
+Armored Core VI: Fires of Rubicon
+Titanfall 2
+Zone of the Enders: The 2nd Runner
+Front Mission 3
+Xenoblade Chronicles X
+13 Sentinels: Aegis Rim
+MechWarrior 2: 31st Century Combat
+BattleTech @2018
+Into the Breach
+MechWarrior 5: Mercenaries
+Armored Core: For Answer
+Super Robot Wars 30
+Steel Battalion
+Cyber Troopers Virtual-On
+Custom Robo
+Front Mission 4
+Metal Wolf Chaos XD
+Daemon X Machina
+Brigador
+MechWarrior 4: Vengeance
+Titanfall
+`,
+  },
+  {
+    key: "top-western",
+    group: "theme",
+    title: "Top {n} des meilleurs westerns",
+    size: 20,
+    tags: ["Western", "Thème"],
+    games: `
+Red Dead Redemption 2
+Red Dead Redemption
+Call of Juarez: Gunslinger
+Desperados III
+Red Dead Revolver
+Oddworld: Stranger's Wrath
+West of Loathing
+Weird West
+Sunset Riders
+GUN
+Call of Juarez: Bound in Blood
+Hard West
+Hunt: Showdown
+Outlaws @1997
+Wild Arms
+Evil West
+Darkwatch
+Hard West 2
+`,
+  },
+  {
+    key: "top-zombies",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de zombies",
+    size: 30,
+    tags: ["Zombies", "Thème"],
+    games: `
+Resident Evil 2 @2019
+The Last of Us
+Left 4 Dead 2
+Dying Light
+Project Zomboid
+Dead Rising
+The Walking Dead
+Plants vs. Zombies
+Resident Evil @2002
+State of Decay 2
+Left 4 Dead
+Days Gone
+Dead Island 2
+Zombies Ate My Neighbors
+The House of the Dead 2
+The Typing of the Dead
+Dead Rising 2
+ZombiU
+World War Z
+Back 4 Blood
+Dead Nation
+They Are Billions
+Killing Floor 2
+Zombie Army 4: Dead War
+Dead Island
+7 Days to Die
+DayZ
+Organ Trail
+`,
+  },
 ];

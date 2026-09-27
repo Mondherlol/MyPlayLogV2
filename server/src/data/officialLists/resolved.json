@@ -23,6 +23,12 @@
   "year": 2009,
   "exact": true
  },
+ "7 Days to Die": {
+  "id": 5574,
+  "name": "7 Days to Die",
+  "year": 2024,
+  "exact": true
+ },
  "7th Dragon III Code: VFD #37": {
   "id": 11828,
   "name": "7th Dragon III Code: VFD",
@@ -83,6 +89,12 @@
   "year": 2018,
   "exact": true
  },
+ "Abiotic Factor": {
+  "id": 219126,
+  "name": "Abiotic Factor",
+  "year": 2025,
+  "exact": true
+ },
  "Absolver": {
   "id": 19333,
   "name": "Absolver",
@@ -119,16 +131,70 @@
   "year": 2009,
   "exact": true
  },
+ "Ace Combat 04: Shattered Skies": {
+  "id": 9763,
+  "name": "Ace Combat 04: Shattered Skies",
+  "year": 2001,
+  "exact": true
+ },
  "Ace Combat 04: Shattered Skies #8": {
   "id": 9763,
   "name": "Ace Combat 04: Shattered Skies",
   "year": 2001,
   "exact": true
  },
+ "Ace Combat 2": {
+  "id": 14750,
+  "name": "Ace Combat 2",
+  "year": 1997,
+  "exact": true
+ },
+ "Ace Combat 3: Electrosphere": {
+  "id": 14751,
+  "name": "Ace Combat 3: Electrosphere",
+  "year": 1999,
+  "exact": true
+ },
+ "Ace Combat 5: The Unsung War": {
+  "id": 14753,
+  "name": "Ace Combat 5: The Unsung War",
+  "year": 2004,
+  "exact": true
+ },
  "Ace Combat 5: The Unsung War #8": {
   "id": 14753,
   "name": "Ace Combat 5: The Unsung War",
   "year": 2004,
+  "exact": true
+ },
+ "Ace Combat 6: Fires of Liberation": {
+  "id": 5476,
+  "name": "Ace Combat 6: Fires of Liberation",
+  "year": 2007,
+  "exact": true
+ },
+ "Ace Combat 7: Skies Unknown": {
+  "id": 14758,
+  "name": "Ace Combat 7: Skies Unknown",
+  "year": 2019,
+  "exact": true
+ },
+ "Ace Combat X: Skies of Deception": {
+  "id": 14755,
+  "name": "Ace Combat X: Skies of Deception",
+  "year": 2006,
+  "exact": true
+ },
+ "Ace Combat Zero: The Belkan War": {
+  "id": 14754,
+  "name": "Ace Combat Zero: The Belkan War",
+  "year": 2006,
+  "exact": true
+ },
+ "Ace Combat: Assault Horizon": {
+  "id": 531,
+  "name": "Ace Combat: Assault Horizon",
+  "year": 2011,
   "exact": true
  },
  "ActRaiser #19": {
@@ -221,16 +287,58 @@
   "year": 2023,
   "exact": true
  },
+ "Against the Storm": {
+  "id": 147519,
+  "name": "Against the Storm",
+  "year": 2023,
+  "exact": true
+ },
+ "Age of Empires @1997": {
+  "id": 289,
+  "name": "Age of Empires",
+  "year": 1997,
+  "exact": true
+ },
+ "Age of Empires II: Definitive Edition": {
+  "id": 55056,
+  "name": "Age of Empires II: Definitive Edition",
+  "year": 2019,
+  "exact": true
+ },
+ "Age of Empires II: The Age of Kings": {
+  "id": 327,
+  "name": "Age of Empires II: The Age of Kings",
+  "year": 1999,
+  "exact": true
+ },
  "Age of Empires II: The Age of Kings #6": {
   "id": 327,
   "name": "Age of Empires II: The Age of Kings",
   "year": 1999,
   "exact": true
  },
+ "Age of Empires III": {
+  "id": 299,
+  "name": "Age of Empires III",
+  "year": 2005,
+  "exact": true
+ },
  "Age of Empires IV": {
   "id": 55029,
   "name": "Age of Empires IV",
   "year": 2021,
+  "exact": true
+ },
+ "Age of Mythology": {
+  "id": 324,
+  "name": "Age of Mythology",
+  "year": 2002,
+  "exact": true
+ },
+ "Age of Mythology: Retold": {
+  "id": 222803,
+  "name": "Age of Mythology: Retold",
+  "year": 2024,
   "exact": true
  },
  "AI: The Somnium Files": {
@@ -389,10 +497,28 @@
   "year": 2003,
   "exact": true
  },
+ "Animal Crossing @2001": {
+  "id": 2655,
+  "name": "Animal Crossing",
+  "year": 2002,
+  "exact": true
+ },
  "Animal Crossing #21": {
   "id": 2655,
   "name": "Animal Crossing",
   "year": 2002,
+  "exact": true
+ },
+ "Animal Crossing: City Folk": {
+  "id": 2688,
+  "name": "Animal Crossing: City Folk",
+  "year": 2008,
+  "exact": true
+ },
+ "Animal Crossing: Happy Home Designer": {
+  "id": 10143,
+  "name": "Animal Crossing: Happy Home Designer",
+  "year": 2015,
   "exact": true
  },
  "Animal Crossing: New Horizons": {
@@ -417,6 +543,12 @@
   "id": 2687,
   "name": "Animal Crossing: New Leaf",
   "year": 2012,
+  "exact": true
+ },
+ "Animal Crossing: Pocket Camp": {
+  "id": 58630,
+  "name": "Animal Crossing: Pocket Camp",
+  "year": 2017,
   "exact": true
  },
  "Animal Crossing: Wild World": {
@@ -447,6 +579,18 @@
   "id": 191435,
   "name": "Animal Well",
   "year": 2024,
+  "exact": true
+ },
+ "Anno 1404": {
+  "id": 662,
+  "name": "Dawn of Discovery",
+  "year": 2009,
+  "exact": true
+ },
+ "Anno 1800": {
+  "id": 55036,
+  "name": "Anno 1800",
+  "year": 2019,
   "exact": true
  },
  "Anodyne": {
@@ -539,6 +683,12 @@
   "year": 2001,
   "exact": true
  },
+ "ARK: Survival Evolved": {
+  "id": 10239,
+  "name": "Ark: Survival Evolved",
+  "year": 2017,
+  "exact": true
+ },
  "Arknights": {
   "id": 123395,
   "name": "Arknights",
@@ -557,6 +707,18 @@
   "year": 2015,
   "exact": true
  },
+ "Armored Core @1997": {
+  "id": 4144,
+  "name": "Armored Core",
+  "year": 1997,
+  "exact": true
+ },
+ "Armored Core 2": {
+  "id": 31719,
+  "name": "Armored Core 2",
+  "year": 2000,
+  "exact": true
+ },
  "Armored Core VI: Fires of Rubicon": {
   "id": 228542,
   "name": "Armored Core VI: Fires of Rubicon",
@@ -567,6 +729,30 @@
   "id": 228542,
   "name": "Armored Core VI: Fires of Rubicon",
   "year": 2023,
+  "exact": true
+ },
+ "Armored Core: For Answer": {
+  "id": 5493,
+  "name": "Armored Core: For Answer",
+  "year": 2008,
+  "exact": true
+ },
+ "Armored Core: Last Raven": {
+  "id": 19410,
+  "name": "Armored Core: Last Raven",
+  "year": 2005,
+  "exact": true
+ },
+ "Armored Core: Master of Arena": {
+  "id": 19424,
+  "name": "Armored Core: Master of Arena",
+  "year": 1999,
+  "exact": true
+ },
+ "Armored Core: Silent Line": {
+  "id": 44703,
+  "name": "Silent Line: Armored Core",
+  "year": 2003,
   "exact": true
  },
  "Arx Fatalis": {
@@ -941,6 +1127,12 @@
   "year": 2019,
   "exact": true
  },
+ "Back 4 Blood": {
+  "id": 116200,
+  "name": "Back 4 Blood",
+  "year": 2021,
+  "exact": true
+ },
  "Backpack Hero": {
   "id": 194504,
   "name": "Backpack Hero",
@@ -975,6 +1167,12 @@
   "id": 251833,
   "name": "Balatro",
   "year": 2024,
+  "exact": true
+ },
+ "Baldur's Gate @1998": {
+  "id": 5,
+  "name": "Baldur's Gate",
+  "year": 1998,
   "exact": true
  },
  "Baldur's Gate 3": {
@@ -1035,6 +1233,12 @@
   "id": 21278,
   "name": "Bangai-O Spirits",
   "year": 2008,
+  "exact": true
+ },
+ "Banished": {
+  "id": 2002,
+  "name": "Banished",
+  "year": 2014,
   "exact": true
  },
  "Banjo-Kazooie": {
@@ -1109,6 +1313,12 @@
   "year": 2003,
   "exact": true
  },
+ "Batman Returns @1993": {
+  "id": 121242,
+  "name": "Batman Returns",
+  "year": 1993,
+  "exact": true
+ },
  "Batman: Arkham Asylum": {
   "id": 500,
   "name": "Batman: Arkham Asylum",
@@ -1151,6 +1361,18 @@
   "year": 2015,
   "exact": true
  },
+ "Batman: Arkham Origins": {
+  "id": 2003,
+  "name": "Batman: Arkham Origins",
+  "year": 2013,
+  "exact": true
+ },
+ "Batman: Arkham Origins Blackgate": {
+  "id": 7689,
+  "name": "Batman: Arkham Origins Blackgate",
+  "year": 2013,
+  "exact": true
+ },
  "Batman: Arkham Shadow": {
   "id": 299736,
   "name": "Batman: Arkham Shadow",
@@ -1160,6 +1382,12 @@
  "Batman: Arkham VR": {
   "id": 19563,
   "name": "Batman: Arkham VR",
+  "year": 2016,
+  "exact": true
+ },
+ "Batman: The Telltale Series": {
+  "id": 14746,
+  "name": "Batman: The Telltale Series",
   "year": 2016,
   "exact": true
  },
@@ -1181,16 +1409,64 @@
   "year": 2016,
   "exact": true
  },
+ "Battlefield 1942": {
+  "id": 240,
+  "name": "Battlefield 1942",
+  "year": 2002,
+  "exact": true
+ },
+ "Battlefield 2": {
+  "id": 277,
+  "name": "Battlefield 2",
+  "year": 2005,
+  "exact": true
+ },
+ "Battlefield 2042": {
+  "id": 125166,
+  "name": "Battlefield 2042",
+  "year": 2021,
+  "exact": true
+ },
  "Battlefield 3": {
   "id": 343,
   "name": "Battlefield 3",
   "year": 2011,
   "exact": true
  },
+ "Battlefield 4": {
+  "id": 1979,
+  "name": "Battlefield 4",
+  "year": 2013,
+  "exact": true
+ },
  "Battlefield 6": {
   "id": 317407,
   "name": "Battlefield 6",
   "year": 2025,
+  "exact": true
+ },
+ "Battlefield V": {
+  "id": 83728,
+  "name": "Battlefield V",
+  "year": 2018,
+  "exact": true
+ },
+ "Battlefield: Bad Company": {
+  "id": 473,
+  "name": "Battlefield: Bad Company",
+  "year": 2008,
+  "exact": true
+ },
+ "Battlefield: Bad Company 2": {
+  "id": 352,
+  "name": "Battlefield: Bad Company 2",
+  "year": 2010,
+  "exact": true
+ },
+ "BattleTech @2018": {
+  "id": 18279,
+  "name": "BattleTech",
+  "year": 2018,
   "exact": true
  },
  "Battletoads": {
@@ -1218,6 +1494,12 @@
   "exact": true
  },
  "Bayonetta": {
+  "id": 2136,
+  "name": "Bayonetta",
+  "year": 2009,
+  "exact": true
+ },
+ "Bayonetta @2009": {
   "id": 2136,
   "name": "Bayonetta",
   "year": 2009,
@@ -1395,6 +1677,12 @@
   "id": 20,
   "name": "BioShock",
   "year": 2007,
+  "exact": true
+ },
+ "BioShock 2": {
+  "id": 21,
+  "name": "BioShock 2",
+  "year": 2010,
   "exact": true
  },
  "BioShock Infinite": {
@@ -1619,10 +1907,28 @@
   "year": 2003,
   "exact": true
  },
+ "Bomb Rush Cyberfunk": {
+  "id": 135940,
+  "name": "Bomb Rush Cyberfunk",
+  "year": 2023,
+  "exact": true
+ },
+ "Bomberman 64": {
+  "id": 3451,
+  "name": "Bomberman 64",
+  "year": 1997,
+  "exact": true
+ },
  "Bomberman 64 #4": {
   "id": 3451,
   "name": "Bomberman 64",
   "year": 1997,
+  "exact": true
+ },
+ "Bomberman Hero": {
+  "id": 3453,
+  "name": "Bomberman Hero",
+  "year": 1998,
   "exact": true
  },
  "Bomberman Hero #4": {
@@ -1635,6 +1941,12 @@
   "id": 2259,
   "name": "Boom Blox",
   "year": 2008,
+  "exact": true
+ },
+ "Borderlands @2009": {
+  "id": 498,
+  "name": "Borderlands",
+  "year": 2009,
   "exact": true
  },
  "Borderlands 2": {
@@ -1653,6 +1965,24 @@
   "id": 1011,
   "name": "Borderlands 2",
   "year": 2012,
+  "exact": true
+ },
+ "Borderlands 3": {
+  "id": 19164,
+  "name": "Borderlands 3",
+  "year": 2019,
+  "exact": true
+ },
+ "Borderlands 4": {
+  "id": 314246,
+  "name": "Borderlands 4",
+  "year": 2025,
+  "exact": true
+ },
+ "Borderlands: The Pre-Sequel": {
+  "id": 6032,
+  "name": "Borderlands: The Pre-Sequel",
+  "year": 2014,
   "exact": true
  },
  "Botanicula": {
@@ -1721,10 +2051,22 @@
   "year": 2017,
   "exact": true
  },
+ "Breath of Fire": {
+  "id": 11617,
+  "name": "Breath of Fire",
+  "year": 1993,
+  "exact": true
+ },
  "Breath of Fire #19": {
   "id": 11617,
   "name": "Breath of Fire",
   "year": 1993,
+  "exact": true
+ },
+ "Breath of Fire II": {
+  "id": 6337,
+  "name": "Breath of Fire II",
+  "year": 1994,
   "exact": true
  },
  "Breath of Fire II #19": {
@@ -1755,6 +2097,18 @@
   "id": 1280,
   "name": "Breath of Fire IV",
   "year": 2000,
+  "exact": true
+ },
+ "Breath of Fire: Dragon Quarter": {
+  "id": 18056,
+  "name": "Breath of Fire: Dragon Quarter",
+  "year": 2002,
+  "exact": true
+ },
+ "Brigador": {
+  "id": 13361,
+  "name": "Brigador",
+  "year": 2016,
   "exact": true
  },
  "Brigandine: The Legend of Forsena #7": {
@@ -1811,6 +2165,12 @@
   "year": 1998,
   "exact": true
  },
+ "Burnout 2: Point of Impact": {
+  "id": 3840,
+  "name": "Burnout 2: Point of Impact",
+  "year": 2002,
+  "exact": true
+ },
  "Burnout 2: Point of Impact #21": {
   "id": 3840,
   "name": "Burnout 2: Point of Impact",
@@ -1833,6 +2193,18 @@
   "id": 5761,
   "name": "Burnout 3: Takedown",
   "year": 2004,
+  "exact": true
+ },
+ "Burnout Dominator": {
+  "id": 6203,
+  "name": "Burnout Dominator",
+  "year": 2007,
+  "exact": true
+ },
+ "Burnout Legends": {
+  "id": 10916,
+  "name": "Burnout Legends",
+  "year": 2005,
   "exact": true
  },
  "Burnout Legends #38": {
@@ -1865,6 +2237,18 @@
   "year": 2018,
   "exact": true
  },
+ "Burnout Revenge": {
+  "id": 2626,
+  "name": "Burnout Revenge",
+  "year": 2005,
+  "exact": true
+ },
+ "Bushido Blade": {
+  "id": 1418,
+  "name": "Bushido Blade",
+  "year": 1997,
+  "exact": true
+ },
  "Bust a Groove": {
   "id": 4138,
   "name": "Bust A Groove",
@@ -1895,6 +2279,24 @@
   "year": 2019,
   "exact": true
  },
+ "Caesar III": {
+  "id": 6332,
+  "name": "Caesar III",
+  "year": 1998,
+  "exact": true
+ },
+ "Call of Duty @2003": {
+  "id": 621,
+  "name": "Call of Duty",
+  "year": 2003,
+  "exact": true
+ },
+ "Call of Duty 2": {
+  "id": 622,
+  "name": "Call of Duty 2",
+  "year": 2005,
+  "exact": true
+ },
  "Call of Duty 4: Modern Warfare": {
   "id": 623,
   "name": "Call of Duty 4: Modern Warfare",
@@ -1913,6 +2315,12 @@
   "year": 2007,
   "exact": true
  },
+ "Call of Duty: Advanced Warfare": {
+  "id": 6632,
+  "name": "Call of Duty: Advanced Warfare",
+  "year": 2014,
+  "exact": true
+ },
  "Call of Duty: Black Ops": {
   "id": 545,
   "name": "Call of Duty: Black Ops",
@@ -1923,6 +2331,30 @@
   "id": 545,
   "name": "Call of Duty: Black Ops",
   "year": 2010,
+  "exact": true
+ },
+ "Call of Duty: Black Ops 6": {
+  "id": 302156,
+  "name": "Call of Duty: Black Ops 6",
+  "year": 2024,
+  "exact": true
+ },
+ "Call of Duty: Black Ops Cold War": {
+  "id": 137001,
+  "name": "Call of Duty: Black Ops Cold War",
+  "year": 2020,
+  "exact": true
+ },
+ "Call of Duty: Black Ops II": {
+  "id": 1122,
+  "name": "Call of Duty: Black Ops II",
+  "year": 2012,
+  "exact": true
+ },
+ "Call of Duty: Black Ops III": {
+  "id": 9509,
+  "name": "Call of Duty: Black Ops III",
+  "year": 2015,
   "exact": true
  },
  "Call of Duty: Mobile": {
@@ -1943,16 +2375,58 @@
   "year": 2009,
   "exact": true
  },
+ "Call of Duty: Modern Warfare 2 @2009": {
+  "id": 559,
+  "name": "Call of Duty: Modern Warfare 2",
+  "year": 2009,
+  "exact": true
+ },
  "Call of Duty: Modern Warfare 2 #12": {
   "id": 559,
   "name": "Call of Duty: Modern Warfare 2",
   "year": 2009,
   "exact": true
  },
+ "Call of Duty: Modern Warfare 3 @2011": {
+  "id": 979,
+  "name": "Call of Duty: Modern Warfare 3",
+  "year": 2011,
+  "exact": true
+ },
+ "Call of Duty: Modern Warfare II @2022": {
+  "id": 200165,
+  "name": "Call of Duty: Modern Warfare II",
+  "year": 2022,
+  "exact": true
+ },
  "Call of Duty: Warzone": {
   "id": 131800,
   "name": "Call of Duty: Warzone",
   "year": 2020,
+  "exact": true
+ },
+ "Call of Duty: World at War": {
+  "id": 625,
+  "name": "Call of Duty: World at War",
+  "year": 2008,
+  "exact": true
+ },
+ "Call of Duty: WWII": {
+  "id": 28204,
+  "name": "Call of Duty: WWII",
+  "year": 2017,
+  "exact": true
+ },
+ "Call of Juarez: Bound in Blood": {
+  "id": 430,
+  "name": "Call of Juarez: Bound In Blood",
+  "year": 2009,
+  "exact": true
+ },
+ "Call of Juarez: Gunslinger": {
+  "id": 1976,
+  "name": "Call of Juarez: Gunslinger",
+  "year": 2013,
   "exact": true
  },
  "Callisto Protocol": {
@@ -2573,6 +3047,12 @@
   "year": 2020,
   "exact": true
  },
+ "Clustertruck": {
+  "id": 18484,
+  "name": "Clustertruck",
+  "year": 2016,
+  "exact": true
+ },
  "Cocoon": {
   "id": 204627,
   "name": "Cocoon",
@@ -2669,16 +3149,70 @@
   "year": 1995,
   "exact": true
  },
+ "Command & Conquer @1995": {
+  "id": 647,
+  "name": "Command & Conquer",
+  "year": 1995,
+  "exact": true
+ },
+ "Command & Conquer 3: Tiberium Wars": {
+  "id": 321,
+  "name": "Command & Conquer 3: Tiberium Wars",
+  "year": 2007,
+  "exact": true
+ },
+ "Command & Conquer: Generals": {
+  "id": 649,
+  "name": "Command & Conquer: Generals",
+  "year": 2003,
+  "exact": true
+ },
+ "Command & Conquer: Red Alert": {
+  "id": 295,
+  "name": "Command & Conquer: Red Alert",
+  "year": 1996,
+  "exact": true
+ },
  "Command & Conquer: Red Alert #7": {
   "id": 295,
   "name": "Command & Conquer: Red Alert",
   "year": 1996,
   "exact": true
  },
+ "Command & Conquer: Red Alert 2": {
+  "id": 245,
+  "name": "Command & Conquer: Red Alert 2",
+  "year": 2000,
+  "exact": true
+ },
  "Command & Conquer: Red Alert 2 #6": {
   "id": 245,
   "name": "Command & Conquer: Red Alert 2",
   "year": 2000,
+  "exact": true
+ },
+ "Command & Conquer: Red Alert 3": {
+  "id": 959,
+  "name": "Command & Conquer: Red Alert 3",
+  "year": 2008,
+  "exact": true
+ },
+ "Command & Conquer: Tiberian Sun": {
+  "id": 340,
+  "name": "Command & Conquer: Tiberian Sun",
+  "year": 1999,
+  "exact": true
+ },
+ "Company of Heroes": {
+  "id": 654,
+  "name": "Company of Heroes",
+  "year": 2006,
+  "exact": true
+ },
+ "Conan Exiles": {
+  "id": 16999,
+  "name": "Conan Exiles",
+  "year": 2018,
   "exact": true
  },
  "Condemned: Criminal Origins": {
@@ -2723,10 +3257,22 @@
   "year": 1987,
   "exact": true
  },
+ "Contra @1987": {
+  "id": 4598,
+  "name": "Contra",
+  "year": 1987,
+  "exact": true
+ },
  "Contra #18,99": {
   "id": 186207,
   "name": "Contra",
   "year": 1988,
+  "exact": true
+ },
+ "Contra 4": {
+  "id": 9545,
+  "name": "Contra 4",
+  "year": 2007,
   "exact": true
  },
  "Contra 4 #20": {
@@ -2735,16 +3281,46 @@
   "year": 2007,
   "exact": true
  },
+ "Contra III: The Alien Wars": {
+  "id": 6351,
+  "name": "Contra III: The Alien Wars",
+  "year": 1992,
+  "exact": true
+ },
  "Contra III: The Alien Wars #19": {
   "id": 6351,
   "name": "Contra III: The Alien Wars",
   "year": 1992,
   "exact": true
  },
+ "Contra: Hard Corps": {
+  "id": 20192,
+  "name": "Contra: Hard Corps",
+  "year": 1994,
+  "exact": true
+ },
  "Contra: Hard Corps #29": {
   "id": 20192,
   "name": "Contra: Hard Corps",
   "year": 1994,
+  "exact": true
+ },
+ "Contra: Operation Galuga": {
+  "id": 266684,
+  "name": "Contra: Operation Galuga",
+  "year": 2024,
+  "exact": true
+ },
+ "Contra: Rogue Corps": {
+  "id": 119385,
+  "name": "Contra: Rogue Corps",
+  "year": 2019,
+  "exact": true
+ },
+ "Contra: Shattered Soldier": {
+  "id": 22226,
+  "name": "Contra: Shattered Soldier",
+  "year": 2002,
   "exact": true
  },
  "Contradiction: Spot the Liar!": {
@@ -2771,6 +3347,12 @@
   "year": 2023,
   "exact": true
  },
+ "Core Keeper": {
+  "id": 152127,
+  "name": "Core Keeper",
+  "year": 2024,
+  "exact": true
+ },
  "Coromon": {
   "id": 123269,
   "name": "Coromon",
@@ -2787,6 +3369,12 @@
   "id": 140443,
   "name": "Cotton Reboot!",
   "year": 2021,
+  "exact": true
+ },
+ "Counter-Strike @2000": {
+  "id": 241,
+  "name": "Counter-Strike",
+  "year": 2000,
   "exact": true
  },
  "Counter-Strike #6": {
@@ -3011,6 +3599,12 @@
   "year": 2012,
   "exact": true
  },
+ "Crusader Kings III": {
+  "id": 124954,
+  "name": "Crusader Kings III",
+  "year": 2020,
+  "exact": true
+ },
  "Crusader Kings III #6": {
   "id": 124954,
   "name": "Crusader Kings III",
@@ -3083,6 +3677,12 @@
   "year": 2021,
   "exact": true
  },
+ "Custom Robo": {
+  "id": 3465,
+  "name": "Custom Robo",
+  "year": 2004,
+  "exact": true
+ },
  "Custom Robo #21": {
   "id": 3465,
   "name": "Custom Robo",
@@ -3093,6 +3693,12 @@
   "id": 3463,
   "name": "Custom Robo V2",
   "year": 2000,
+  "exact": true
+ },
+ "Cyber Troopers Virtual-On": {
+  "id": 46775,
+  "name": "Cyber Troopers Virtual-On",
+  "year": 1995,
   "exact": true
  },
  "Cyberpunk 2077": {
@@ -3111,6 +3717,12 @@
   "id": 215769,
   "name": "Cyberpunk 2077: Phantom Liberty",
   "year": 2023,
+  "exact": true
+ },
+ "Daemon X Machina": {
+  "id": 103338,
+  "name": "Daemon X Machina",
+  "year": 2019,
   "exact": true
  },
  "Dance Dance Revolution Extreme": {
@@ -3263,6 +3875,12 @@
   "year": 1998,
   "exact": true
  },
+ "Darkwatch": {
+  "id": 5808,
+  "name": "Darkwatch",
+  "year": 2005,
+  "exact": true
+ },
  "Darkwood": {
   "id": 17032,
   "name": "Darkwood",
@@ -3284,6 +3902,12 @@
  "Dawn of Mana": {
   "id": 14989,
   "name": "Dawn of Mana",
+  "year": 2006,
+  "exact": true
+ },
+ "Daxter": {
+  "id": 1533,
+  "name": "Daxter",
   "year": 2006,
   "exact": true
  },
@@ -3329,6 +3953,12 @@
   "year": 1995,
   "exact": true
  },
+ "DayZ": {
+  "id": 2117,
+  "name": "DayZ",
+  "year": 2018,
+  "exact": true
+ },
  "DCS World": {
   "id": 3769,
   "name": "DCS World",
@@ -3365,6 +3995,24 @@
   "year": 2018,
   "exact": true
  },
+ "Dead Island": {
+  "id": 536,
+  "name": "Dead Island",
+  "year": 2011,
+  "exact": true
+ },
+ "Dead Island 2": {
+  "id": 7329,
+  "name": "Dead Island 2",
+  "year": 2023,
+  "exact": true
+ },
+ "Dead Nation": {
+  "id": 2134,
+  "name": "Dead Nation",
+  "year": 2010,
+  "exact": true
+ },
  "Dead or Alive 2 #23": {
   "id": 1388,
   "name": "Dead or Alive 2",
@@ -3383,10 +4031,40 @@
   "year": 2015,
   "exact": true
  },
+ "Dead Rising": {
+  "id": 4797,
+  "name": "Dead Rising",
+  "year": 2006,
+  "exact": true
+ },
  "Dead Rising #12": {
   "id": 4797,
   "name": "Dead Rising",
   "year": 2006,
+  "exact": true
+ },
+ "Dead Rising 2": {
+  "id": 496,
+  "name": "Dead Rising 2",
+  "year": 2010,
+  "exact": true
+ },
+ "Dead Rising 3": {
+  "id": 3199,
+  "name": "Dead Rising 3",
+  "year": 2013,
+  "exact": true
+ },
+ "Dead Rising 4": {
+  "id": 19521,
+  "name": "Dead Rising 4",
+  "year": 2016,
+  "exact": true
+ },
+ "Dead Rising Deluxe Remaster": {
+  "id": 306979,
+  "name": "Dead Rising Deluxe Remaster",
+  "year": 2024,
   "exact": true
  },
  "Dead Space @2008": {
@@ -3695,6 +4373,12 @@
   "year": 1997,
   "exact": true
  },
+ "Diablo @1996": {
+  "id": 125,
+  "name": "Diablo",
+  "year": 1996,
+  "exact": true
+ },
  "Diablo #6": {
   "id": 125,
   "name": "Diablo",
@@ -3857,16 +4541,46 @@
   "year": 1995,
   "exact": true
  },
+ "Disgaea 2: Cursed Memories": {
+  "id": 11694,
+  "name": "Disgaea 2: Cursed Memories",
+  "year": 2006,
+  "exact": true
+ },
+ "Disgaea 3: Absence of Justice": {
+  "id": 7297,
+  "name": "Disgaea 3: Absence of Justice",
+  "year": 2008,
+  "exact": true
+ },
  "Disgaea 4: A Promise Revisited #46": {
   "id": 42697,
   "name": "Disgaea 4: A Promise Revisited",
   "year": 2014,
   "exact": true
  },
+ "Disgaea 4: A Promise Unforgotten": {
+  "id": 7298,
+  "name": "Disgaea 4: A Promise Unforgotten",
+  "year": 2011,
+  "exact": true
+ },
  "Disgaea 5: Alliance of Vengeance": {
   "id": 11594,
   "name": "Disgaea 5: Alliance of Vengeance",
   "year": 2015,
+  "exact": true
+ },
+ "Disgaea 6: Defiance of Destiny": {
+  "id": 138953,
+  "name": "Disgaea 6: Defiance of Destiny",
+  "year": 2021,
+  "exact": true
+ },
+ "Disgaea 7: Vows of the Virtueless": {
+  "id": 214530,
+  "name": "Disgaea 7: Vows of the Virtueless",
+  "year": 2023,
   "exact": true
  },
  "Disgaea: Afternoon of Darkness #38": {
@@ -4211,6 +4925,18 @@
   "year": 2001,
   "exact": true
  },
+ "Doom 3": {
+  "id": 280,
+  "name": "Doom 3",
+  "year": 2004,
+  "exact": true
+ },
+ "Doom 64": {
+  "id": 3471,
+  "name": "Doom 64",
+  "year": 1997,
+  "exact": true
+ },
  "Doom 64 #4": {
   "id": 3471,
   "name": "Doom 64",
@@ -4233,6 +4959,12 @@
   "id": 103298,
   "name": "Doom Eternal",
   "year": 2020,
+  "exact": true
+ },
+ "Doom II: Hell on Earth": {
+  "id": 312,
+  "name": "Doom II: Hell on Earth",
+  "year": 1994,
   "exact": true
  },
  "Doom: The Dark Ages": {
@@ -4269,6 +5001,12 @@
   "id": 132188,
   "name": "Dordogne",
   "year": 2023,
+  "exact": true
+ },
+ "Dorfromantik": {
+  "id": 134799,
+  "name": "Dorfromantik",
+  "year": 2022,
   "exact": true
  },
  "Dota 2": {
@@ -4349,6 +5087,12 @@
   "year": 2018,
   "exact": true
  },
+ "Dragon Age II": {
+  "id": 78,
+  "name": "Dragon Age II",
+  "year": 2011,
+  "exact": true
+ },
  "Dragon Age: Inquisition": {
   "id": 1887,
   "name": "Dragon Age: Inquisition",
@@ -4365,6 +5109,12 @@
   "id": 76,
   "name": "Dragon Age: Origins",
   "year": 2009,
+  "exact": true
+ },
+ "Dragon Age: The Veilguard": {
+  "id": 30208,
+  "name": "Dragon Age: The Veilguard",
+  "year": 2024,
   "exact": true
  },
  "Dragon Ball FighterZ": {
@@ -4581,6 +5331,12 @@
   "id": 1824,
   "name": "Dragon Quest Heroes: Rocket Slime",
   "year": 2005,
+  "exact": true
+ },
+ "Dragon Quest Heroes: The World Tree's Woe and the Blight Below": {
+  "id": 9214,
+  "name": "Dragon Quest Heroes: The World Tree's Woe and the Blight Below",
+  "year": 2015,
   "exact": true
  },
  "Dragon Quest II: Luminaries of the Legendary Line": {
@@ -4835,6 +5591,24 @@
   "year": 2013,
   "exact": true
  },
+ "Drakengard": {
+  "id": 11635,
+  "name": "Drakengard",
+  "year": 2003,
+  "exact": true
+ },
+ "Drakengard 2": {
+  "id": 11663,
+  "name": "Drakengard 2",
+  "year": 2005,
+  "exact": true
+ },
+ "Drakengard 3": {
+  "id": 8576,
+  "name": "Drakengard 3",
+  "year": 2013,
+  "exact": true
+ },
  "Drawn to Life #20": {
   "id": 4821,
   "name": "Drawn to Life",
@@ -4883,6 +5657,12 @@
   "year": 1989,
   "exact": true
  },
+ "Dungeon Keeper": {
+  "id": 35,
+  "name": "Dungeon Keeper",
+  "year": 1997,
+  "exact": true
+ },
  "Dungeon Travelers 2": {
   "id": 13657,
   "name": "Dungeon Travelers 2: The Royal Library & the Monster Seal",
@@ -4919,6 +5699,12 @@
   "year": 2012,
   "exact": true
  },
+ "Dwarf Fortress": {
+  "id": 6341,
+  "name": "Dwarf Fortress",
+  "year": null,
+  "exact": true
+ },
  "Dwarf Fortress #6": {
   "id": 6341,
   "name": "Dwarf Fortress",
@@ -4931,6 +5717,12 @@
   "year": 2015,
   "exact": true
  },
+ "Dying Light 2 Stay Human": {
+  "id": 102584,
+  "name": "Dying Light 2: Stay Human",
+  "year": 2022,
+  "exact": true
+ },
  "Dynamite Headdy": {
   "id": 22744,
   "name": "Dynamite Headdy",
@@ -4941,6 +5733,36 @@
   "id": 22744,
   "name": "Dynamite Headdy",
   "year": 1994,
+  "exact": true
+ },
+ "Dynasty Warriors 3": {
+  "id": 2984,
+  "name": "Dynasty Warriors 3",
+  "year": 2001,
+  "exact": true
+ },
+ "Dynasty Warriors 4": {
+  "id": 3007,
+  "name": "Dynasty Warriors 4",
+  "year": 2003,
+  "exact": true
+ },
+ "Dynasty Warriors 5": {
+  "id": 5820,
+  "name": "Dynasty Warriors 5",
+  "year": 2005,
+  "exact": true
+ },
+ "Dynasty Warriors 8: Xtreme Legends": {
+  "id": 10267,
+  "name": "Dynasty Warriors 8: Xtreme Legends",
+  "year": 2013,
+  "exact": true
+ },
+ "Dynasty Warriors: Origins": {
+  "id": 303808,
+  "name": "Dynasty Warriors: Origins",
+  "year": 2025,
   "exact": true
  },
  "EA Sports FC 25": {
@@ -5081,6 +5903,12 @@
   "year": 2014,
   "exact": true
  },
+ "Empire: Total War": {
+  "id": 441,
+  "name": "Empire: Total War",
+  "year": 2009,
+  "exact": true
+ },
  "Ender Lilies: Quietus of the Knights": {
   "id": 138858,
   "name": "Ender Lilies: Quietus of the Knights",
@@ -5093,9 +5921,21 @@
   "year": 2025,
   "exact": true
  },
+ "Endless Legend": {
+  "id": 9278,
+  "name": "Endless Legend",
+  "year": 2014,
+  "exact": true
+ },
  "Enotria: The Last Song": {
   "id": 218521,
   "name": "Enotria: The Last Song",
+  "year": 2024,
+  "exact": true
+ },
+ "Enshrouded": {
+  "id": 248643,
+  "name": "Enshrouded",
   "year": 2024,
   "exact": true
  },
@@ -5213,6 +6053,12 @@
   "year": 2012,
   "exact": true
  },
+ "Europa Universalis IV": {
+  "id": 1904,
+  "name": "Europa Universalis IV",
+  "year": 2013,
+  "exact": true
+ },
  "Europa Universalis IV #6": {
   "id": 1904,
   "name": "Europa Universalis IV",
@@ -5253,6 +6099,12 @@
   "id": 121762,
   "name": "Everspace 2",
   "year": 2023,
+  "exact": true
+ },
+ "Evil West": {
+  "id": 141547,
+  "name": "Evil West",
+  "year": 2022,
   "exact": true
  },
  "Excite Truck": {
@@ -5513,6 +6365,12 @@
   "year": 2025,
   "exact": true
  },
+ "Far Cry @2004": {
+  "id": 306,
+  "name": "Far Cry",
+  "year": 2004,
+  "exact": true
+ },
  "Far Cry 2": {
   "id": 361,
   "name": "Far Cry 2",
@@ -5525,10 +6383,40 @@
   "year": 2012,
   "exact": true
  },
+ "Far Cry 3: Blood Dragon": {
+  "id": 2001,
+  "name": "Far Cry 3: Blood Dragon",
+  "year": 2013,
+  "exact": true
+ },
  "Far Cry 4": {
   "id": 6801,
   "name": "Far Cry 4",
   "year": 2014,
+  "exact": true
+ },
+ "Far Cry 5": {
+  "id": 28552,
+  "name": "Far Cry 5",
+  "year": 2018,
+  "exact": true
+ },
+ "Far Cry 6": {
+  "id": 126290,
+  "name": "Far Cry 6",
+  "year": 2021,
+  "exact": true
+ },
+ "Far Cry Primal": {
+  "id": 13182,
+  "name": "Far Cry: Primal",
+  "year": 2016,
+  "exact": true
+ },
+ "Far Cry: New Dawn": {
+  "id": 113111,
+  "name": "Far Cry New Dawn",
+  "year": 2019,
   "exact": true
  },
  "Farming Simulator 22": {
@@ -5613,6 +6501,18 @@
   "id": 226035,
   "name": "Fields of Mistria",
   "year": 2026,
+  "exact": true
+ },
+ "FIFA 12": {
+  "id": 2946,
+  "name": "FIFA Soccer 12",
+  "year": 2011,
+  "exact": true
+ },
+ "Fight Night Round 3": {
+  "id": 5836,
+  "name": "Fight Night Round 3",
+  "year": 2006,
   "exact": true
  },
  "Fight'N Rage": {
@@ -5739,6 +6639,12 @@
   "id": 421,
   "name": "Final Fantasy IX",
   "year": 2000,
+  "exact": true
+ },
+ "Final Fantasy Legend II": {
+  "id": 403,
+  "name": "Final Fantasy Legend II",
+  "year": 1990,
   "exact": true
  },
  "Final Fantasy Legend II #33,22": {
@@ -6173,6 +7079,12 @@
   "year": 1999,
   "exact": true
  },
+ "Fire Emblem: Three Hopes": {
+  "id": 191396,
+  "name": "Fire Emblem Warriors: Three Hopes",
+  "year": 2022,
+  "exact": false
+ },
  "Fire Emblem: Three Houses": {
   "id": 26845,
   "name": "Fire Emblem: Three Houses",
@@ -6251,6 +7163,12 @@
   "year": 2011,
   "exact": true
  },
+ "Forza Horizon": {
+  "id": 3047,
+  "name": "Forza Horizon",
+  "year": 2012,
+  "exact": true
+ },
  "Forza Horizon #12": {
   "id": 3047,
   "name": "Forza Horizon",
@@ -6293,6 +7211,12 @@
   "year": 2021,
   "exact": true
  },
+ "Forza Motorsport @2005": {
+  "id": 3073,
+  "name": "Forza Motorsport",
+  "year": 2005,
+  "exact": true
+ },
  "Forza Motorsport @2023": {
   "id": 78511,
   "name": "Forza Motorsport",
@@ -6303,6 +7227,18 @@
   "id": 3073,
   "name": "Forza Motorsport",
   "year": 2005,
+  "exact": true
+ },
+ "Forza Motorsport 2": {
+  "id": 3072,
+  "name": "Forza Motorsport 2",
+  "year": 2007,
+  "exact": true
+ },
+ "Forza Motorsport 3": {
+  "id": 3069,
+  "name": "Forza Motorsport 3",
+  "year": 2009,
   "exact": true
  },
  "Forza Motorsport 4": {
@@ -6327,6 +7263,12 @@
   "id": 4872,
   "name": "Fragile Dreams: Farewell Ruins of the Moon",
   "year": 2009,
+  "exact": true
+ },
+ "Freedom Force": {
+  "id": 720,
+  "name": "Freedom Force",
+  "year": 2002,
   "exact": true
  },
  "Freedom Planet": {
@@ -6387,6 +7329,12 @@
   "id": 1502,
   "name": "Front Mission 3",
   "year": 1999,
+  "exact": true
+ },
+ "Front Mission 4": {
+  "id": 1503,
+  "name": "Front Mission 4",
+  "year": 2003,
   "exact": true
  },
  "Front Mission: Gun Hazard #19": {
@@ -6473,7 +7421,19 @@
   "year": 1999,
   "exact": true
  },
+ "Gears 5": {
+  "id": 103292,
+  "name": "Gears 5",
+  "year": 2019,
+  "exact": true
+ },
  "Gears of War": {
+  "id": 547,
+  "name": "Gears of War",
+  "year": 2006,
+  "exact": true
+ },
+ "Gears of War @2006": {
   "id": 547,
   "name": "Gears of War",
   "year": 2006,
@@ -6485,16 +7445,40 @@
   "year": 2006,
   "exact": true
  },
+ "Gears of War 2": {
+  "id": 548,
+  "name": "Gears of War 2",
+  "year": 2008,
+  "exact": true
+ },
  "Gears of War 2 #12": {
   "id": 548,
   "name": "Gears of War 2",
   "year": 2008,
   "exact": true
  },
+ "Gears of War 3": {
+  "id": 492,
+  "name": "Gears of War 3",
+  "year": 2011,
+  "exact": true
+ },
  "Gears of War 3 #12": {
   "id": 492,
   "name": "Gears of War 3",
   "year": 2011,
+  "exact": true
+ },
+ "Gears of War 4": {
+  "id": 11186,
+  "name": "Gears of War 4",
+  "year": 2016,
+  "exact": true
+ },
+ "Gears of War: Judgment": {
+  "id": 1319,
+  "name": "Gears of War: Judgment",
+  "year": 2013,
   "exact": true
  },
  "Gears Tactics": {
@@ -6579,6 +7563,18 @@
   "id": 1348,
   "name": "Ghost Trick: Phantom Detective",
   "year": 2010,
+  "exact": true
+ },
+ "Ghostrunner": {
+  "id": 121752,
+  "name": "Ghostrunner",
+  "year": 2020,
+  "exact": true
+ },
+ "Ghostrunner 2": {
+  "id": 250617,
+  "name": "Ghostrunner II",
+  "year": 2023,
   "exact": true
  },
  "Ghosts 'n Goblins": {
@@ -6809,6 +7805,12 @@
   "year": 1997,
   "exact": true
  },
+ "Golf Story": {
+  "id": 35626,
+  "name": "Golf Story",
+  "year": 2017,
+  "exact": true
+ },
  "Gone Home": {
   "id": 1906,
   "name": "Gone Home",
@@ -6869,6 +7871,12 @@
   "year": 1997,
   "exact": true
  },
+ "Gran Turismo @1997": {
+  "id": 1594,
+  "name": "Gran Turismo",
+  "year": 1997,
+  "exact": true
+ },
  "Gran Turismo @2009 #38": {
   "id": 20426,
   "name": "Gran Turismo",
@@ -6879,6 +7887,12 @@
   "id": 1594,
   "name": "Gran Turismo",
   "year": 1997,
+  "exact": true
+ },
+ "Gran Turismo 2": {
+  "id": 1597,
+  "name": "Gran Turismo 2",
+  "year": 1999,
   "exact": true
  },
  "Gran Turismo 2 #7": {
@@ -6911,10 +7925,22 @@
   "year": 2004,
   "exact": true
  },
+ "Gran Turismo 5": {
+  "id": 1602,
+  "name": "Gran Turismo 5",
+  "year": 2010,
+  "exact": true
+ },
  "Gran Turismo 5 #9": {
   "id": 1602,
   "name": "Gran Turismo 5",
   "year": 2010,
+  "exact": true
+ },
+ "Gran Turismo 6": {
+  "id": 7316,
+  "name": "Gran Turismo 6",
+  "year": 2013,
   "exact": true
  },
  "Gran Turismo 7": {
@@ -6927,6 +7953,12 @@
   "id": 101006,
   "name": "Gran Turismo 7",
   "year": 2022,
+  "exact": true
+ },
+ "Gran Turismo Sport": {
+  "id": 14363,
+  "name": "Gran Turismo Sport",
+  "year": 2017,
   "exact": true
  },
  "Gran Turismo Sport #48": {
@@ -7133,6 +8165,12 @@
   "year": 2017,
   "exact": true
  },
+ "Green Hell": {
+  "id": 101461,
+  "name": "Green Hell",
+  "year": 2019,
+  "exact": true
+ },
  "Grim Dawn": {
   "id": 1907,
   "name": "Grim Dawn",
@@ -7167,6 +8205,12 @@
   "id": 22917,
   "name": "Gris",
   "year": 2018,
+  "exact": true
+ },
+ "Grounded": {
+  "id": 125624,
+  "name": "Grounded",
+  "year": 2022,
   "exact": true
  },
  "Guacamelee!": {
@@ -7223,6 +8267,18 @@
   "year": 2021,
   "exact": true
  },
+ "Guilty Gear X": {
+  "id": 9141,
+  "name": "Guilty Gear X",
+  "year": 2000,
+  "exact": true
+ },
+ "Guilty Gear Xrd Rev 2": {
+  "id": 26801,
+  "name": "Guilty Gear Xrd: Rev 2",
+  "year": 2017,
+  "exact": true
+ },
  "Guilty Gear Xrd Rev 2 #48": {
   "id": 26801,
   "name": "Guilty Gear Xrd: Rev 2",
@@ -7233,6 +8289,12 @@
   "id": 9145,
   "name": "Guilty Gear XX Accent Core",
   "year": 2006,
+  "exact": true
+ },
+ "Guilty Gear XX Accent Core Plus R": {
+  "id": 9146,
+  "name": "Guilty Gear XX Accent Core Plus R",
+  "year": 2012,
   "exact": true
  },
  "Guitar Hero": {
@@ -7269,6 +8331,12 @@
   "id": 2671,
   "name": "Guitar Hero III: Legends of Rock",
   "year": 2007,
+  "exact": true
+ },
+ "GUN": {
+  "id": 3939,
+  "name": "Gun",
+  "year": 2005,
   "exact": true
  },
  "Gunbird 2": {
@@ -7377,6 +8445,18 @@
   "id": 233,
   "name": "Half-Life 2",
   "year": 2004,
+  "exact": true
+ },
+ "Half-Life 2: Episode One": {
+  "id": 338,
+  "name": "Half-Life 2: Episode One",
+  "year": 2006,
+  "exact": true
+ },
+ "Half-Life 2: Episode Two": {
+  "id": 247,
+  "name": "Half-Life 2: Episode Two",
+  "year": 2007,
   "exact": true
  },
  "Half-Life: Alyx": {
@@ -7499,6 +8579,12 @@
   "year": 2015,
   "exact": true
  },
+ "Hard West": {
+  "id": 7675,
+  "name": "Hard West",
+  "year": 2015,
+  "exact": true
+ },
  "Hard West 2": {
   "id": 116014,
   "name": "Hard West 2",
@@ -7509,6 +8595,54 @@
   "id": 130216,
   "name": "Hardspace: Shipbreaker",
   "year": 2022,
+  "exact": true
+ },
+ "Harry Potter and the Chamber of Secrets @2002": {
+  "id": 3941,
+  "name": "Harry Potter and the Chamber of Secrets",
+  "year": 2002,
+  "exact": true
+ },
+ "Harry Potter and the Goblet of Fire": {
+  "id": 3942,
+  "name": "Harry Potter and the Goblet of Fire",
+  "year": 2005,
+  "exact": true
+ },
+ "Harry Potter and the Half-Blood Prince": {
+  "id": 4906,
+  "name": "Harry Potter and the Half-Blood Prince",
+  "year": 2009,
+  "exact": true
+ },
+ "Harry Potter and the Order of the Phoenix": {
+  "id": 3011,
+  "name": "Harry Potter and the Order of the Phoenix",
+  "year": 2007,
+  "exact": true
+ },
+ "Harry Potter and the Prisoner of Azkaban @2004": {
+  "id": 3943,
+  "name": "Harry Potter and the Prisoner of Azkaban",
+  "year": 2004,
+  "exact": true
+ },
+ "Harry Potter and the Sorcerer's Stone @2001": {
+  "id": 341,
+  "name": "Harry Potter and the Sorcerer's Stone",
+  "year": 2001,
+  "exact": true
+ },
+ "Harry Potter: Quidditch World Cup": {
+  "id": 3944,
+  "name": "Harry Potter: Quidditch World Cup",
+  "year": 2003,
+  "exact": true
+ },
+ "Harvest Moon @1996": {
+  "id": 3376,
+  "name": "Harvest Moon",
+  "year": 1996,
   "exact": true
  },
  "Harvest Moon #19": {
@@ -7529,10 +8663,22 @@
   "year": 1999,
   "exact": true
  },
+ "Harvest Moon DS": {
+  "id": 3385,
+  "name": "Harvest Moon DS",
+  "year": 2005,
+  "exact": true
+ },
  "Harvest Moon GBC #33,22": {
   "id": 220737,
   "name": "Harvest Moon GBC",
   "year": 1998,
+  "exact": true
+ },
+ "Harvest Moon: A Wonderful Life": {
+  "id": 3384,
+  "name": "Harvest Moon: A Wonderful Life",
+  "year": 2003,
   "exact": true
  },
  "Harvest Moon: Back to Nature": {
@@ -7551,6 +8697,12 @@
   "id": 3383,
   "name": "Harvest Moon: Friends of Mineral Town",
   "year": 2003,
+  "exact": true
+ },
+ "Harvest Moon: Magical Melody": {
+  "id": 3386,
+  "name": "Harvest Moon: Magical Melody",
+  "year": 2005,
   "exact": true
  },
  "Hatoful Boyfriend": {
@@ -7581,6 +8733,12 @@
   "id": 1279,
   "name": "Hearthstone",
   "year": 2014,
+  "exact": true
+ },
+ "Hearts of Iron IV": {
+  "id": 15894,
+  "name": "Hearts of Iron IV",
+  "year": 2016,
   "exact": true
  },
  "Heave Ho": {
@@ -7643,6 +8801,12 @@
   "year": 2007,
   "exact": true
  },
+ "Heroes of Might and Magic III": {
+  "id": 364,
+  "name": "Heroes of Might and Magic III: The Restoration of Erathia",
+  "year": 1999,
+  "exact": true
+ },
  "Heroes of Might and Magic III #6": {
   "id": 364,
   "name": "Heroes of Might and Magic III: The Restoration of Erathia",
@@ -7653,6 +8817,12 @@
   "id": 7313,
   "name": "Heroes of the Storm",
   "year": 2015,
+  "exact": true
+ },
+ "Hey! Pikmin": {
+  "id": 28124,
+  "name": "Hey! Pikmin",
+  "year": 2017,
   "exact": true
  },
  "Hey! Pikmin #37": {
@@ -7697,16 +8867,58 @@
   "year": 2018,
   "exact": true
  },
+ "Hitman 2 @2018": {
+  "id": 103210,
+  "name": "Hitman 2",
+  "year": 2018,
+  "exact": true
+ },
  "Hitman 2 #48": {
   "id": 103210,
   "name": "Hitman 2",
   "year": 2018,
   "exact": true
  },
+ "Hitman 2: Silent Assassin": {
+  "id": 748,
+  "name": "Hitman 2: Silent Assassin",
+  "year": 2002,
+  "exact": true
+ },
+ "Hitman 3": {
+  "id": 134595,
+  "name": "Hitman 3",
+  "year": 2021,
+  "exact": true
+ },
+ "Hitman Go": {
+  "id": 6073,
+  "name": "Hitman Go",
+  "year": 2014,
+  "exact": true
+ },
+ "Hitman: Absolution": {
+  "id": 530,
+  "name": "Hitman: Absolution",
+  "year": 2012,
+  "exact": true
+ },
  "Hitman: Blood Money": {
   "id": 1048,
   "name": "Hitman: Blood Money",
   "year": 2006,
+  "exact": true
+ },
+ "Hitman: Codename 47": {
+  "id": 1050,
+  "name": "Hitman: Codename 47",
+  "year": 2000,
+  "exact": true
+ },
+ "Hitman: Contracts": {
+  "id": 1049,
+  "name": "Hitman: Contracts",
+  "year": 2004,
   "exact": true
  },
  "Hitman: World of Assassination": {
@@ -7901,6 +9113,18 @@
   "year": 2023,
   "exact": true
  },
+ "Humankind": {
+  "id": 121731,
+  "name": "Humankind",
+  "year": 2021,
+  "exact": true
+ },
+ "Hunt: Showdown": {
+  "id": 7291,
+  "name": "Hunt: Showdown 1896",
+  "year": 2019,
+  "exact": true
+ },
  "Hunter x Hunter: Nen x Impact": {
   "id": 281740,
   "name": "Hunter x Hunter: Nen x Impact",
@@ -7929,6 +9153,12 @@
   "id": 138343,
   "name": "Hyrule Warriors: Age of Calamity",
   "year": 2020,
+  "exact": true
+ },
+ "Hyrule Warriors: Definitive Edition": {
+  "id": 81147,
+  "name": "Hyrule Warriors: Definitive Edition",
+  "year": 2018,
   "exact": true
  },
  "I Wanna Be the Guy": {
@@ -8015,6 +9245,12 @@
   "year": 2020,
   "exact": true
  },
+ "Inazuma Eleven": {
+  "id": 22688,
+  "name": "Inazuma Eleven",
+  "year": 2008,
+  "exact": true
+ },
  "Inazuma Eleven #20": {
   "id": 22688,
   "name": "Inazuma Eleven",
@@ -8037,6 +9273,12 @@
   "id": 523,
   "name": "Infamous",
   "year": 2009,
+  "exact": true
+ },
+ "Infamous 2": {
+  "id": 515,
+  "name": "Infamous 2",
+  "year": 2011,
   "exact": true
  },
  "Infamous 2 #9": {
@@ -8219,10 +9461,22 @@
   "year": 1999,
   "exact": true
  },
+ "Jak 3": {
+  "id": 1530,
+  "name": "Jak 3",
+  "year": 2004,
+  "exact": true
+ },
  "Jak 3 #8": {
   "id": 1530,
   "name": "Jak 3",
   "year": 2004,
+  "exact": true
+ },
+ "Jak and Daxter: The Lost Frontier": {
+  "id": 1531,
+  "name": "Jak and Daxter: The Lost Frontier",
+  "year": 2009,
   "exact": true
  },
  "Jak and Daxter: The Lost Frontier #38": {
@@ -8243,10 +9497,22 @@
   "year": 2001,
   "exact": true
  },
+ "Jak II": {
+  "id": 1529,
+  "name": "Jak II",
+  "year": 2003,
+  "exact": true
+ },
  "Jak II #8": {
   "id": 1529,
   "name": "Jak II",
   "year": 2003,
+  "exact": true
+ },
+ "Jak X: Combat Racing": {
+  "id": 1532,
+  "name": "Jak X: Combat Racing",
+  "year": 2005,
   "exact": true
  },
  "Jamestown": {
@@ -8535,6 +9801,12 @@
   "id": 3966,
   "name": "Killer7",
   "year": 2005,
+  "exact": true
+ },
+ "Killing Floor 2": {
+  "id": 6748,
+  "name": "Killing Floor 2",
+  "year": 2016,
   "exact": true
  },
  "Killzone #8": {
@@ -9023,6 +10295,12 @@
   "year": 2009,
   "exact": true
  },
+ "Left 4 Dead": {
+  "id": 122,
+  "name": "Left 4 Dead",
+  "year": 2008,
+  "exact": true
+ },
  "Left 4 Dead #12": {
   "id": 122,
   "name": "Left 4 Dead",
@@ -9077,6 +10355,84 @@
   "year": 2020,
   "exact": true
  },
+ "Lego Batman 2: DC Super Heroes": {
+  "id": 6836,
+  "name": "LEGO Batman 2: DC Super Heroes",
+  "year": 2012,
+  "exact": true
+ },
+ "Lego Batman: The Videogame": {
+  "id": 2738,
+  "name": "LEGO Batman: The Videogame",
+  "year": 2008,
+  "exact": true
+ },
+ "Lego Bricktales": {
+  "id": 194745,
+  "name": "LEGO Bricktales",
+  "year": 2022,
+  "exact": true
+ },
+ "Lego City Undercover": {
+  "id": 2177,
+  "name": "LEGO City Undercover",
+  "year": 2013,
+  "exact": true
+ },
+ "Lego Dimensions": {
+  "id": 11077,
+  "name": "LEGO Dimensions",
+  "year": 2015,
+  "exact": true
+ },
+ "Lego Harry Potter: Years 1-4": {
+  "id": 3149,
+  "name": "LEGO Harry Potter: Years 1-4",
+  "year": 2010,
+  "exact": true
+ },
+ "Lego Harry Potter: Years 5-7": {
+  "id": 3150,
+  "name": "LEGO Harry Potter: Years 5-7",
+  "year": 2011,
+  "exact": true
+ },
+ "Lego Indiana Jones: The Original Adventures": {
+  "id": 189,
+  "name": "LEGO Indiana Jones: The Original Adventures",
+  "year": 2008,
+  "exact": true
+ },
+ "Lego Island": {
+  "id": 5612,
+  "name": "LEGO Island",
+  "year": 1997,
+  "exact": true
+ },
+ "Lego Jurassic World": {
+  "id": 9918,
+  "name": "LEGO Jurassic World",
+  "year": 2015,
+  "exact": true
+ },
+ "Lego Marvel Super Heroes": {
+  "id": 2050,
+  "name": "LEGO Marvel Super Heroes",
+  "year": 2013,
+  "exact": true
+ },
+ "Lego Marvel Super Heroes 2": {
+  "id": 28815,
+  "name": "LEGO Marvel Super Heroes 2",
+  "year": 2017,
+  "exact": true
+ },
+ "Lego Star Wars III: The Clone Wars": {
+  "id": 6844,
+  "name": "LEGO Star Wars III: The Clone Wars",
+  "year": 2011,
+  "exact": true
+ },
  "Lego Star Wars: The Complete Saga": {
   "id": 2682,
   "name": "LEGO Star Wars: The Complete Saga",
@@ -9087,6 +10443,12 @@
   "id": 119305,
   "name": "LEGO Star Wars: The Skywalker Saga",
   "year": 2022,
+  "exact": true
+ },
+ "Lego The Lord of the Rings": {
+  "id": 4969,
+  "name": "LEGO The Lord of the Rings",
+  "year": 2012,
   "exact": true
  },
  "Leisure Suit Larry in the Land of the Lounge Lizards": {
@@ -9491,6 +10853,12 @@
   "year": 2009,
   "exact": true
  },
+ "Mafia @2002": {
+  "id": 39,
+  "name": "Mafia",
+  "year": 2002,
+  "exact": true
+ },
  "Mafia #8": {
   "id": 39,
   "name": "Mafia",
@@ -9503,10 +10871,22 @@
   "year": 2010,
   "exact": true
  },
+ "Mafia III": {
+  "id": 11492,
+  "name": "Mafia III",
+  "year": 2016,
+  "exact": true
+ },
  "Mafia: Definitive Edition": {
   "id": 134070,
   "name": "Mafia: Definitive Edition",
   "year": 2020,
+  "exact": true
+ },
+ "Mafia: The Old Country": {
+  "id": 314276,
+  "name": "Mafia: The Old Country",
+  "year": 2025,
   "exact": true
  },
  "Magic Knight Rayearth #32": {
@@ -9549,6 +10929,12 @@
   "id": 307416,
   "name": "Maniac Mansion",
   "year": 1988,
+  "exact": true
+ },
+ "Manor Lords": {
+  "id": 137206,
+  "name": "Manor Lords",
+  "year": 2024,
   "exact": true
  },
  "Mario & Luigi: Bowser's Inside Story": {
@@ -9635,6 +11021,12 @@
   "year": 2022,
   "exact": true
  },
+ "Mario Golf @1999": {
+  "id": 3401,
+  "name": "Mario Golf",
+  "year": 1999,
+  "exact": true
+ },
  "Mario Golf @1999 #33,22": {
   "id": 135389,
   "name": "Mario Golf",
@@ -9653,10 +11045,22 @@
   "year": 2003,
   "exact": true
  },
+ "Mario Kart 64": {
+  "id": 2342,
+  "name": "Mario Kart 64",
+  "year": 1996,
+  "exact": true
+ },
  "Mario Kart 64 #4": {
   "id": 2342,
   "name": "Mario Kart 64",
   "year": 1996,
+  "exact": true
+ },
+ "Mario Kart 7": {
+  "id": 2349,
+  "name": "Mario Kart 7",
+  "year": 2011,
   "exact": true
  },
  "Mario Kart 7 #37": {
@@ -9731,6 +11135,12 @@
   "year": 2003,
   "exact": true
  },
+ "Mario Kart: Super Circuit": {
+  "id": 2343,
+  "name": "Mario Kart: Super Circuit",
+  "year": 2001,
+  "exact": true
+ },
  "Mario Kart: Super Circuit #24": {
   "id": 2343,
   "name": "Mario Kart: Super Circuit",
@@ -9741,6 +11151,12 @@
   "id": 8203,
   "name": "Mario Paint",
   "year": 1992,
+  "exact": true
+ },
+ "Mario Party @1998": {
+  "id": 2327,
+  "name": "Mario Party",
+  "year": 1998,
   "exact": true
  },
  "Mario Party 2": {
@@ -9755,16 +11171,46 @@
   "year": 1999,
   "exact": true
  },
+ "Mario Party 3": {
+  "id": 2329,
+  "name": "Mario Party 3",
+  "year": 2000,
+  "exact": true
+ },
+ "Mario Party 4": {
+  "id": 2330,
+  "name": "Mario Party 4",
+  "year": 2002,
+  "exact": true
+ },
  "Mario Party 4 #21": {
   "id": 2330,
   "name": "Mario Party 4",
   "year": 2002,
   "exact": true
  },
+ "Mario Party 5": {
+  "id": 2331,
+  "name": "Mario Party 5",
+  "year": 2003,
+  "exact": true
+ },
+ "Mario Party 6": {
+  "id": 2333,
+  "name": "Mario Party 6",
+  "year": 2004,
+  "exact": true
+ },
  "Mario Party 9 #5": {
   "id": 2336,
   "name": "Mario Party 9",
   "year": 2012,
+  "exact": true
+ },
+ "Mario Party DS": {
+  "id": 2335,
+  "name": "Mario Party DS",
+  "year": 2007,
   "exact": true
  },
  "Mario Party DS #20": {
@@ -9785,10 +11231,22 @@
   "year": 2004,
   "exact": true
  },
+ "Mario Strikers Charged": {
+  "id": 2255,
+  "name": "Mario Strikers Charged",
+  "year": 2007,
+  "exact": true
+ },
  "Mario Strikers Charged #5": {
   "id": 2255,
   "name": "Mario Strikers Charged",
   "year": 2007,
+  "exact": true
+ },
+ "Mario Tennis @2000": {
+  "id": 3406,
+  "name": "Mario Tennis",
+  "year": 2000,
   "exact": true
  },
  "Mario Tennis @2000 #33,22": {
@@ -9855,6 +11313,12 @@
   "id": 8245,
   "name": "Marvel Super Heroes vs. Street Fighter",
   "year": 1997,
+  "exact": true
+ },
+ "Marvel Ultimate Alliance": {
+  "id": 4999,
+  "name": "Marvel: Ultimate Alliance",
+  "year": 2006,
   "exact": true
  },
  "Marvel vs. Capcom 2: New Age of Heroes": {
@@ -9929,6 +11393,12 @@
   "year": 2023,
   "exact": true
  },
+ "Marvel's Spider-Man: Miles Morales": {
+  "id": 134581,
+  "name": "Marvel's Spider-Man: Miles Morales",
+  "year": 2020,
+  "exact": true
+ },
  "Marvel's Spider-Man: Miles Morales #167": {
   "id": 134581,
   "name": "Marvel's Spider-Man: Miles Morales",
@@ -9971,6 +11441,12 @@
   "year": 2012,
   "exact": true
  },
+ "Mass Effect: Andromeda": {
+  "id": 7349,
+  "name": "Mass Effect: Andromeda",
+  "year": 2017,
+  "exact": true
+ },
  "Mass Effect: Legendary Edition": {
   "id": 140839,
   "name": "Mass Effect Legendary Edition",
@@ -10004,6 +11480,36 @@
  "MechAssault #11": {
   "id": 5910,
   "name": "MechAssault",
+  "year": 2002,
+  "exact": true
+ },
+ "MechWarrior 2: 31st Century Combat": {
+  "id": 784,
+  "name": "MechWarrior 2: 31st Century Combat",
+  "year": 1995,
+  "exact": true
+ },
+ "MechWarrior 4: Vengeance": {
+  "id": 786,
+  "name": "MechWarrior 4: Vengeance",
+  "year": 2000,
+  "exact": true
+ },
+ "MechWarrior 5: Mercenaries": {
+  "id": 26227,
+  "name": "MechWarrior 5: Mercenaries",
+  "year": 2019,
+  "exact": true
+ },
+ "Medieval II: Total War": {
+  "id": 440,
+  "name": "Medieval II: Total War",
+  "year": 2006,
+  "exact": true
+ },
+ "Medieval: Total War": {
+  "id": 437,
+  "name": "Medieval: Total War",
   "year": 2002,
   "exact": true
  },
@@ -10499,6 +12005,12 @@
   "year": 1999,
   "exact": true
  },
+ "Metal Wolf Chaos XD": {
+  "id": 103304,
+  "name": "Metal Wolf Chaos XD",
+  "year": 2019,
+  "exact": true
+ },
  "Metal: Hellsinger": {
   "id": 134560,
   "name": "Metal: Hellsinger",
@@ -10845,6 +12357,12 @@
   "id": 1051,
   "name": "Mirror's Edge",
   "year": 2008,
+  "exact": true
+ },
+ "Mirror's Edge Catalyst": {
+  "id": 2112,
+  "name": "Mirror's Edge Catalyst",
+  "year": 2016,
   "exact": true
  },
  "Mischief Makers": {
@@ -11297,6 +12815,12 @@
   "year": 1996,
   "exact": true
  },
+ "Ms. Pac-Man": {
+  "id": 7452,
+  "name": "Ms. Pac-Man",
+  "year": 1982,
+  "exact": true
+ },
  "Multiversus": {
   "id": 182278,
   "name": "MultiVersus",
@@ -11423,6 +12947,12 @@
   "year": 2008,
   "exact": true
  },
+ "Napoleon: Total War": {
+  "id": 442,
+  "name": "Napoleon: Total War",
+  "year": 2010,
+  "exact": true
+ },
  "Naruto Shippuden: Ultimate Ninja Heroes 3 #38": {
   "id": 42855,
   "name": "Naruto Shippuden: Ultimate Ninja Heroes 3",
@@ -11435,16 +12965,40 @@
   "year": 2010,
   "exact": true
  },
+ "Naruto Shippuden: Ultimate Ninja Storm 3": {
+  "id": 7099,
+  "name": "Naruto Shippuden: Ultimate Ninja Storm 3",
+  "year": 2013,
+  "exact": true
+ },
  "Naruto Shippuden: Ultimate Ninja Storm 4": {
   "id": 11059,
   "name": "Naruto Shippuden: Ultimate Ninja Storm 4",
   "year": 2016,
   "exact": true
  },
+ "Naruto Shippuden: Ultimate Ninja Storm Generations": {
+  "id": 7100,
+  "name": "Naruto Shippuden: Ultimate Ninja Storm Generations",
+  "year": 2012,
+  "exact": true
+ },
+ "Naruto x Boruto: Ultimate Ninja Storm Connections": {
+  "id": 239385,
+  "name": "Naruto x Boruto: Ultimate Ninja Storm Connections",
+  "year": 2023,
+  "exact": true
+ },
  "Naruto: Clash of Ninja Revolution": {
   "id": 19622,
   "name": "Naruto: Clash of Ninja Revolution",
   "year": 2007,
+  "exact": true
+ },
+ "Naruto: Ultimate Ninja 3": {
+  "id": 19626,
+  "name": "Naruto: Ultimate Ninja 3",
+  "year": 2005,
   "exact": true
  },
  "Naruto: Ultimate Ninja 3 #8": {
@@ -11459,10 +13013,34 @@
   "year": 2008,
   "exact": true
  },
+ "NBA 2K11": {
+  "id": 5056,
+  "name": "NBA 2K11",
+  "year": 2010,
+  "exact": true
+ },
+ "NBA Jam @1993": {
+  "id": 8995,
+  "name": "NBA Jam",
+  "year": 1993,
+  "exact": true
+ },
  "NBA Jam: Tournament Edition #19": {
   "id": 19712,
   "name": "NBA Jam Tournament Edition",
   "year": 1994,
+  "exact": true
+ },
+ "NBA Street Vol. 2": {
+  "id": 4036,
+  "name": "NBA Street Vol. 2",
+  "year": 2003,
+  "exact": true
+ },
+ "Need for Speed Heat": {
+  "id": 119161,
+  "name": "Need for Speed: Heat",
+  "year": 2019,
   "exact": true
  },
  "Need for Speed III: Hot Pursuit": {
@@ -11477,6 +13055,18 @@
   "year": 1998,
   "exact": true
  },
+ "Need for Speed: Carbon": {
+  "id": 99,
+  "name": "Need for Speed: Carbon",
+  "year": 2006,
+  "exact": true
+ },
+ "Need for Speed: High Stakes": {
+  "id": 93,
+  "name": "Need for Speed: High Stakes",
+  "year": 1999,
+  "exact": true
+ },
  "Need for Speed: High Stakes #7": {
   "id": 93,
   "name": "Need for Speed: High Stakes",
@@ -11489,16 +13079,46 @@
   "year": 2010,
   "exact": true
  },
+ "Need for Speed: Hot Pursuit 2": {
+  "id": 95,
+  "name": "Need for Speed: Hot Pursuit 2",
+  "year": 2002,
+  "exact": true
+ },
  "Need for Speed: Most Wanted @2005": {
   "id": 98,
   "name": "Need for Speed: Most Wanted",
   "year": 2005,
   "exact": true
  },
+ "Need for Speed: Most Wanted @2012": {
+  "id": 3193,
+  "name": "Need for Speed: Most Wanted",
+  "year": 2012,
+  "exact": true
+ },
  "Need for Speed: Most Wanted #8": {
   "id": 243048,
   "name": "Need for Speed: Most Wanted",
   "year": 2005,
+  "exact": true
+ },
+ "Need for Speed: Porsche Unleashed": {
+  "id": 94,
+  "name": "Need for Speed: Porsche Unleashed",
+  "year": 2000,
+  "exact": true
+ },
+ "Need for Speed: Unbound": {
+  "id": 219442,
+  "name": "Need for Speed: Unbound",
+  "year": 2022,
+  "exact": true
+ },
+ "Need for Speed: Underground": {
+  "id": 96,
+  "name": "Need for Speed: Underground",
+  "year": 2003,
   "exact": true
  },
  "Need for Speed: Underground 2": {
@@ -11510,6 +13130,12 @@
  "Need for Speed: Underground 2 #8": {
   "id": 97,
   "name": "Need for Speed: Underground 2",
+  "year": 2004,
+  "exact": true
+ },
+ "Neo Contra": {
+  "id": 20208,
+  "name": "Neo Contra",
   "year": 2004,
   "exact": true
  },
@@ -11603,6 +13229,12 @@
   "year": 2009,
   "exact": true
  },
+ "New Tales from the Borderlands": {
+  "id": 214139,
+  "name": "New Tales from the Borderlands",
+  "year": 2022,
+  "exact": true
+ },
  "Nex Machina": {
   "id": 26202,
   "name": "Nex Machina",
@@ -11619,6 +13251,12 @@
   "id": 8843,
   "name": "NFL 2K1",
   "year": 2000,
+  "exact": true
+ },
+ "NHL '94": {
+  "id": 5405,
+  "name": "NHL '94",
+  "year": 1993,
   "exact": true
  },
  "NHL '94 #29": {
@@ -11657,7 +13295,19 @@
   "year": 2014,
   "exact": true
  },
+ "NieR @2010": {
+  "id": 7120,
+  "name": "NieR",
+  "year": 2010,
+  "exact": true
+ },
  "Nier Replicant ver.1.22474487139...": {
+  "id": 131999,
+  "name": "NieR Replicant ver.1.22474487139...",
+  "year": 2021,
+  "exact": true
+ },
+ "NieR Replicant ver.1.22474487139...": {
   "id": 131999,
   "name": "NieR Replicant ver.1.22474487139...",
   "year": 2021,
@@ -11741,6 +13391,12 @@
   "year": 2025,
   "exact": true
  },
+ "Ninja Gaiden 3: Razor's Edge": {
+  "id": 5317,
+  "name": "Ninja Gaiden 3: Razor's Edge",
+  "year": 2012,
+  "exact": true
+ },
  "Ninja Gaiden 4": {
   "id": 329130,
   "name": "Ninja Gaiden 4",
@@ -11765,10 +13421,22 @@
   "year": 2008,
   "exact": true
  },
+ "Ninja Gaiden II @2008": {
+  "id": 6782,
+  "name": "Ninja Gaiden II",
+  "year": 2008,
+  "exact": true
+ },
  "Ninja Gaiden II #12": {
   "id": 6782,
   "name": "Ninja Gaiden II",
   "year": 2008,
+  "exact": true
+ },
+ "Ninja Gaiden II: The Dark Sword of Chaos": {
+  "id": 15540,
+  "name": "Ninja Gaiden II: The Dark Sword of Chaos",
+  "year": 1990,
   "exact": true
  },
  "Ninja Gaiden II: The Dark Sword of Chaos #18,99": {
@@ -11793,6 +13461,12 @@
   "id": 21000,
   "name": "Ninja Gaiden Sigma 2 Plus",
   "year": 2013,
+  "exact": true
+ },
+ "Ninja Gaiden: Dragon Sword": {
+  "id": 21466,
+  "name": "Ninja Gaiden: Dragon Sword",
+  "year": 2008,
   "exact": true
  },
  "Ninja Gaiden: Dragon Sword #20": {
@@ -11981,6 +13655,12 @@
   "year": 2014,
   "exact": true
  },
+ "Oddworld: Stranger's Wrath": {
+  "id": 1002,
+  "name": "Oddworld: Stranger's Wrath",
+  "year": 2005,
+  "exact": true
+ },
  "Oddworld: Stranger's Wrath #11": {
   "id": 1002,
   "name": "Oddworld: Stranger's Wrath",
@@ -12041,6 +13721,18 @@
   "year": 2010,
   "exact": true
  },
+ "Old World": {
+  "id": 133674,
+  "name": "Old World",
+  "year": 2021,
+  "exact": true
+ },
+ "OlliOlli World": {
+  "id": 145782,
+  "name": "OlliOlli World",
+  "year": 2022,
+  "exact": true
+ },
  "Omori": {
   "id": 26673,
   "name": "Omori",
@@ -12051,6 +13743,18 @@
   "id": 194837,
   "name": "One Piece Odyssey",
   "year": 2023,
+  "exact": true
+ },
+ "One Piece: Burning Blood": {
+  "id": 18443,
+  "name": "One Piece: Burning Blood",
+  "year": 2016,
+  "exact": true
+ },
+ "One Piece: Grand Adventure": {
+  "id": 4053,
+  "name": "One Piece: Grand Adventure",
+  "year": 2006,
   "exact": true
  },
  "One Piece: Pirate Warriors 3": {
@@ -12071,6 +13775,18 @@
   "year": 2007,
   "exact": true
  },
+ "One Piece: Unlimited World Red": {
+  "id": 6860,
+  "name": "One Piece: Unlimited World RED",
+  "year": 2013,
+  "exact": true
+ },
+ "One Piece: World Seeker": {
+  "id": 76742,
+  "name": "One Piece: World Seeker",
+  "year": 2019,
+  "exact": true
+ },
  "One Way Heroics": {
   "id": 13099,
   "name": "One Way Heroics",
@@ -12087,6 +13803,24 @@
   "id": 11757,
   "name": "Onimusha 2: Samurai's Destiny",
   "year": 2002,
+  "exact": true
+ },
+ "Onimusha 3: Demon Siege": {
+  "id": 11758,
+  "name": "Onimusha 3: Demon Siege",
+  "year": 2004,
+  "exact": true
+ },
+ "Onimusha: Dawn of Dreams": {
+  "id": 11759,
+  "name": "Onimusha: Dawn of Dreams",
+  "year": 2006,
+  "exact": true
+ },
+ "Onimusha: Warlords": {
+  "id": 5845,
+  "name": "Onimusha: Warlords",
+  "year": 2001,
   "exact": true
  },
  "Onimusha: Warlords #8": {
@@ -12123,6 +13857,12 @@
   "id": 74545,
   "name": "Opus Magnum",
   "year": 2017,
+  "exact": true
+ },
+ "Organ Trail": {
+  "id": 65257,
+  "name": "Organ Trail",
+  "year": 2013,
   "exact": true
  },
  "Ori and the Blind Forest": {
@@ -12191,6 +13931,12 @@
   "year": 2013,
   "exact": true
  },
+ "Outlaws @1997": {
+  "id": 196,
+  "name": "Outlaws",
+  "year": 1997,
+  "exact": true
+ },
  "OutRun": {
   "id": 2051,
   "name": "OutRun",
@@ -12239,6 +13985,12 @@
   "year": 2016,
   "exact": true
  },
+ "Oxygen Not Included": {
+  "id": 19542,
+  "name": "Oxygen Not Included",
+  "year": 2019,
+  "exact": true
+ },
  "P.N.03 #21": {
   "id": 4060,
   "name": "P.N.03",
@@ -12257,10 +14009,46 @@
   "year": 1993,
   "exact": true
  },
+ "Pac-Man @1980": {
+  "id": 2750,
+  "name": "Pac-Man",
+  "year": 1980,
+  "exact": true
+ },
+ "Pac-Man 99": {
+  "id": 145515,
+  "name": "Pac-Man 99",
+  "year": 2021,
+  "exact": true
+ },
+ "Pac-Man Championship Edition 2": {
+  "id": 23240,
+  "name": "Pac-Man Championship Edition 2",
+  "year": 2016,
+  "exact": true
+ },
+ "Pac-Man Championship Edition DX": {
+  "id": 21737,
+  "name": "Pac-Man: Championship Edition DX",
+  "year": 2010,
+  "exact": true
+ },
  "Pac-Man Championship Edition DX #12": {
   "id": 21737,
   "name": "Pac-Man: Championship Edition DX",
   "year": 2010,
+  "exact": true
+ },
+ "Pac-Man World": {
+  "id": 6530,
+  "name": "Pac-Man World",
+  "year": 1999,
+  "exact": true
+ },
+ "Pac-Man World Re-Pac": {
+  "id": 206811,
+  "name": "Pac-Man World Re-Pac",
+  "year": 2022,
   "exact": true
  },
  "Paladins": {
@@ -12713,16 +14501,46 @@
   "year": 2018,
   "exact": true
  },
+ "Phantasy Star @1987": {
+  "id": 1233,
+  "name": "Phantasy Star",
+  "year": 1987,
+  "exact": true
+ },
+ "Phantasy Star II": {
+  "id": 1232,
+  "name": "Phantasy Star II",
+  "year": 1989,
+  "exact": true
+ },
  "Phantasy Star II #29": {
   "id": 1232,
   "name": "Phantasy Star II",
   "year": 1989,
   "exact": true
  },
+ "Phantasy Star III: Generations of Doom": {
+  "id": 1231,
+  "name": "Phantasy Star III: Generations of Doom",
+  "year": 1990,
+  "exact": true
+ },
+ "Phantasy Star IV: The End of the Millennium": {
+  "id": 1230,
+  "name": "Phantasy Star IV: The End of the Millennium",
+  "year": 1993,
+  "exact": true
+ },
  "Phantasy Star IV: The End of the Millennium #29": {
   "id": 1230,
   "name": "Phantasy Star IV: The End of the Millennium",
   "year": 1993,
+  "exact": true
+ },
+ "Phantasy Star Online": {
+  "id": 21968,
+  "name": "Phantasy Star Online",
+  "year": 2000,
   "exact": true
  },
  "Phantasy Star Online #23": {
@@ -12737,16 +14555,34 @@
   "year": 2012,
   "exact": true
  },
+ "Phantasy Star Portable 2": {
+  "id": 19256,
+  "name": "Phantasy Star Portable 2",
+  "year": 2009,
+  "exact": true
+ },
  "Phantasy Star Portable 2 #38": {
   "id": 19256,
   "name": "Phantasy Star Portable 2",
   "year": 2009,
   "exact": true
  },
+ "Phantasy Star Universe": {
+  "id": 7129,
+  "name": "Phantasy Star Universe",
+  "year": 2006,
+  "exact": true
+ },
  "Phantom Brave #8": {
   "id": 5097,
   "name": "Phantom Brave",
   "year": 2004,
+  "exact": true
+ },
+ "Pharaoh": {
+  "id": 7510,
+  "name": "Pharaoh",
+  "year": 1999,
   "exact": true
  },
  "Phasmophobia": {
@@ -12839,10 +14675,22 @@
   "year": 2011,
   "exact": true
  },
+ "Pikmin @2001": {
+  "id": 2239,
+  "name": "Pikmin",
+  "year": 2001,
+  "exact": true
+ },
  "Pikmin #21": {
   "id": 2239,
   "name": "Pikmin",
   "year": 2001,
+  "exact": true
+ },
+ "Pikmin 2": {
+  "id": 2240,
+  "name": "Pikmin 2",
+  "year": 2004,
   "exact": true
  },
  "Pikmin 2 #21": {
@@ -12855,6 +14703,12 @@
   "id": 2241,
   "name": "Pikmin 3",
   "year": 2013,
+  "exact": true
+ },
+ "Pikmin 3 Deluxe": {
+  "id": 136498,
+  "name": "Pikmin 3 Deluxe",
+  "year": 2020,
   "exact": true
  },
  "Pikmin 3 Deluxe #130": {
@@ -12957,6 +14811,12 @@
   "id": 11413,
   "name": "Planetarian: The Reverie of a Little Planet",
   "year": 2004,
+  "exact": true
+ },
+ "Plants vs. Zombies": {
+  "id": 1277,
+  "name": "Plants vs. Zombies",
+  "year": 2009,
   "exact": true
  },
  "PlateUp!": {
@@ -13451,6 +15311,30 @@
   "year": 2012,
   "exact": true
  },
+ "Prince of Persia @1989": {
+  "id": 2472,
+  "name": "Prince of Persia",
+  "year": 1989,
+  "exact": true
+ },
+ "Prince of Persia @2008": {
+  "id": 2438,
+  "name": "Prince of Persia",
+  "year": 2008,
+  "exact": true
+ },
+ "Prince of Persia 2: The Shadow and the Flame": {
+  "id": 3164,
+  "name": "Prince of Persia 2: The Shadow and the Flame",
+  "year": 1993,
+  "exact": true
+ },
+ "Prince of Persia: The Forgotten Sands": {
+  "id": 2468,
+  "name": "Prince of Persia: The Forgotten Sands",
+  "year": 2010,
+  "exact": true
+ },
  "Prince of Persia: The Lost Crown": {
   "id": 252476,
   "name": "Prince of Persia: The Lost Crown",
@@ -13467,6 +15351,12 @@
   "id": 252476,
   "name": "Prince of Persia: The Lost Crown",
   "year": 2024,
+  "exact": true
+ },
+ "Prince of Persia: The Sands of Time": {
+  "id": 836,
+  "name": "Prince of Persia: The Sands of Time",
+  "year": 2003,
   "exact": true
  },
  "Prince of Persia: The Sands of Time #11": {
@@ -13487,10 +15377,28 @@
   "year": 2003,
   "exact": true
  },
+ "Prince of Persia: The Two Thrones": {
+  "id": 2437,
+  "name": "Prince of Persia: The Two Thrones",
+  "year": 2005,
+  "exact": true
+ },
+ "Prince of Persia: Warrior Within": {
+  "id": 837,
+  "name": "Prince of Persia: Warrior Within",
+  "year": 2004,
+  "exact": true
+ },
  "Prince of Persia: Warrior Within #8": {
   "id": 837,
   "name": "Prince of Persia: Warrior Within",
   "year": 2004,
+  "exact": true
+ },
+ "Prison Architect": {
+  "id": 1338,
+  "name": "Prison Architect",
+  "year": 2015,
   "exact": true
  },
  "Pro Evolution Soccer 6 #8": {
@@ -13607,6 +15515,24 @@
   "year": 2000,
   "exact": true
  },
+ "Project Zomboid": {
+  "id": 3189,
+  "name": "Project Zomboid",
+  "year": 2013,
+  "exact": true
+ },
+ "Prototype": {
+  "id": 570,
+  "name": "Prototype",
+  "year": 2009,
+  "exact": true
+ },
+ "Pseudoregalia": {
+  "id": 242148,
+  "name": "Pseudoregalia",
+  "year": 2023,
+  "exact": true
+ },
  "Psychonauts": {
   "id": 1339,
   "name": "Psychonauts",
@@ -13635,6 +15561,12 @@
   "id": 7255,
   "name": "Pulstar",
   "year": 1995,
+  "exact": true
+ },
+ "Punch-Out!!": {
+  "id": 2194,
+  "name": "Punch-Out!!",
+  "year": 2009,
   "exact": true
  },
  "Punch-Out!! #18,99": {
@@ -13731,6 +15663,12 @@
   "id": 333,
   "name": "Quake",
   "year": 1996,
+  "exact": true
+ },
+ "Quake II": {
+  "id": 286,
+  "name": "Quake II",
+  "year": 1997,
   "exact": true
  },
  "Quake II #4": {
@@ -13845,6 +15783,12 @@
   "id": 19160,
   "name": "Radiata Stories",
   "year": 2005,
+  "exact": true
+ },
+ "Raft": {
+  "id": 27082,
+  "name": "Raft",
+  "year": 2022,
   "exact": true
  },
  "Rage 2": {
@@ -14027,6 +15971,12 @@
   "year": 2024,
   "exact": true
  },
+ "Rayman @1995": {
+  "id": 1963,
+  "name": "Rayman",
+  "year": 1995,
+  "exact": true
+ },
  "Rayman #7": {
   "id": 1963,
   "name": "Rayman",
@@ -14049,6 +15999,18 @@
   "id": 843,
   "name": "Rayman 2: The Great Escape",
   "year": 1999,
+  "exact": true
+ },
+ "Rayman 3: Hoodlum Havoc": {
+  "id": 1966,
+  "name": "Rayman 3: Hoodlum Havoc",
+  "year": 2003,
+  "exact": true
+ },
+ "Rayman Fiesta Run": {
+  "id": 19726,
+  "name": "Rayman Fiesta Run",
+  "year": 2013,
   "exact": true
  },
  "Rayman Legends": {
@@ -14105,6 +16067,12 @@
   "year": 2011,
   "exact": true
  },
+ "Rayman Raving Rabbids": {
+  "id": 2277,
+  "name": "Rayman Raving Rabbids",
+  "year": 2006,
+  "exact": true
+ },
  "Rebel Galaxy Outlaw": {
   "id": 107318,
   "name": "Rebel Galaxy Outlaw",
@@ -14151,6 +16119,18 @@
   "id": 3735,
   "name": "Red Dead Redemption: Undead Nightmare",
   "year": 2010,
+  "exact": true
+ },
+ "Red Dead Revolver": {
+  "id": 1969,
+  "name": "Red Dead Revolver",
+  "year": 2004,
+  "exact": true
+ },
+ "Redfall": {
+  "id": 152247,
+  "name": "Redfall",
+  "year": 2023,
   "exact": true
  },
  "Remnant II": {
@@ -14435,6 +16415,12 @@
   "year": 2018,
   "exact": true
  },
+ "Return to Castle Wolfenstein": {
+  "id": 281,
+  "name": "Return to Castle Wolfenstein",
+  "year": 2001,
+  "exact": true
+ },
  "Return to Monkey Island": {
   "id": 195517,
   "name": "Return to Monkey Island",
@@ -14595,6 +16581,12 @@
   "id": 2444,
   "name": "Risen",
   "year": 2009,
+  "exact": true
+ },
+ "Risen 2: Dark Waters": {
+  "id": 3802,
+  "name": "Risen 2: Dark Waters",
+  "year": 2012,
   "exact": true
  },
  "Risk of Rain 2": {
@@ -14819,6 +16811,24 @@
   "year": 2024,
   "exact": true
  },
+ "Romancing SaGa 3": {
+  "id": 11313,
+  "name": "Romancing SaGa 3",
+  "year": 1995,
+  "exact": true
+ },
+ "Romancing SaGa: Minstrel Song": {
+  "id": 141296,
+  "name": "Romancing SaGa",
+  "year": 2005,
+  "exact": true
+ },
+ "Rome: Total War": {
+  "id": 438,
+  "name": "Rome: Total War",
+  "year": 2004,
+  "exact": true
+ },
  "Root": {
   "id": 139145,
   "name": "Root",
@@ -14837,6 +16847,12 @@
   "year": 2006,
   "exact": true
  },
+ "Rune Factory 3": {
+  "id": 9640,
+  "name": "Rune Factory 3: A Fantasy Harvest Moon",
+  "year": 2009,
+  "exact": false
+ },
  "Rune Factory 3: A Fantasy Harvest Moon": {
   "id": 9640,
   "name": "Rune Factory 3: A Fantasy Harvest Moon",
@@ -14847,6 +16863,12 @@
   "id": 9640,
   "name": "Rune Factory 3: A Fantasy Harvest Moon",
   "year": 2009,
+  "exact": true
+ },
+ "Rune Factory 4": {
+  "id": 6874,
+  "name": "Rune Factory 4",
+  "year": 2012,
   "exact": true
  },
  "Rune Factory 4 Special": {
@@ -14861,10 +16883,22 @@
   "year": 2021,
   "exact": true
  },
+ "Rune Factory Frontier": {
+  "id": 5132,
+  "name": "Rune Factory Frontier",
+  "year": 2008,
+  "exact": true
+ },
  "Rune Factory: Guardians of Azuma": {
   "id": 250922,
   "name": "Rune Factory: Guardians of Azuma",
   "year": 2025,
+  "exact": true
+ },
+ "Rust": {
+  "id": 3277,
+  "name": "Rust",
+  "year": 2018,
   "exact": true
  },
  "Rusty Lake Hotel": {
@@ -14903,6 +16937,30 @@
   "year": 2020,
   "exact": true
  },
+ "SaGa Frontier": {
+  "id": 11310,
+  "name": "SaGa Frontier",
+  "year": 1997,
+  "exact": true
+ },
+ "SaGa Frontier 2": {
+  "id": 2353,
+  "name": "SaGa Frontier 2",
+  "year": 1999,
+  "exact": true
+ },
+ "SaGa Scarlet Grace": {
+  "id": 23981,
+  "name": "SaGa: Scarlet Grace",
+  "year": 2016,
+  "exact": true
+ },
+ "SaGa: Emerald Beyond": {
+  "id": 266681,
+  "name": "SaGa: Emerald Beyond",
+  "year": 2024,
+  "exact": true
+ },
  "Sailor Moon: Another Story": {
   "id": 16142,
   "name": "Bishoujo Senshi Sailor Moon: Another Story",
@@ -14927,10 +16985,34 @@
   "year": 2006,
   "exact": true
  },
+ "Saints Row @2006": {
+  "id": 825,
+  "name": "Saints Row",
+  "year": 2006,
+  "exact": true
+ },
+ "Saints Row 2": {
+  "id": 826,
+  "name": "Saints Row 2",
+  "year": 2008,
+  "exact": true
+ },
  "Saints Row IV": {
   "id": 1981,
   "name": "Saints Row IV",
   "year": 2013,
+  "exact": true
+ },
+ "Saints Row: Gat out of Hell": {
+  "id": 7708,
+  "name": "Saints Row: Gat Out of Hell",
+  "year": 2015,
+  "exact": true
+ },
+ "Saints Row: The Third": {
+  "id": 873,
+  "name": "Saints Row: The Third",
+  "year": 2011,
   "exact": true
  },
  "Saints Row: The Third #12": {
@@ -14981,10 +17063,28 @@
   "year": 1994,
   "exact": true
  },
+ "Samurai Warriors 2": {
+  "id": 7173,
+  "name": "Samurai Warriors 2",
+  "year": 2006,
+  "exact": true
+ },
+ "Samurai Warriors 5": {
+  "id": 143608,
+  "name": "Samurai Warriors 5",
+  "year": 2021,
+  "exact": true
+ },
  "Satisfactory": {
   "id": 90558,
   "name": "Satisfactory",
   "year": 2024,
+  "exact": true
+ },
+ "Saturn Bomberman": {
+  "id": 28393,
+  "name": "Saturn Bomberman",
+  "year": 1996,
   "exact": true
  },
  "Saturn Bomberman #32": {
@@ -15051,6 +17151,12 @@
   "id": 131890,
   "name": "Sea of Stars",
   "year": 2023,
+  "exact": true
+ },
+ "Sea of Thieves": {
+  "id": 11137,
+  "name": "Sea of Thieves",
+  "year": 2018,
   "exact": true
  },
  "Seaman #23": {
@@ -15143,10 +17249,28 @@
   "year": 2005,
   "exact": true
  },
+ "Sensible World of Soccer": {
+  "id": 10121,
+  "name": "Sensible World of Soccer",
+  "year": 1994,
+  "exact": true
+ },
  "Senua's Saga: Hellblade II": {
   "id": 127342,
   "name": "Hellblade II: Senua's Saga",
   "year": 2024,
+  "exact": true
+ },
+ "Session: Skate Sim": {
+  "id": 75694,
+  "name": "Session: Skate Sim",
+  "year": 2022,
+  "exact": true
+ },
+ "SEUM: Speedrunners from Hell": {
+  "id": 21993,
+  "name": "Seum: Speedrunners from Hell",
+  "year": 2016,
   "exact": true
  },
  "Shadow Complex": {
@@ -15449,6 +17573,18 @@
   "year": 1997,
   "exact": true
  },
+ "Shinobi @2002": {
+  "id": 10223,
+  "name": "Shinobi",
+  "year": 2002,
+  "exact": true
+ },
+ "Shinobi III: Return of the Ninja Master": {
+  "id": 2623,
+  "name": "Shinobi III: Return of the Ninja Master",
+  "year": 1993,
+  "exact": true
+ },
  "Shinobi III: Return of the Ninja Master #29": {
   "id": 2623,
   "name": "Shinobi III: Return of the Ninja Master",
@@ -15471,6 +17607,12 @@
   "id": 19460,
   "name": "Shiren the Wanderer: The Tower of Fortune and the Dice of Fate",
   "year": 2010,
+  "exact": true
+ },
+ "Shogun: Total War": {
+  "id": 436,
+  "name": "Shogun: Total War",
+  "year": 2000,
   "exact": true
  },
  "Shovel Knight": {
@@ -15515,6 +17657,36 @@
   "year": 1999,
   "exact": true
  },
+ "Sid Meier's Civilization @1991": {
+  "id": 902,
+  "name": "Sid Meier's Civilization",
+  "year": 1991,
+  "exact": true
+ },
+ "Sid Meier's Civilization II": {
+  "id": 634,
+  "name": "Sid Meier's Civilization II",
+  "year": 1996,
+  "exact": true
+ },
+ "Sid Meier's Civilization III": {
+  "id": 310,
+  "name": "Sid Meier's Civilization III",
+  "year": 2001,
+  "exact": true
+ },
+ "Sid Meier's Civilization IV": {
+  "id": 293,
+  "name": "Sid Meier's Civilization IV",
+  "year": 2005,
+  "exact": true
+ },
+ "Sid Meier's Civilization V": {
+  "id": 866,
+  "name": "Sid Meier's Civilization V",
+  "year": 2010,
+  "exact": true
+ },
  "Sid Meier's Civilization V #6": {
   "id": 866,
   "name": "Sid Meier's Civilization V",
@@ -15525,6 +17697,30 @@
   "id": 19130,
   "name": "Sid Meier's Civilization VI",
   "year": 2016,
+  "exact": true
+ },
+ "Sid Meier's Civilization VII": {
+  "id": 305006,
+  "name": "Sid Meier's Civilization VII",
+  "year": 2025,
+  "exact": true
+ },
+ "Sid Meier's Civilization: Beyond Earth": {
+  "id": 6038,
+  "name": "Sid Meier's Civilization: Beyond Earth",
+  "year": 2014,
+  "exact": true
+ },
+ "Sid Meier's Pirates! @1987": {
+  "id": 9231,
+  "name": "Sid Meier's Pirates!",
+  "year": 1987,
+  "exact": true
+ },
+ "Sid Meier's Pirates! @2004": {
+  "id": 868,
+  "name": "Sid Meier's Pirates!",
+  "year": 2004,
   "exact": true
  },
  "Sifu": {
@@ -15671,6 +17867,12 @@
   "year": 1991,
   "exact": true
  },
+ "SimCity 2000": {
+  "id": 330,
+  "name": "SimCity 2000",
+  "year": 1993,
+  "exact": true
+ },
  "SimCity 4": {
   "id": 1275,
   "name": "SimCity 4",
@@ -15729,6 +17931,12 @@
   "id": 14522,
   "name": "Siren",
   "year": 2003,
+  "exact": true
+ },
+ "Skate 3": {
+  "id": 2587,
+  "name": "Skate 3",
+  "year": 2010,
   "exact": true
  },
  "Skies of Arcadia": {
@@ -15827,10 +18035,28 @@
   "year": 2004,
   "exact": true
  },
+ "Sly 3: Honor Among Thieves": {
+  "id": 1800,
+  "name": "Sly 3: Honor Among Thieves",
+  "year": 2005,
+  "exact": true
+ },
+ "Sly Cooper and the Thievius Raccoonus": {
+  "id": 1798,
+  "name": "Sly Cooper and the Thievius Raccoonus",
+  "year": 2002,
+  "exact": true
+ },
  "Sly Cooper and the Thievius Raccoonus #8": {
   "id": 1798,
   "name": "Sly Cooper and the Thievius Raccoonus",
   "year": 2002,
+  "exact": true
+ },
+ "Sly Cooper: Thieves in Time": {
+  "id": 1801,
+  "name": "Sly Cooper: Thieves in Time",
+  "year": 2013,
   "exact": true
  },
  "Sly Cooper: Thieves in Time #9": {
@@ -16115,6 +18341,12 @@
   "year": 2024,
   "exact": true
  },
+ "Sons of the Forest": {
+  "id": 127346,
+  "name": "Sons of the Forest",
+  "year": 2024,
+  "exact": true
+ },
  "Sorcery Saga: Curse of the Great Curry God": {
   "id": 19915,
   "name": "Sorcery Saga: Curse of the Great Curry God",
@@ -16139,6 +18371,12 @@
   "year": 1992,
   "exact": true
  },
+ "Soul Edge": {
+  "id": 1563,
+  "name": "Soul Edge",
+  "year": 1996,
+  "exact": true
+ },
  "Soul Hackers 2": {
   "id": 191738,
   "name": "Soul Hackers 2",
@@ -16158,6 +18396,12 @@
   "exact": true
  },
  "Soulcalibur": {
+  "id": 1564,
+  "name": "SoulCalibur",
+  "year": 1998,
+  "exact": true
+ },
+ "Soulcalibur @1998": {
   "id": 1564,
   "name": "SoulCalibur",
   "year": 1998,
@@ -16193,10 +18437,22 @@
   "year": 2003,
   "exact": true
  },
+ "Soulcalibur III": {
+  "id": 1566,
+  "name": "SoulCalibur III",
+  "year": 2005,
+  "exact": true
+ },
  "Soulcalibur III #8": {
   "id": 1566,
   "name": "SoulCalibur III",
   "year": 2005,
+  "exact": true
+ },
+ "Soulcalibur IV": {
+  "id": 1567,
+  "name": "SoulCalibur IV",
+  "year": 2008,
   "exact": true
  },
  "Soulcalibur IV #12": {
@@ -16283,6 +18539,12 @@
   "year": 2012,
   "exact": true
  },
+ "SpeedRunners": {
+  "id": 9527,
+  "name": "SpeedRunners",
+  "year": 2016,
+  "exact": true
+ },
  "Spelunky": {
   "id": 3029,
   "name": "Spelunky",
@@ -16319,10 +18581,40 @@
   "year": 2003,
   "exact": true
  },
+ "Spider-Man @2000": {
+  "id": 3603,
+  "name": "Spider-Man",
+  "year": 2000,
+  "exact": true
+ },
+ "Spider-Man 2 @2004": {
+  "id": 6285,
+  "name": "Spider-Man 2",
+  "year": 2004,
+  "exact": true
+ },
  "Spider-Man 2 #8": {
   "id": 6285,
   "name": "Spider-Man 2",
   "year": 2004,
+  "exact": true
+ },
+ "Spider-Man: Edge of Time": {
+  "id": 5179,
+  "name": "Spider-Man: Edge of Time",
+  "year": 2011,
+  "exact": true
+ },
+ "Spider-Man: Shattered Dimensions": {
+  "id": 553,
+  "name": "Spider-Man: Shattered Dimensions",
+  "year": 2010,
+  "exact": true
+ },
+ "Spider-Man: Web of Shadows": {
+  "id": 5181,
+  "name": "Spider-Man: Web of Shadows",
+  "year": 2008,
   "exact": true
  },
  "Spirit Hunter: NG": {
@@ -16349,10 +18641,22 @@
   "year": 2015,
   "exact": true
  },
+ "Splatoon @2015": {
+  "id": 7335,
+  "name": "Splatoon",
+  "year": 2015,
+  "exact": true
+ },
  "Splatoon #41": {
   "id": 7335,
   "name": "Splatoon",
   "year": 2015,
+  "exact": true
+ },
+ "Splatoon 2": {
+  "id": 26761,
+  "name": "Splatoon 2",
+  "year": 2017,
   "exact": true
  },
  "Splatoon 2 #130": {
@@ -16403,10 +18707,22 @@
   "year": 2019,
   "exact": true
  },
+ "Spyro 2: Ripto's Rage!": {
+  "id": 1577,
+  "name": "Spyro 2: Ripto's Rage!",
+  "year": 1999,
+  "exact": true
+ },
  "Spyro 2: Ripto's Rage! #7": {
   "id": 1577,
   "name": "Spyro 2: Ripto's Rage!",
   "year": 1999,
+  "exact": true
+ },
+ "Spyro 2: Season of Flame": {
+  "id": 1588,
+  "name": "Spyro 2: Season of Flame",
+  "year": 2002,
   "exact": true
  },
  "Spyro Reignited Trilogy": {
@@ -16427,10 +18743,40 @@
   "year": 1998,
   "exact": true
  },
+ "Spyro: A Hero's Tail": {
+  "id": 1580,
+  "name": "Spyro: A Hero's Tail",
+  "year": 2004,
+  "exact": true
+ },
+ "Spyro: Enter the Dragonfly": {
+  "id": 1579,
+  "name": "Spyro: Enter the Dragonfly",
+  "year": 2002,
+  "exact": true
+ },
+ "Spyro: Season of Ice": {
+  "id": 1587,
+  "name": "Spyro: Season of Ice",
+  "year": 2001,
+  "exact": true
+ },
+ "Spyro: Year of the Dragon": {
+  "id": 1578,
+  "name": "Spyro: Year of the Dragon",
+  "year": 2000,
+  "exact": true
+ },
  "Spyro: Year of the Dragon #7": {
   "id": 1578,
   "name": "Spyro: Year of the Dragon",
   "year": 2000,
+  "exact": true
+ },
+ "SSX 3": {
+  "id": 4174,
+  "name": "SSX 3",
+  "year": 2003,
   "exact": true
  },
  "SSX 3 #21": {
@@ -16445,6 +18791,12 @@
   "year": 2003,
   "exact": true
  },
+ "SSX Tricky": {
+  "id": 4176,
+  "name": "SSX Tricky",
+  "year": 2001,
+  "exact": true
+ },
  "SSX Tricky #21": {
   "id": 4176,
   "name": "SSX Tricky",
@@ -16455,6 +18807,12 @@
   "id": 4176,
   "name": "SSX Tricky",
   "year": 2001,
+  "exact": true
+ },
+ "Star Fox @1993": {
+  "id": 8581,
+  "name": "Star Fox",
+  "year": 1993,
   "exact": true
  },
  "Star Fox #19": {
@@ -16481,16 +18839,46 @@
   "year": 2011,
   "exact": true
  },
+ "Star Fox Adventures": {
+  "id": 2686,
+  "name": "Star Fox Adventures",
+  "year": 2002,
+  "exact": true
+ },
  "Star Fox Adventures #21": {
   "id": 2686,
   "name": "Star Fox Adventures",
   "year": 2002,
   "exact": true
  },
+ "Star Fox Command": {
+  "id": 20556,
+  "name": "Star Fox Command",
+  "year": 2006,
+  "exact": true
+ },
+ "Star Fox Zero": {
+  "id": 11196,
+  "name": "Star Fox Zero",
+  "year": 2016,
+  "exact": true
+ },
  "Star Fox Zero #41": {
   "id": 11196,
   "name": "Star Fox Zero",
   "year": 2016,
+  "exact": true
+ },
+ "Star Fox: Assault": {
+  "id": 3243,
+  "name": "Star Fox: Assault",
+  "year": 2005,
+  "exact": true
+ },
+ "Star Ocean @1996": {
+  "id": 11209,
+  "name": "Star Ocean",
+  "year": 1996,
   "exact": true
  },
  "Star Ocean #19": {
@@ -16505,6 +18893,18 @@
   "year": 2007,
   "exact": true
  },
+ "Star Ocean: First Departure R": {
+  "id": 119057,
+  "name": "Star Ocean: First Departure R",
+  "year": 2019,
+  "exact": true
+ },
+ "Star Ocean: Integrity and Faithlessness": {
+  "id": 11213,
+  "name": "Star Ocean: Integrity and Faithlessness",
+  "year": 2016,
+  "exact": true
+ },
  "Star Ocean: Second Evolution #38": {
   "id": 80504,
   "name": "Star Ocean: Second Evolution",
@@ -16515,6 +18915,12 @@
   "id": 178298,
   "name": "Star Ocean: The Divine Force",
   "year": 2022,
+  "exact": true
+ },
+ "Star Ocean: The Last Hope": {
+  "id": 7192,
+  "name": "Star Ocean: The Last Hope",
+  "year": 2009,
   "exact": true
  },
  "Star Ocean: The Second Story": {
@@ -16703,10 +19109,28 @@
   "year": 2016,
   "exact": true
  },
+ "StarCraft": {
+  "id": 230,
+  "name": "StarCraft",
+  "year": 1998,
+  "exact": true
+ },
  "StarCraft #6": {
   "id": 230,
   "name": "StarCraft",
   "year": 1998,
+  "exact": true
+ },
+ "StarCraft II: Heart of the Swarm": {
+  "id": 457,
+  "name": "StarCraft II: Heart of the Swarm",
+  "year": 2013,
+  "exact": true
+ },
+ "StarCraft II: Legacy of the Void": {
+  "id": 458,
+  "name": "StarCraft II: Legacy of the Void",
+  "year": 2015,
   "exact": true
  },
  "StarCraft II: Wings of Liberty": {
@@ -16763,6 +19187,12 @@
   "year": 1990,
   "exact": true
  },
+ "State of Decay 2": {
+  "id": 19541,
+  "name": "State of Decay 2",
+  "year": 2018,
+  "exact": true
+ },
  "Steamworld Dig #41": {
   "id": 5772,
   "name": "SteamWorld Dig",
@@ -16773,6 +19203,12 @@
   "id": 27433,
   "name": "SteamWorld Dig 2",
   "year": 2017,
+  "exact": true
+ },
+ "Steel Battalion": {
+  "id": 6163,
+  "name": "Steel Battalion",
+  "year": 2002,
   "exact": true
  },
  "Steel Battalion #11": {
@@ -16841,10 +19277,34 @@
   "year": 2024,
   "exact": true
  },
+ "Story of Seasons: A Wonderful Life": {
+  "id": 217553,
+  "name": "Story of Seasons: A Wonderful Life",
+  "year": 2023,
+  "exact": true
+ },
  "Story of Seasons: Friends of Mineral Town": {
   "id": 120300,
   "name": "Story of Seasons: Friends of Mineral Town",
   "year": 2019,
+  "exact": true
+ },
+ "Story of Seasons: Pioneers of Olive Town": {
+  "id": 140500,
+  "name": "Story of Seasons: Pioneers of Olive Town",
+  "year": 2021,
+  "exact": true
+ },
+ "Story of Seasons: Trio of Towns": {
+  "id": 15910,
+  "name": "Story of Seasons: Trio of Towns",
+  "year": 2016,
+  "exact": true
+ },
+ "Stranded Deep": {
+  "id": 8751,
+  "name": "Stranded Deep",
+  "year": 2015,
   "exact": true
  },
  "Strange Horticulture": {
@@ -17051,6 +19511,12 @@
   "year": 2019,
   "exact": true
  },
+ "Stronghold": {
+  "id": 965,
+  "name": "Stronghold",
+  "year": 2001,
+  "exact": true
+ },
  "Stunt Race FX #19": {
   "id": 28509,
   "name": "Stunt Race FX",
@@ -17085,6 +19551,12 @@
   "id": 9254,
   "name": "Subnautica",
   "year": 2018,
+  "exact": true
+ },
+ "Subnautica: Below Zero": {
+  "id": 107315,
+  "name": "Subnautica: Below Zero",
+  "year": 2021,
   "exact": true
  },
  "Suikoden": {
@@ -17195,6 +19667,12 @@
   "year": 2014,
   "exact": true
  },
+ "Sunset Riders": {
+  "id": 4370,
+  "name": "Sunset Riders",
+  "year": 1991,
+  "exact": true
+ },
  "Sunset Riders #19": {
   "id": 276081,
   "name": "Sunset Riders",
@@ -17213,10 +19691,22 @@
   "year": 1992,
   "exact": true
  },
+ "Super Bomberman": {
+  "id": 3450,
+  "name": "Super Bomberman",
+  "year": 1993,
+  "exact": true
+ },
  "Super Bomberman #19": {
   "id": 3450,
   "name": "Super Bomberman",
   "year": 1993,
+  "exact": true
+ },
+ "Super Bomberman 2": {
+  "id": 14530,
+  "name": "Super Bomberman 2",
+  "year": 1994,
   "exact": true
  },
  "Super Bomberman 2 #19": {
@@ -17229,6 +19719,12 @@
   "id": 26760,
   "name": "Super Bomberman R",
   "year": 2017,
+  "exact": true
+ },
+ "Super C": {
+  "id": 84919,
+  "name": "Super C",
+  "year": 1990,
   "exact": true
  },
  "Super C #18,99": {
@@ -17489,6 +19985,12 @@
   "year": 2017,
   "exact": true
  },
+ "Super Mario Party": {
+  "id": 103339,
+  "name": "Super Mario Party",
+  "year": 2018,
+  "exact": true
+ },
  "Super Mario Party Jamboree": {
   "id": 306148,
   "name": "Super Mario Party Jamboree",
@@ -17573,6 +20075,12 @@
   "year": 2010,
   "exact": true
  },
+ "Super Mega Baseball 3": {
+  "id": 131946,
+  "name": "Super Mega Baseball 3",
+  "year": 2020,
+  "exact": true
+ },
  "Super Metroid": {
   "id": 1103,
   "name": "Super Metroid",
@@ -17633,16 +20141,34 @@
   "year": 2010,
   "exact": true
  },
+ "Super Smash Bros. @1999": {
+  "id": 1626,
+  "name": "Super Smash Bros.",
+  "year": 1999,
+  "exact": true
+ },
  "Super Smash Bros. #4": {
   "id": 1626,
   "name": "Super Smash Bros.",
   "year": 1999,
   "exact": true
  },
+ "Super Smash Bros. Brawl": {
+  "id": 1628,
+  "name": "Super Smash Bros. Brawl",
+  "year": 2008,
+  "exact": true
+ },
  "Super Smash Bros. Brawl #5": {
   "id": 1628,
   "name": "Super Smash Bros. Brawl",
   "year": 2008,
+  "exact": true
+ },
+ "Super Smash Bros. for Nintendo 3DS": {
+  "id": 9621,
+  "name": "Super Smash Bros. for Nintendo 3DS",
+  "year": 2014,
   "exact": true
  },
  "Super Smash Bros. for Nintendo 3DS #37": {
@@ -17759,6 +20285,12 @@
   "year": 2025,
   "exact": true
  },
+ "Supreme Commander": {
+  "id": 276,
+  "name": "Supreme Commander",
+  "year": 2007,
+  "exact": true
+ },
  "Surgeon Simulator": {
   "id": 2974,
   "name": "Surgeon Simulator 2013",
@@ -17820,6 +20352,12 @@
   "exact": true
  },
  "System Shock": {
+  "id": 23,
+  "name": "System Shock",
+  "year": 1994,
+  "exact": true
+ },
+ "System Shock @1994": {
   "id": 23,
   "name": "System Shock",
   "year": 1994,
@@ -18275,6 +20813,12 @@
   "year": 2022,
   "exact": true
  },
+ "Tenchu 2: Birth of the Assassins": {
+  "id": 4114,
+  "name": "Tenchu 2: Birth of the Stealth Assassins",
+  "year": 2000,
+  "exact": false
+ },
  "Tenchu: Stealth Assassins": {
   "id": 4113,
   "name": "Tenchu: Stealth Assassins",
@@ -18377,6 +20921,12 @@
   "year": 1996,
   "exact": true
  },
+ "Tetris DS": {
+  "id": 18599,
+  "name": "Tetris DS",
+  "year": 2006,
+  "exact": true
+ },
  "Tetris DS #20": {
   "id": 18599,
   "name": "Tetris DS",
@@ -18413,6 +20963,12 @@
   "year": 2020,
   "exact": true
  },
+ "Tetris Forever": {
+  "id": 314934,
+  "name": "Tetris Forever",
+  "year": 2024,
+  "exact": true
+ },
  "Tex Murphy: Under a Killing Moon": {
   "id": 955,
   "name": "Tex Murphy: Under a Killing Moon",
@@ -18429,6 +20985,12 @@
   "id": 15925,
   "name": "That Dragon, Cancer",
   "year": 2016,
+  "exact": true
+ },
+ "The Amazing Spider-Man": {
+  "id": 1376,
+  "name": "The Amazing Spider-Man",
+  "year": 2012,
   "exact": true
  },
  "The Binding of Isaac: Rebirth": {
@@ -18569,6 +21131,12 @@
   "year": 2017,
   "exact": true
  },
+ "The Final Fantasy Legend": {
+  "id": 396,
+  "name": "The Final Fantasy Legend",
+  "year": 1989,
+  "exact": true
+ },
  "The Final Fantasy Legend #33,22": {
   "id": 396,
   "name": "The Final Fantasy Legend",
@@ -18579,6 +21147,18 @@
   "id": 214417,
   "name": "The Finals",
   "year": 2023,
+  "exact": true
+ },
+ "The Flame in the Flood": {
+  "id": 9732,
+  "name": "The Flame in the Flood",
+  "year": 2016,
+  "exact": true
+ },
+ "The Forest": {
+  "id": 7504,
+  "name": "The Forest",
+  "year": 2018,
   "exact": true
  },
  "The Great Ace Attorney 2: Resolve": {
@@ -18623,10 +21203,58 @@
   "year": 1996,
   "exact": true
  },
+ "The House of the Dead 2": {
+  "id": 13777,
+  "name": "The House of the Dead 2",
+  "year": 1998,
+  "exact": true
+ },
  "The House of the Dead 2 #23": {
   "id": 13777,
   "name": "The House of the Dead 2",
   "year": 1998,
+  "exact": true
+ },
+ "The King of Fighters '94": {
+  "id": 15426,
+  "name": "The King of Fighters '94",
+  "year": 1994,
+  "exact": true
+ },
+ "The King of Fighters '97": {
+  "id": 15428,
+  "name": "The King of Fighters '97",
+  "year": 1997,
+  "exact": true
+ },
+ "The King of Fighters '98": {
+  "id": 15429,
+  "name": "The King of Fighters '98",
+  "year": 1998,
+  "exact": true
+ },
+ "The King of Fighters 2002": {
+  "id": 5884,
+  "name": "The King of Fighters 2002",
+  "year": 2002,
+  "exact": true
+ },
+ "The King of Fighters XIII": {
+  "id": 7038,
+  "name": "The King of Fighters XIII",
+  "year": 2010,
+  "exact": true
+ },
+ "The King of Fighters XIV": {
+  "id": 18814,
+  "name": "The King of Fighters XIV",
+  "year": 2016,
+  "exact": true
+ },
+ "The King of Fighters XV": {
+  "id": 113104,
+  "name": "The King of Fighters XV",
+  "year": 2022,
   "exact": true
  },
  "The Last Blade 2": {
@@ -18789,6 +21417,18 @@
   "id": 42722,
   "name": "The Legend of Nayuta: Boundless Trails",
   "year": 2021,
+  "exact": true
+ },
+ "The Legend of Spyro: A New Beginning": {
+  "id": 1582,
+  "name": "The Legend of Spyro: A New Beginning",
+  "year": 2006,
+  "exact": true
+ },
+ "The Legend of Spyro: Dawn of the Dragon": {
+  "id": 1584,
+  "name": "The Legend of Spyro: Dawn of the Dragon",
+  "year": 2008,
   "exact": true
  },
  "The Legend of the Mystical Ninja #19": {
@@ -19073,10 +21713,22 @@
   "year": 2016,
   "exact": true
  },
+ "The Lego Movie Videogame": {
+  "id": 4845,
+  "name": "The LEGO Movie Videogame",
+  "year": 2014,
+  "exact": true
+ },
  "The Lion King #19": {
   "id": 3166,
   "name": "The Lion King",
   "year": 1994,
+  "exact": true
+ },
+ "The Long Dark": {
+  "id": 8347,
+  "name": "The Long Dark",
+  "year": 2017,
   "exact": true
  },
  "The Longest Journey": {
@@ -19151,6 +21803,18 @@
   "year": 2022,
   "exact": true
  },
+ "The Punisher @2005": {
+  "id": 18294,
+  "name": "The Punisher",
+  "year": 2004,
+  "exact": true
+ },
+ "The Revenge of Shinobi": {
+  "id": 3327,
+  "name": "The Revenge of Shinobi",
+  "year": 1989,
+  "exact": true
+ },
  "The Revenge of Shinobi #29": {
   "id": 3327,
   "name": "The Revenge of Shinobi",
@@ -19203,6 +21867,12 @@
   "id": 60,
   "name": "The Secret of Monkey Island",
   "year": 1990,
+  "exact": true
+ },
+ "The Settlers II": {
+  "id": 2596,
+  "name": "The Settlers II: Veni, Vidi, Vici",
+  "year": 1996,
   "exact": true
  },
  "The Simpsons Arcade Game": {
@@ -19307,6 +21977,12 @@
   "year": 2023,
   "exact": true
  },
+ "The Typing of the Dead": {
+  "id": 11605,
+  "name": "The Typing of the Dead",
+  "year": 1999,
+  "exact": true
+ },
  "The Typing of the Dead #23": {
   "id": 11605,
   "name": "The Typing of the Dead",
@@ -19353,6 +22029,18 @@
   "id": 6030,
   "name": "The Warriors",
   "year": 2005,
+  "exact": true
+ },
+ "The Witcher @2007": {
+  "id": 80,
+  "name": "The Witcher",
+  "year": 2007,
+  "exact": true
+ },
+ "The Witcher 2: Assassins of Kings": {
+  "id": 478,
+  "name": "The Witcher 2: Assassins of Kings",
+  "year": 2011,
   "exact": true
  },
  "The Witcher 3: Wild Hunt": {
@@ -19451,10 +22139,28 @@
   "year": 2020,
   "exact": true
  },
+ "Theme Hospital": {
+  "id": 1624,
+  "name": "Theme Hospital",
+  "year": 1997,
+  "exact": true
+ },
  "Theme Hospital #7": {
   "id": 216009,
   "name": "Theme Hospital",
   "year": 1998,
+  "exact": true
+ },
+ "Theme Park": {
+  "id": 283,
+  "name": "Theme Park",
+  "year": 1994,
+  "exact": true
+ },
+ "They Are Billions": {
+  "id": 36616,
+  "name": "They Are Billions",
+  "year": 2019,
   "exact": true
  },
  "Thief II: The Metal Age": {
@@ -19481,6 +22187,12 @@
   "year": 2017,
   "exact": true
  },
+ "This War of Mine": {
+  "id": 7706,
+  "name": "This War of Mine",
+  "year": 2014,
+  "exact": true
+ },
  "Thomas Was Alone": {
   "id": 2291,
   "name": "Thomas Was Alone",
@@ -19491,6 +22203,12 @@
   "id": 28402,
   "name": "Threads of Fate",
   "year": 1999,
+  "exact": true
+ },
+ "Thronebreaker: The Witcher Tales": {
+  "id": 107300,
+  "name": "Thronebreaker: The Witcher Tales",
+  "year": 2018,
   "exact": true
  },
  "Through the Ages": {
@@ -19535,6 +22253,12 @@
   "year": 2023,
   "exact": true
  },
+ "Timberborn": {
+  "id": 126381,
+  "name": "Timberborn",
+  "year": 2026,
+  "exact": true
+ },
  "Timespinner": {
   "id": 28952,
   "name": "Timespinner",
@@ -19577,10 +22301,22 @@
   "year": 2019,
   "exact": true
  },
+ "Tiny Tina's Wonderlands": {
+  "id": 152061,
+  "name": "Tiny Tina's Wonderlands",
+  "year": 2022,
+  "exact": true
+ },
  "Titan Quest": {
   "id": 8311,
   "name": "Titan Quest",
   "year": 2006,
+  "exact": true
+ },
+ "Titanfall": {
+  "id": 2115,
+  "name": "Titanfall",
+  "year": 2014,
   "exact": true
  },
  "Titanfall 2": {
@@ -19661,10 +22397,22 @@
   "year": 2016,
   "exact": true
  },
+ "Tom Clancy's Splinter Cell": {
+  "id": 910,
+  "name": "Tom Clancy's Splinter Cell",
+  "year": 2002,
+  "exact": true
+ },
  "Tom Clancy's Splinter Cell #11": {
   "id": 910,
   "name": "Tom Clancy's Splinter Cell",
   "year": 2002,
+  "exact": true
+ },
+ "Tom Clancy's Splinter Cell: Blacklist": {
+  "id": 1305,
+  "name": "Tom Clancy's Splinter Cell: Blacklist",
+  "year": 2013,
   "exact": true
  },
  "Tom Clancy's Splinter Cell: Chaos Theory": {
@@ -19683,6 +22431,18 @@
   "id": 911,
   "name": "Tom Clancy's Splinter Cell: Chaos Theory",
   "year": 2005,
+  "exact": true
+ },
+ "Tom Clancy's Splinter Cell: Conviction": {
+  "id": 562,
+  "name": "Tom Clancy's Splinter Cell: Conviction",
+  "year": 2010,
+  "exact": true
+ },
+ "Tom Clancy's Splinter Cell: Double Agent": {
+  "id": 7469,
+  "name": "Tom Clancy's Splinter Cell: Double Agent",
+  "year": 2006,
   "exact": true
  },
  "Tom Clancy's Splinter Cell: Pandora Tomorrow": {
@@ -19775,6 +22535,18 @@
   "year": 2013,
   "exact": true
  },
+ "Tony Hawk's American Wasteland": {
+  "id": 7219,
+  "name": "Tony Hawk's American Wasteland",
+  "year": 2005,
+  "exact": true
+ },
+ "Tony Hawk's Pro Skater @1999": {
+  "id": 6692,
+  "name": "Tony Hawk's Pro Skater",
+  "year": 1999,
+  "exact": true
+ },
  "Tony Hawk's Pro Skater #7": {
   "id": 6692,
   "name": "Tony Hawk's Pro Skater",
@@ -19791,6 +22563,12 @@
   "id": 133887,
   "name": "Tony Hawk's Pro Skater 1+2",
   "year": 2020,
+  "exact": true
+ },
+ "Tony Hawk's Pro Skater 2": {
+  "id": 913,
+  "name": "Tony Hawk's Pro Skater 2",
+  "year": 2000,
   "exact": true
  },
  "Tony Hawk's Pro Skater 2 #23": {
@@ -19817,6 +22595,12 @@
   "year": 2000,
   "exact": true
  },
+ "Tony Hawk's Pro Skater 3": {
+  "id": 914,
+  "name": "Tony Hawk's Pro Skater 3",
+  "year": 2001,
+  "exact": true
+ },
  "Tony Hawk's Pro Skater 3 #7": {
   "id": 194213,
   "name": "Tony Hawk's Pro Skater 3",
@@ -19829,16 +22613,40 @@
   "year": 2001,
   "exact": true
  },
+ "Tony Hawk's Pro Skater 4": {
+  "id": 915,
+  "name": "Tony Hawk's Pro Skater 4",
+  "year": 2002,
+  "exact": true
+ },
  "Tony Hawk's Pro Skater 4 #21": {
   "id": 915,
   "name": "Tony Hawk's Pro Skater 4",
   "year": 2002,
   "exact": true
  },
+ "Tony Hawk's Project 8": {
+  "id": 6204,
+  "name": "Tony Hawk's Project 8",
+  "year": 2006,
+  "exact": true
+ },
+ "Tony Hawk's Underground": {
+  "id": 2698,
+  "name": "Tony Hawk's Underground",
+  "year": 2003,
+  "exact": true
+ },
  "Tony Hawk's Underground #11": {
   "id": 2698,
   "name": "Tony Hawk's Underground",
   "year": 2003,
+  "exact": true
+ },
+ "Tony Hawk's Underground 2": {
+  "id": 2699,
+  "name": "Tony Hawk's Underground 2",
+  "year": 2004,
   "exact": true
  },
  "Top Gear": {
@@ -19851,6 +22659,12 @@
   "id": 27461,
   "name": "Top Gear",
   "year": 1992,
+  "exact": true
+ },
+ "Top Spin 4": {
+  "id": 5233,
+  "name": "Top Spin 4",
+  "year": 2011,
   "exact": true
  },
  "Torchlight II": {
@@ -19877,10 +22691,52 @@
   "year": 1999,
   "exact": true
  },
+ "Total War: Attila": {
+  "id": 8200,
+  "name": "Total War: Attila",
+  "year": 2015,
+  "exact": true
+ },
+ "Total War: Rome II": {
+  "id": 2359,
+  "name": "Total War: Rome II",
+  "year": 2013,
+  "exact": true
+ },
+ "Total War: Shogun 2": {
+  "id": 432,
+  "name": "Total War: Shogun 2",
+  "year": 2011,
+  "exact": true
+ },
  "Total War: Shogun 2 #6": {
   "id": 432,
   "name": "Total War: Shogun 2",
   "year": 2011,
+  "exact": true
+ },
+ "Total War: Three Kingdoms": {
+  "id": 80961,
+  "name": "Total War: Three Kingdoms",
+  "year": 2019,
+  "exact": true
+ },
+ "Total War: Warhammer": {
+  "id": 9898,
+  "name": "Total War: Warhammer",
+  "year": 2016,
+  "exact": true
+ },
+ "Total War: Warhammer II": {
+  "id": 28028,
+  "name": "Total War: Warhammer II",
+  "year": 2017,
+  "exact": true
+ },
+ "Total War: Warhammer III": {
+  "id": 143114,
+  "name": "Total War: Warhammer III",
+  "year": 2022,
   "exact": true
  },
  "Touhou Chireiden: Subterranean Animism": {
@@ -20021,6 +22877,12 @@
   "year": 2014,
   "exact": true
  },
+ "Townscaper": {
+  "id": 135789,
+  "name": "Townscaper",
+  "year": 2020,
+  "exact": true
+ },
  "Toy Commander #23": {
   "id": 10125,
   "name": "Toy Commander",
@@ -20081,6 +22943,12 @@
   "year": 1996,
   "exact": true
  },
+ "Trek to Yomi": {
+  "id": 152203,
+  "name": "Trek to Yomi",
+  "year": 2022,
+  "exact": true
+ },
  "Trials of Mana @1995": {
   "id": 11227,
   "name": "Trials of Mana",
@@ -20109,6 +22977,18 @@
   "id": 6250,
   "name": "Trine 2",
   "year": 2011,
+  "exact": true
+ },
+ "Tropico 4": {
+  "id": 2595,
+  "name": "Tropico 4",
+  "year": 2011,
+  "exact": true
+ },
+ "Tropico 6": {
+  "id": 36649,
+  "name": "Tropico 6",
+  "year": 2019,
   "exact": true
  },
  "Tunic": {
@@ -20199,6 +23079,12 @@
   "id": 1621,
   "name": "Ultimate Mortal Kombat 3",
   "year": 1995,
+  "exact": true
+ },
+ "Ultimate Spider-Man": {
+  "id": 4225,
+  "name": "Ultimate Spider-Man",
+  "year": 2005,
   "exact": true
  },
  "Ultra Street Fighter IV": {
@@ -20363,6 +23249,12 @@
   "year": 1994,
   "exact": true
  },
+ "Unlimited SaGa": {
+  "id": 11314,
+  "name": "Unlimited SaGa",
+  "year": 2002,
+  "exact": true
+ },
  "Unpacking": {
   "id": 115843,
   "name": "Unpacking",
@@ -20453,6 +23345,12 @@
   "year": 2008,
   "exact": true
  },
+ "Valkyria Chronicles 2": {
+  "id": 14674,
+  "name": "Valkyria Chronicles 2",
+  "year": 2010,
+  "exact": true
+ },
  "Valkyria Chronicles 4": {
   "id": 75848,
   "name": "Valkyria Chronicles 4",
@@ -20463,6 +23361,18 @@
   "id": 14674,
   "name": "Valkyria Chronicles 2",
   "year": 2010,
+  "exact": true
+ },
+ "Valkyria Chronicles III": {
+  "id": 14675,
+  "name": "Valkyria Chronicles 3: Unrecorded Chronicles",
+  "year": 2011,
+  "exact": false
+ },
+ "Valkyria Revolution": {
+  "id": 14673,
+  "name": "Valkyria Revolution",
+  "year": 2017,
   "exact": true
  },
  "Valkyrie Profile": {
@@ -20663,10 +23573,28 @@
   "year": 2006,
   "exact": true
  },
+ "Warcraft II: Tides of Darkness": {
+  "id": 130,
+  "name": "Warcraft II: Tides of Darkness",
+  "year": 1995,
+  "exact": true
+ },
+ "Warcraft III: Reign of Chaos": {
+  "id": 132,
+  "name": "Warcraft III: Reign of Chaos",
+  "year": 2002,
+  "exact": true
+ },
  "Warcraft III: Reign of Chaos #6": {
   "id": 132,
   "name": "Warcraft III: Reign of Chaos",
   "year": 2002,
+  "exact": true
+ },
+ "Warcraft: Orcs & Humans": {
+  "id": 129,
+  "name": "Warcraft: Orcs & Humans",
+  "year": 1994,
   "exact": true
  },
  "Warframe": {
@@ -20679,6 +23607,12 @@
   "id": 27441,
   "name": "Wargroove",
   "year": 2019,
+  "exact": true
+ },
+ "Warhammer 40,000: Dawn of War": {
+  "id": 257,
+  "name": "Warhammer 40,000: Dawn of War",
+  "year": 2004,
   "exact": true
  },
  "Warhammer 40,000: Rogue Trader": {
@@ -20711,16 +23645,34 @@
   "year": 2001,
   "exact": true
  },
+ "Wario Land II": {
+  "id": 1697,
+  "name": "Wario Land II",
+  "year": 1998,
+  "exact": true
+ },
  "Wario Land II #33,22": {
   "id": 1697,
   "name": "Wario Land II",
   "year": 1998,
   "exact": true
  },
+ "Wario Land: Shake It!": {
+  "id": 1702,
+  "name": "Wario Land: Shake It!",
+  "year": 2008,
+  "exact": true
+ },
  "Wario Land: Shake It! #5": {
   "id": 1702,
   "name": "Wario Land: Shake It!",
   "year": 2008,
+  "exact": true
+ },
+ "Wario Land: Super Mario Land 3": {
+  "id": 1072,
+  "name": "Wario Land: Super Mario Land 3",
+  "year": 1994,
   "exact": true
  },
  "Wario Land: Super Mario Land 3 #33,22": {
@@ -20735,6 +23687,18 @@
   "year": 2003,
   "exact": true
  },
+ "WarioWare Gold": {
+  "id": 90108,
+  "name": "WarioWare Gold",
+  "year": 2018,
+  "exact": true
+ },
+ "WarioWare, Inc.: Mega Microgame$!": {
+  "id": 1703,
+  "name": "WarioWare, Inc.: Mega Microgame$!",
+  "year": 2003,
+  "exact": true
+ },
  "WarioWare, Inc.: Mega Microgame$! #24": {
   "id": 1703,
   "name": "WarioWare, Inc.: Mega Microgame$!",
@@ -20745,6 +23709,12 @@
   "id": 1708,
   "name": "WarioWare D.I.Y.",
   "year": 2009,
+  "exact": true
+ },
+ "WarioWare: Get It Together!": {
+  "id": 152358,
+  "name": "WarioWare: Get It Together!",
+  "year": 2021,
   "exact": true
  },
  "WarioWare: Smooth Moves": {
@@ -20771,10 +23741,22 @@
   "year": 2004,
   "exact": true
  },
+ "WarioWare: Twisted!": {
+  "id": 1704,
+  "name": "WarioWare: Twisted!",
+  "year": 2004,
+  "exact": true
+ },
  "WarioWare: Twisted! #24": {
   "id": 1704,
   "name": "WarioWare: Twisted!",
   "year": 2004,
+  "exact": true
+ },
+ "Warriors Orochi 3": {
+  "id": 5324,
+  "name": "Warriors Orochi 3",
+  "year": 2011,
   "exact": true
  },
  "Warsong #29": {
@@ -20811,6 +23793,12 @@
   "id": 3629,
   "name": "Wave Race 64",
   "year": 1996,
+  "exact": true
+ },
+ "Way of the Samurai": {
+  "id": 10156,
+  "name": "Way of the Samurai",
+  "year": 2002,
   "exact": true
  },
  "We Love Katamari": {
@@ -20855,6 +23843,12 @@
   "year": 2022,
   "exact": true
  },
+ "West of Loathing": {
+  "id": 44516,
+  "name": "West of Loathing",
+  "year": 2017,
+  "exact": true
+ },
  "What Remains of Edith Finch": {
   "id": 11233,
   "name": "What Remains of Edith Finch",
@@ -20877,6 +23871,12 @@
   "id": 2181,
   "name": "Wii Sports",
   "year": 2006,
+  "exact": true
+ },
+ "Wii Sports Resort": {
+  "id": 2182,
+  "name": "Wii Sports Resort",
+  "year": 2009,
   "exact": true
  },
  "Wii Sports Resort #5": {
@@ -20925,6 +23925,12 @@
   "id": 279617,
   "name": "Windblown",
   "year": 2024,
+  "exact": true
+ },
+ "Windjammers": {
+  "id": 11222,
+  "name": "Windjammers",
+  "year": 1994,
   "exact": true
  },
  "Wingspan": {
@@ -20993,6 +23999,12 @@
   "year": 2023,
   "exact": true
  },
+ "Wolfenstein 3D": {
+  "id": 262516,
+  "name": "Wolfenstein 3D",
+  "year": 1992,
+  "exact": true
+ },
  "Wolfenstein II: The New Colossus": {
   "id": 36952,
   "name": "Wolfenstein II: The New Colossus",
@@ -21009,6 +24021,12 @@
   "id": 2031,
   "name": "Wolfenstein: The New Order",
   "year": 2014,
+  "exact": true
+ },
+ "Wolfenstein: The Old Blood": {
+  "id": 9192,
+  "name": "Wolfenstein: The Old Blood",
+  "year": 2015,
   "exact": true
  },
  "Wonder Boy: The Dragon's Trap": {
@@ -21029,10 +24047,22 @@
   "year": 2008,
   "exact": true
  },
+ "World of Warcraft": {
+  "id": 123,
+  "name": "World of Warcraft",
+  "year": 2004,
+  "exact": true
+ },
  "World of Warcraft #6": {
   "id": 123,
   "name": "World of Warcraft",
   "year": 2004,
+  "exact": true
+ },
+ "World War Z": {
+  "id": 20910,
+  "name": "World War Z",
+  "year": 2019,
   "exact": true
  },
  "World's End Club": {
@@ -21065,10 +24095,34 @@
   "year": 2022,
   "exact": true
  },
+ "X-COM: Terror from the Deep": {
+  "id": 25,
+  "name": "X-COM: Terror From the Deep",
+  "year": 1995,
+  "exact": true
+ },
+ "X-COM: UFO Defense": {
+  "id": 24,
+  "name": "X-COM: UFO Defense",
+  "year": 1994,
+  "exact": true
+ },
  "X-Men": {
   "id": 80408,
   "name": "X-Men",
   "year": 1992,
+  "exact": true
+ },
+ "X-Men @1992": {
+  "id": 80408,
+  "name": "X-Men",
+  "year": 1992,
+  "exact": true
+ },
+ "X-Men Origins: Wolverine": {
+  "id": 573,
+  "name": "X-Men Origins: Wolverine",
+  "year": 2009,
   "exact": true
  },
  "X-Men vs. Street Fighter #32": {
@@ -21087,6 +24141,12 @@
   "id": 10919,
   "name": "XCOM 2",
   "year": 2016,
+  "exact": true
+ },
+ "XCOM: Chimera Squad": {
+  "id": 132139,
+  "name": "XCOM: Chimera Squad",
+  "year": 2020,
   "exact": true
  },
  "XCOM: Enemy Unknown": {
@@ -21347,6 +24407,12 @@
   "year": 2019,
   "exact": true
  },
+ "Yoshi's Island DS": {
+  "id": 20601,
+  "name": "Yoshi's Island DS",
+  "year": 2006,
+  "exact": true
+ },
  "Yoshi's Island DS #20": {
   "id": 20601,
   "name": "Yoshi's Island DS",
@@ -21359,10 +24425,22 @@
   "year": 2002,
   "exact": true
  },
+ "Yoshi's Story": {
+  "id": 3213,
+  "name": "Yoshi's Story",
+  "year": 1997,
+  "exact": true
+ },
  "Yoshi's Story #4": {
   "id": 3213,
   "name": "Yoshi's Story",
   "year": 1997,
+  "exact": true
+ },
+ "Yoshi's Woolly World": {
+  "id": 7343,
+  "name": "Yoshi's Woolly World",
+  "year": 2015,
   "exact": true
  },
  "Yoshi's Woolly World #41": {
@@ -21539,10 +24617,40 @@
   "year": 2018,
   "exact": true
  },
+ "Zombie Army 4: Dead War": {
+  "id": 119234,
+  "name": "Zombie Army 4: Dead War",
+  "year": 2020,
+  "exact": true
+ },
+ "Zombies Ate My Neighbors": {
+  "id": 2162,
+  "name": "Zombies Ate My Neighbors",
+  "year": 1993,
+  "exact": true
+ },
+ "ZombiU": {
+  "id": 1591,
+  "name": "ZombiU",
+  "year": 2012,
+  "exact": true
+ },
+ "Zone of the Enders: The 2nd Runner": {
+  "id": 1473,
+  "name": "Zone of the Enders: The 2nd Runner",
+  "year": 2003,
+  "exact": true
+ },
  "Zone of the Enders: The 2nd Runner #8": {
   "id": 1473,
   "name": "Zone of the Enders: The 2nd Runner",
   "year": 2003,
+  "exact": true
+ },
+ "Zoo Tycoon": {
+  "id": 334,
+  "name": "Zoo Tycoon",
+  "year": 2001,
   "exact": true
  }
 }
