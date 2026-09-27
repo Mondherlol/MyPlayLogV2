@@ -26,8 +26,9 @@ export const FEATURES = {
   cards: {
     label: "Cartes",
     hint: "Les boosters de cartes à collectionner, payés en points d'arcade.",
-    // Éteinte par défaut : l'admin la teste avant de l'ouvrir à tous.
-    default: false,
+    // Ouverte à tous (demande du 2026-09-27). L'interrupteur de la page Cartes
+    // (admin) peut toujours la masquer : un réglage enregistré prime.
+    default: true,
   },
 };
 

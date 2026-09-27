@@ -8,6 +8,7 @@ import BoosterPack from "../components/cards/BoosterPack";
 import PackOpening from "../components/cards/PackOpening";
 import CardCollection from "../components/cards/CardCollection";
 import FriendsBinders from "../components/cards/FriendsBinders";
+import CardsVisibility from "../components/cards/CardsVisibility";
 
 // ======================================================================
 //  Cartes — les boosters à ouvrir et le classeur
@@ -109,6 +110,8 @@ export default function Cards() {
           <b>{fmt(points)}</b>
         </Link>
       </header>
+
+      <CardsVisibility />
 
       {err && <p className="cd-err">{err}</p>}
 
