@@ -143,41 +143,26 @@ Ys III: Wanderers from Ys
 `,
   },
   {
-    // ⚠️ FUSIONNÉ avec l'ancien top genre « Ace Attorney-like » (clé
-    // top-ace-attorney-like, retirée) : deux listes pour la même famille de
-    // jeux, c'était un doublon. Les enquêtes « pures » (Obra Dinn, Golden
-    // Idol…) vivent dans le top thème « jeux d'enquête ».
+    // Les épisodes de la série SEULEMENT. Les jeux qui lui ressemblent
+    // (Danganronpa, Ghost Trick…) ont leur propre top, indépendant :
+    // top-deduction, dans genres-b.js.
     key: "top-ace-attorney",
     group: "series",
-    title: "Les {n} meilleurs Ace Attorney & Ace Attorney-like",
-    size: 30,
-    tags: ["Ace Attorney", "Ace Attorney-like", "Enquête", "Saga"],
+    title: "Les {n} meilleurs Ace Attorney",
+    size: 15,
+    tags: ["Ace Attorney", "Capcom", "Enquête", "Saga"],
     games: `
 Phoenix Wright: Ace Attorney - Trials and Tribulations
 Ace Attorney Investigations 2: Prosecutor's Gambit
 The Great Ace Attorney 2: Resolve
 Phoenix Wright: Ace Attorney
-Danganronpa 2: Goodbye Despair
-Ghost Trick: Phantom Detective
 Phoenix Wright: Ace Attorney - Justice for All
 Apollo Justice: Ace Attorney
 The Great Ace Attorney: Adventures
-AI: The Somnium Files
 Phoenix Wright: Ace Attorney - Spirit of Justice
-Danganronpa: Trigger Happy Havoc
 Phoenix Wright: Ace Attorney - Dual Destinies
-Master Detective Archives: Rain Code
 Ace Attorney Investigations: Miles Edgeworth
-Paranormasight: The Seven Mysteries of Honjo
-Danganronpa V3: Killing Harmony
 Professor Layton vs. Phoenix Wright: Ace Attorney
-Famicom Detective Club: The Missing Heir
-Aviary Attorney
-Famicom Detective Club: Emio - The Smiling Man
-Chaos;Head Noah
-Tangle Tower
-Murder by Numbers
-Hotel Dusk: Room 215
 `,
   },
   {

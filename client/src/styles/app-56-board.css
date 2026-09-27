@@ -175,19 +175,20 @@
   text-align: center;
 }
 /* Le libellé SOUS la case, remplie ou non, sur deux lignes au plus. */
+/* ⚠️ JAMAIS DE « … » SUR UNE ÉTIQUETTE. Coupée, « Plus belle direction
+   artis… » ne disait plus ce qu'on choisissait. Deux lignes réservées, une
+   troisième si vraiment il le faut : la case grandit plutôt que de tronquer. */
 .pc-label {
   flex: none;
-  height: 30px;
+  min-height: 30px;
   font-size: 0.64rem;
   font-weight: 700;
   line-height: 15px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   text-transform: uppercase;
   color: var(--text-soft);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 .pc-slot:hover .pc-label {
   color: var(--text);

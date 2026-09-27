@@ -5,7 +5,7 @@ export default [
     key: "top-zelda",
     group: "series",
     title: "Les {n} meilleurs Zelda",
-    size: 25,
+    size: 28,
     tags: ["Zelda", "Nintendo", "Saga"],
     games: `
 The Legend of Zelda: Breath of the Wild
@@ -30,13 +30,19 @@ Zelda II: The Adventure of Link
 The Legend of Zelda: Tri Force Heroes
 Hyrule Warriors: Age of Calamity
 Cadence of Hyrule: Crypt of the NecroDancer Featuring The Legend of Zelda
+The Legend of Zelda: Link's Awakening @2019
+Hyrule Warriors: Definitive Edition
+The Legend of Zelda: Four Swords
+Hyrule Warriors: Age of Imprisonment
+Link's Crossbow Training
+Freshly-Picked Tingle's Rosy Rupeeland
 `,
   },
   {
     key: "top-mario",
     group: "series",
     title: "Les {n} meilleurs Super Mario",
-    size: 25,
+    size: 33,
     tags: ["Mario", "Nintendo", "Saga", "Plateformes"],
     games: `
 Super Mario Galaxy 2
@@ -62,13 +68,23 @@ Super Mario Land
 New Super Mario Bros. 2
 Super Mario Bros.: The Lost Levels
 Super Mario 3D All-Stars
+Super Mario 64 DS
+Super Mario Maker
+Super Mario All-Stars
+Super Mario Advance 4: Super Mario Bros. 3
+Super Mario Bros. Deluxe
+New Super Luigi U
+Super Mario Run
+Super Princess Peach
+Princess Peach: Showtime!
+Mario vs. Donkey Kong @2004
 `,
   },
   {
     key: "top-final-fantasy",
     group: "series",
     title: "Les {n} meilleurs Final Fantasy",
-    size: 25,
+    size: 41,
     tags: ["Final Fantasy", "Square Enix", "Saga", "JRPG"],
     games: `
 Final Fantasy VI
@@ -96,13 +112,29 @@ Dissidia 012: Duodecim Final Fantasy
 Final Fantasy X-2
 Stranger of Paradise: Final Fantasy Origin
 Final Fantasy XIII-2
+Final Fantasy XIV: Shadowbringers
+Final Fantasy XIV: Heavensward
+Final Fantasy XIV: Stormblood
+Final Fantasy XIV: Dawntrail
+Final Fantasy XI
+Final Fantasy Tactics: The Ivalice Chronicles
+Final Fantasy IV: The After Years
+Final Fantasy Crystal Chronicles
+Final Fantasy Tactics A2: Grimoire of the Rift
+Lightning Returns: Final Fantasy XIII
+World of Final Fantasy
+Dissidia Final Fantasy
+Final Fantasy Adventure
+Final Fantasy Mystic Quest
+Dirge of Cerberus: Final Fantasy VII
+Chocobo's Mystery Dungeon Every Buddy!
 `,
   },
   {
     key: "top-pokemon",
     group: "series",
     title: "Les {n} meilleurs Pokémon",
-    size: 20,
+    size: 51,
     tags: ["Pokémon", "Nintendo", "Saga", "RPG"],
     games: `
 Pokémon HeartGold Version
@@ -125,13 +157,44 @@ Pokémon Sword
 Pokémon Yellow Version: Special Pikachu Edition
 Pokémon Diamond Version
 Pokémon: Let's Go, Pikachu!
+Pokémon Mystery Dungeon: Explorers of Sky
+Pokémon Snap
+Pokémon Stadium
+Pokémon Colosseum
+Pokémon Ruby Version
+Pokémon Puzzle League
+Pokémon XD: Gale of Darkness
+Pokémon Trading Card Game
+Pokémon Stadium 2
+New Pokémon Snap
+Pokémon Conquest
+Pokémon Pinball
+Pokkén Tournament DX
+Pokémon Ranger
+Pokémon Mystery Dungeon: Red Rescue Team
+Pokémon Mystery Dungeon: Rescue Team DX
+Pokémon Brilliant Diamond
+Pokémon Pinball: Ruby & Sapphire
+Pokémon Ranger: Shadows of Almia
+Pokémon Mystery Dungeon: Explorers of Time
+Pokémon Mystery Dungeon: Gates to Infinity
+Pokémon Super Mystery Dungeon
+Detective Pikachu
+Pokémon Unite
+Pokémon Trading Card Game Pocket
+Pokémon Go
+Pokémon Café ReMix
+Pokémon Puzzle Challenge
+Pokémon Rumble World
+PokéPark Wii: Pikachu's Adventure
+Hey You, Pikachu!
 `,
   },
   {
     key: "top-metroid",
     group: "series",
     title: "Les {n} meilleurs Metroid",
-    size: 15,
+    size: 16,
     tags: ["Metroid", "Nintendo", "Saga", "Metroidvania"],
     games: `
 Super Metroid
@@ -148,13 +211,15 @@ Metroid II: Return of Samus
 Metroid Prime Hunters
 Metroid: Other M
 Metroid Prime: Federation Force
+Metroid Prime Remastered
+Metroid Prime Pinball
 `,
   },
   {
     key: "top-resident-evil",
     group: "series",
     title: "Les {n} meilleurs Resident Evil",
-    size: 20,
+    size: 24,
     tags: ["Resident Evil", "Capcom", "Saga", "Horreur"],
     games: `
 Resident Evil 4 @2005
@@ -174,13 +239,20 @@ Resident Evil @1996
 Resident Evil Revelations 2
 Resident Evil Zero
 Resident Evil 6
+Resident Evil 0
+Resident Evil Outbreak
+Resident Evil: The Darkside Chronicles
+Resident Evil: The Umbrella Chronicles
+Resident Evil Gaiden
+Resident Evil: Operation Raccoon City
+Umbrella Corps
 `,
   },
   {
     key: "top-castlevania",
     group: "series",
     title: "Les {n} meilleurs Castlevania",
-    size: 20,
+    size: 26,
     tags: ["Castlevania", "Konami", "Saga", "Metroidvania"],
     games: `
 Castlevania: Symphony of the Night
@@ -203,13 +275,19 @@ Castlevania: Lament of Innocence
 Castlevania: Curse of Darkness
 Castlevania: Legacy of Darkness
 Castlevania: Lords of Shadow 2
+Castlevania: The Dracula X Chronicles
+Castlevania Chronicles
+Castlevania: Harmony of Despair
+Castlevania: Lords of Shadow - Mirror of Fate
+Castlevania Legends
+Kid Dracula
 `,
   },
   {
     key: "top-dragon-quest",
     group: "series",
     title: "Les {n} meilleurs Dragon Quest",
-    size: 15,
+    size: 25,
     tags: ["Dragon Quest", "Square Enix", "Saga", "JRPG"],
     games: `
 Dragon Quest XI S: Echoes of an Elusive Age - Definitive Edition
@@ -227,13 +305,23 @@ Dragon Quest Monsters: Joker 2
 Dragon Quest Heroes II
 Dragon Quest Treasures
 Dragon Quest
+Dragon Quest Monsters: Joker
+Dragon Quest Heroes: Rocket Slime
+Dragon Quest I & II HD-2D Remake
+Dragon Quest Builders
+Dragon Quest Monsters: The Dark Prince
+Dragon Quest Monsters @1998
+Dragon Quest Monsters 2
+Dragon Quest X
+Dragon Quest Heroes: The World Tree's Woe and the Blight Below
+Dragon Quest Swords
 `,
   },
   {
     key: "top-kingdom-hearts",
     group: "series",
     title: "Les {n} meilleurs Kingdom Hearts",
-    size: 10,
+    size: 11,
     tags: ["Kingdom Hearts", "Square Enix", "Saga", "Action-RPG"],
     games: `
 Kingdom Hearts II
@@ -246,13 +334,14 @@ Kingdom Hearts 358/2 Days
 Kingdom Hearts 0.2: Birth by Sleep - A Fragmentary Passage
 Kingdom Hearts Re:coded
 Kingdom Hearts: Melody of Memory
+Kingdom Hearts: Chain of Memories
 `,
   },
   {
     key: "top-sonic",
     group: "series",
     title: "Les {n} meilleurs Sonic",
-    size: 20,
+    size: 33,
     tags: ["Sonic", "Sega", "Saga", "Plateformes"],
     games: `
 Sonic Mania
@@ -275,13 +364,26 @@ Sonic Lost World
 Sonic Forces
 Sonic Advance
 Sonic Rush Adventure
+Sonic & All-Stars Racing Transformed
+Sonic Advance 3
+Sonic Racing: CrossWorlds
+Team Sonic Racing
+Sonic Origins
+Sonic the Hedgehog Pocket Adventure
+Sonic Riders
+Shadow the Hedgehog
+Sonic Chronicles: The Dark Brotherhood
+Sonic the Hedgehog 4: Episode II
+Sonic the Hedgehog: Spinball
+Sonic 3D Blast
+Sonic the Hedgehog @2006
 `,
   },
   {
     key: "top-yakuza",
     group: "series",
     title: "Les {n} meilleurs Yakuza & Like a Dragon",
-    size: 15,
+    size: 19,
     tags: ["Yakuza", "Sega", "Saga", "Action"],
     games: `
 Yakuza 0
@@ -299,6 +401,10 @@ Yakuza 3
 Like a Dragon: Ishin!
 Like a Dragon: Pirate Yakuza in Hawaii
 Yakuza 2
+Yakuza @2005
+Fist of the North Star: Lost Paradise
+Yakuza Kenzan!
+Yakuza: Dead Souls
 `,
   },
   {
@@ -325,7 +431,7 @@ Elden Ring Nightreign
     key: "top-fire-emblem",
     group: "series",
     title: "Les {n} meilleurs Fire Emblem",
-    size: 15,
+    size: 24,
     tags: ["Fire Emblem", "Nintendo", "Saga", "RPG tactique"],
     games: `
 Fire Emblem: Three Houses
@@ -342,13 +448,23 @@ Fire Emblem Fates: Conquest
 Fire Emblem: Fuuin no Tsurugi
 Fire Emblem Fates: Birthright
 Fire Emblem: Shadow Dragon
+Fire Emblem: Fuuin no Tsurugi
+Fire Emblem: Shin Monshou no Nazo - Hikari to Kage no Eiyuu
+Fire Emblem Fates: Revelation
+Fire Emblem: Monshou no Nazo
+Fire Emblem Gaiden
+Fire Emblem: Shadow Dragon and the Blade of Light
+Fire Emblem Warriors: Three Hopes
+Tokyo Mirage Sessions #FE Encore
+Fire Emblem Warriors
+Fire Emblem Heroes
 `,
   },
   {
     key: "top-kirby",
     group: "series",
     title: "Les {n} meilleurs Kirby",
-    size: 15,
+    size: 27,
     tags: ["Kirby", "Nintendo", "Saga", "Plateformes"],
     games: `
 Kirby and the Forgotten Land
@@ -366,6 +482,18 @@ Kirby Star Allies
 Kirby and the Rainbow Curse
 Kirby Mass Attack
 Kirby's Dream Land 2
+Kirby Super Star
+Kirby's Return to Dream Land
+Kirby: Squeak Squad
+Kirby Air Ride
+Kirby's Dream Course
+Kirby Air Riders
+Kirby Tilt 'n' Tumble
+Kirby's Pinball Land
+Kirby's Blowout Blast
+Kirby Fighters 2
+Kirby's Dream Buffet
+Kirby's Dream Land
 `,
   },
   {
@@ -393,7 +521,7 @@ Metal Gear Solid: Portable Ops
     key: "top-street-fighter",
     group: "series",
     title: "Les {n} meilleurs Street Fighter",
-    size: 12,
+    size: 19,
     tags: ["Street Fighter", "Capcom", "Saga", "Combat"],
     games: `
 Street Fighter III: 3rd Strike
@@ -408,13 +536,20 @@ Street Fighter V: Champion Edition
 Street Fighter III: 2nd Impact
 Street Fighter EX Plus Alpha
 Street Fighter
+Street Fighter II: The World Warrior
+Super Street Fighter II
+Street Fighter V
+Street Fighter Alpha: Warriors' Dreams
+Street Fighter III
+Street Fighter X Tekken
+Super Puzzle Fighter II Turbo
 `,
   },
   {
     key: "top-tales-of",
     group: "series",
     title: "Les {n} meilleurs Tales of",
-    size: 14,
+    size: 18,
     tags: ["Tales of", "Bandai Namco", "Saga", "JRPG"],
     games: `
 Tales of Berseria
@@ -431,13 +566,17 @@ Tales of Eternia
 Tales of Zestiria
 Tales of Legendia
 Tales of Hearts R
+Tales of Rebirth
+Tales of Destiny 2
+Tales of Symphonia: Dawn of the New World
+Tales of the World: Radiant Mythology
 `,
   },
   {
     key: "top-mega-man",
     group: "series",
     title: "Les {n} meilleurs Mega Man",
-    size: 20,
+    size: 33,
     tags: ["Mega Man", "Capcom", "Saga", "Plateformes"],
     games: `
 Mega Man 2
@@ -461,6 +600,18 @@ Mega Man 10
 Mega Man 6
 Mega Man Zero 4
 Mega Man
+Mega Man 8
+Mega Man X5
+Mega Man Zero
+Mega Man ZX Advent
+Mega Man Battle Network 2
+Mega Man Battle Network 6: Cybeast Gregar
+Mega Man Battle Network
+Mega Man & Bass
+The Misadventures of Tron Bonne
+Mega Man X8
+Mega Man X6
+Mega Man X7
 `,
   },
   {

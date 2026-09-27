@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  CopyPlus,
   Heart,
   Globe,
   Lock,
@@ -48,6 +49,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { typeMeta, timeAgo, DEFAULT_TIERS, localId, GAME_LIST_TYPES } from "../lib/lists";
 import PlaylistDetail from "./PlaylistDetail";
 import NineDetail from "./NineDetail";
@@ -196,6 +198,7 @@ const containerOfItem = (it) => it.tier ?? POOL;
 export default function ListDetail() {
   const { id } = useParams();
   const { token, user } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -436,6 +439,51 @@ export default function ListDetail() {
     }
     setList((prev) => ({ ...prev, type: next }));
     scheduleSave();
+  }
+
+  // --- Un top officiel comme modèle ---
+  // « Top 100 des meilleurs jeux Switch » → « Mon top 100 des meilleurs jeux
+  // Switch » ; « Les 25 meilleurs Zelda » → « Mes 25 meilleurs Zelda ».
+  function myTopTitle(title) {
+    const t = String(title || "").trim();
+    if (/^les\s/i.test(t)) return `Mes ${t.slice(4)}`;
+    return `Mon ${t.charAt(0).toLowerCase()}${t.slice(1)}`;
+  }
+  const [forking, setForking] = useState(false);
+  /**
+   * Faire SON top à partir d'un top officiel : une copie à soi, mêmes jeux
+   * dans le même ordre, ouverte directement en édition — on réordonne, on
+   * retire, on ajoute. Les notes de la liste d'origine ne suivent pas : ce
+   * sont celles du site, pas les siennes.
+   */
+  async function useAsTemplate() {
+    if (!token) return navigate("/login");
+    if (forking) return;
+    setForking(true);
+    try {
+      const body = {
+        title: myTopTitle(list.title).slice(0, 120),
+        type: list.type,
+        itemKind: list.itemKind || "game",
+        tags: (list.tags || []).filter((t) => t !== "Saga" && t !== "Thème"),
+        items: items.map(({ key, _id, note, media, ...it }) => ({ ...it, note: "", media: [] })),
+      };
+      const { list: made } = await apiFetch("/lists", { method: "POST", token, body });
+      navigate(`/lists/${made.id}`, { state: { edit: true } });
+      toast.show({
+        title: "Ton top est prêt",
+        text: "Réordonne, retire ou ajoute des jeux : il est à toi.",
+        cover: items[0]?.image || null,
+        undo: async () => {
+          await apiFetch(`/lists/${made.id}`, { method: "DELETE", token });
+          navigate(`/lists/${id}`);
+        },
+      });
+    } catch (e) {
+      alert(e.message || "Impossible de créer ton top.");
+    } finally {
+      setForking(false);
+    }
   }
 
   // --- Couverture ---
@@ -753,6 +801,19 @@ export default function ListDetail() {
             <Heart size={18} fill={list.liked ? "currentColor" : "none"} />
             {list.likeCount}
           </button>
+          {/* Un top officiel sert de modèle : on repart de ses jeux pour faire
+              le sien. */}
+          {list.official?.kind === "top" && !isOwner && items.length > 0 && (
+            <button
+              className="ld-template clickable"
+              onClick={useAsTemplate}
+              disabled={forking}
+              title="Créer ton propre top à partir de celui-ci"
+            >
+              {forking ? <Loader2 size={16} className="spin" /> : <CopyPlus size={16} />}
+              Faire mon top
+            </button>
+          )}
           {!editing && items.length > 0 && (
             <button
               className="ld-export clickable"

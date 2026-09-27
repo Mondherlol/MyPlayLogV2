@@ -2567,6 +2567,12 @@
   "year": 1986,
   "exact": true
  },
+ "Castlevania Chronicles": {
+  "id": 19468,
+  "name": "Castlevania Chronicles",
+  "year": 2001,
+  "exact": true
+ },
  "Castlevania II: Belmont's Revenge": {
   "id": 1123,
   "name": "Castlevania II: Belmont's Revenge",
@@ -2601,6 +2607,12 @@
   "id": 1119,
   "name": "Castlevania III: Dracula's Curse",
   "year": 1990,
+  "exact": true
+ },
+ "Castlevania Legends": {
+  "id": 1129,
+  "name": "Castlevania Legends",
+  "year": 1997,
   "exact": true
  },
  "Castlevania: Aria of Sorrow": {
@@ -2663,6 +2675,12 @@
   "year": 1995,
   "exact": true
  },
+ "Castlevania: Harmony of Despair": {
+  "id": 1147,
+  "name": "Castlevania: Harmony of Despair",
+  "year": 2010,
+  "exact": true
+ },
  "Castlevania: Harmony of Dissonance": {
   "id": 1133,
   "name": "Castlevania: Harmony of Dissonance",
@@ -2697,6 +2715,12 @@
   "id": 491,
   "name": "Castlevania: Lords of Shadow",
   "year": 2010,
+  "exact": true
+ },
+ "Castlevania: Lords of Shadow - Mirror of Fate": {
+  "id": 1149,
+  "name": "Castlevania: Lords of Shadow - Mirror of Fate",
+  "year": 2013,
   "exact": true
  },
  "Castlevania: Lords of Shadow - Mirror of Fate #37": {
@@ -2775,6 +2799,12 @@
   "id": 1146,
   "name": "Castlevania: The Adventure ReBirth",
   "year": 2009,
+  "exact": true
+ },
+ "Castlevania: The Dracula X Chronicles": {
+  "id": 21888,
+  "name": "Castlevania: The Dracula X Chronicles",
+  "year": 2007,
   "exact": true
  },
  "Castlevania: The Dracula X Chronicles #38": {
@@ -4487,6 +4517,12 @@
   "year": 1999,
   "exact": true
  },
+ "Dirge of Cerberus: Final Fantasy VII": {
+  "id": 18068,
+  "name": "Dirge of Cerberus: Final Fantasy VII",
+  "year": 2006,
+  "exact": true
+ },
  "Dirt 2 #9": {
   "id": 561,
   "name": "Colin McRae: Dirt 2",
@@ -4653,6 +4689,12 @@
   "id": 24288,
   "name": "Dissidia 012 Final Fantasy",
   "year": 2011,
+  "exact": true
+ },
+ "Dissidia Final Fantasy": {
+  "id": 391,
+  "name": "Dissidia Final Fantasy",
+  "year": 2008,
   "exact": true
  },
  "Dissidia Final Fantasy #38": {
@@ -5303,6 +5345,12 @@
   "year": 2004,
   "exact": true
  },
+ "Dragon Quest Builders": {
+  "id": 24069,
+  "name": "Dragon Quest Builders",
+  "year": 2016,
+  "exact": true
+ },
  "Dragon Quest Builders #46": {
   "id": 24069,
   "name": "Dragon Quest Builders",
@@ -5327,6 +5375,12 @@
   "year": 2016,
   "exact": true
  },
+ "Dragon Quest Heroes: Rocket Slime": {
+  "id": 1824,
+  "name": "Dragon Quest Heroes: Rocket Slime",
+  "year": 2005,
+  "exact": true
+ },
  "Dragon Quest Heroes: Rocket Slime #20": {
   "id": 1824,
   "name": "Dragon Quest Heroes: Rocket Slime",
@@ -5337,6 +5391,12 @@
   "id": 9214,
   "name": "Dragon Quest Heroes: The World Tree's Woe and the Blight Below",
   "year": 2015,
+  "exact": true
+ },
+ "Dragon Quest I & II HD-2D Remake": {
+  "id": 306144,
+  "name": "Dragon Quest I & II HD-2D Remake",
+  "year": 2025,
   "exact": true
  },
  "Dragon Quest II: Luminaries of the Legendary Line": {
@@ -5399,10 +5459,28 @@
   "year": 2002,
   "exact": true
  },
+ "Dragon Quest Monsters @1998": {
+  "id": 228790,
+  "name": "Dragon Quest Monsters",
+  "year": 2002,
+  "exact": true
+ },
  "Dragon Quest Monsters #33,22": {
   "id": 228790,
   "name": "Dragon Quest Monsters",
   "year": 2002,
+  "exact": true
+ },
+ "Dragon Quest Monsters 2": {
+  "id": 85643,
+  "name": "Dragon Warrior Monsters 2: Tara's Adventure & Cobi's Journey",
+  "year": 2001,
+  "exact": true
+ },
+ "Dragon Quest Monsters: Joker": {
+  "id": 17460,
+  "name": "Dragon Quest Monsters: Joker",
+  "year": 2006,
   "exact": true
  },
  "Dragon Quest Monsters: Joker #20": {
@@ -5422,6 +5500,12 @@
   "name": "Dragon Quest Monsters: The Dark Prince",
   "year": 2023,
   "exact": true
+ },
+ "Dragon Quest Swords": {
+  "id": 1822,
+  "name": "Dragon Quest Swords: The Masked Queen and the Tower of Mirrors",
+  "year": 2007,
+  "exact": false
  },
  "Dragon Quest Treasures": {
   "id": 150022,
@@ -5500,6 +5584,12 @@
   "name": "Dragon Quest VIII: Journey of the Cursed King",
   "year": 2004,
   "exact": true
+ },
+ "Dragon Quest X": {
+  "id": 80597,
+  "name": "Dragon Quest X: Mezameshi Itsutsu no Shuzoku Online",
+  "year": 2012,
+  "exact": false
  },
  "Dragon Quest X #5": {
   "id": 80597,
@@ -6563,6 +6653,12 @@
   "year": 2015,
   "exact": true
  },
+ "Final Fantasy Crystal Chronicles": {
+  "id": 412,
+  "name": "Final Fantasy: Crystal Chronicles",
+  "year": 2003,
+  "exact": true
+ },
  "Final Fantasy Fables: Chocobo's Dungeon": {
   "id": 18069,
   "name": "Final Fantasy Fables: Chocobo's Dungeon",
@@ -6623,6 +6719,12 @@
   "year": 2005,
   "exact": true
  },
+ "Final Fantasy IV: The After Years": {
+  "id": 388,
+  "name": "Final Fantasy IV: The After Years",
+  "year": 2008,
+  "exact": true
+ },
  "Final Fantasy IV: The Complete Collection #38": {
   "id": 21779,
   "name": "Final Fantasy IV: The Complete Collection",
@@ -6659,6 +6761,12 @@
   "year": 1991,
   "exact": true
  },
+ "Final Fantasy Mystic Quest": {
+  "id": 415,
+  "name": "Final Fantasy: Mystic Quest",
+  "year": 1992,
+  "exact": true
+ },
  "Final Fantasy Mystic Quest #19": {
   "id": 415,
   "name": "Final Fantasy: Mystic Quest",
@@ -6675,6 +6783,12 @@
   "id": 428,
   "name": "Final Fantasy Tactics",
   "year": 1997,
+  "exact": true
+ },
+ "Final Fantasy Tactics A2: Grimoire of the Rift": {
+  "id": 2408,
+  "name": "Final Fantasy Tactics A2: Grimoire of the Rift",
+  "year": 2007,
   "exact": true
  },
  "Final Fantasy Tactics A2: Grimoire of the Rift #20": {
@@ -6833,6 +6947,12 @@
   "year": 2013,
   "exact": true
  },
+ "Final Fantasy XI": {
+  "id": 411,
+  "name": "Final Fantasy XI Online",
+  "year": 2002,
+  "exact": false
+ },
  "Final Fantasy XII": {
   "id": 398,
   "name": "Final Fantasy XII",
@@ -6875,16 +6995,40 @@
   "year": 2013,
   "exact": true
  },
+ "Final Fantasy XIV: Dawntrail": {
+  "id": 259338,
+  "name": "Final Fantasy XIV: Dawntrail",
+  "year": 2024,
+  "exact": true
+ },
  "Final Fantasy XIV: Endwalker": {
   "id": 143232,
   "name": "Final Fantasy XIV: Endwalker",
   "year": 2021,
   "exact": true
  },
+ "Final Fantasy XIV: Heavensward": {
+  "id": 14723,
+  "name": "Final Fantasy XIV: Heavensward",
+  "year": 2015,
+  "exact": true
+ },
+ "Final Fantasy XIV: Shadowbringers": {
+  "id": 112412,
+  "name": "Final Fantasy XIV: Shadowbringers",
+  "year": 2019,
+  "exact": true
+ },
  "Final Fantasy XIV: Shadowbringers #48": {
   "id": 112412,
   "name": "Final Fantasy XIV: Shadowbringers",
   "year": 2019,
+  "exact": true
+ },
+ "Final Fantasy XIV: Stormblood": {
+  "id": 26625,
+  "name": "Final Fantasy XIV: Stormblood",
+  "year": 2017,
   "exact": true
  },
  "Final Fantasy XV": {
@@ -6995,10 +7139,34 @@
   "year": 2015,
   "exact": true
  },
+ "Fire Emblem Fates: Revelation": {
+  "id": 18038,
+  "name": "Fire Emblem Fates: Revelation",
+  "year": 2015,
+  "exact": true
+ },
+ "Fire Emblem Gaiden": {
+  "id": 1434,
+  "name": "Fire Emblem Gaiden",
+  "year": 1992,
+  "exact": true
+ },
  "Fire Emblem Heroes": {
   "id": 26841,
   "name": "Fire Emblem Heroes",
   "year": 2017,
+  "exact": true
+ },
+ "Fire Emblem Warriors": {
+  "id": 26769,
+  "name": "Fire Emblem Warriors",
+  "year": 2017,
+  "exact": true
+ },
+ "Fire Emblem Warriors: Three Hopes": {
+  "id": 191396,
+  "name": "Fire Emblem Warriors: Three Hopes",
+  "year": 2022,
   "exact": true
  },
  "Fire Emblem Warriors: Three Hopes #130": {
@@ -7011,6 +7179,12 @@
   "id": 1438,
   "name": "Fire Emblem: Fuuin no Tsurugi",
   "year": 2002,
+  "exact": true
+ },
+ "Fire Emblem: Monshou no Nazo": {
+  "id": 1435,
+  "name": "Fire Emblem: Monshou no Nazo",
+  "year": 1994,
   "exact": true
  },
  "Fire Emblem: Path of Radiance": {
@@ -7059,6 +7233,18 @@
   "id": 1444,
   "name": "Fire Emblem: Shadow Dragon",
   "year": 2008,
+  "exact": true
+ },
+ "Fire Emblem: Shadow Dragon and the Blade of Light": {
+  "id": 172410,
+  "name": "Fire Emblem: Shadow Dragon and the Blade of Light",
+  "year": 2020,
+  "exact": true
+ },
+ "Fire Emblem: Shin Monshou no Nazo - Hikari to Kage no Eiyuu": {
+  "id": 1445,
+  "name": "Fire Emblem: Shin Monshou no Nazo - Hikari to Kage no Eiyuu",
+  "year": 2010,
   "exact": true
  },
  "Fire Emblem: The Sacred Stones": {
@@ -7305,6 +7491,12 @@
   "id": 9111,
   "name": "Frequency",
   "year": 2001,
+  "exact": true
+ },
+ "Freshly-Picked Tingle's Rosy Rupeeland": {
+  "id": 11607,
+  "name": "Freshly-Picked Tingle's Rosy Rupeeland",
+  "year": 2006,
   "exact": true
  },
  "Frog Fractions": {
@@ -8819,6 +9011,12 @@
   "year": 2015,
   "exact": true
  },
+ "Hey You, Pikachu!": {
+  "id": 2642,
+  "name": "Hey You, Pikachu!",
+  "year": 1998,
+  "exact": true
+ },
  "Hey! Pikmin": {
   "id": 28124,
   "name": "Hey! Pikmin",
@@ -9153,6 +9351,12 @@
   "id": 138343,
   "name": "Hyrule Warriors: Age of Calamity",
   "year": 2020,
+  "exact": true
+ },
+ "Hyrule Warriors: Age of Imprisonment": {
+  "id": 338085,
+  "name": "Hyrule Warriors: Age of Imprisonment",
+  "year": 2025,
   "exact": true
  },
  "Hyrule Warriors: Definitive Edition": {
@@ -9749,6 +9953,12 @@
   "year": 1992,
   "exact": true
  },
+ "Kid Dracula": {
+  "id": 1120,
+  "name": "Kid Dracula",
+  "year": 1990,
+  "exact": true
+ },
  "Kid Icarus": {
   "id": 3663,
   "name": "Kid Icarus",
@@ -9947,6 +10157,12 @@
   "year": 2010,
   "exact": true
  },
+ "Kingdom Hearts: Chain of Memories": {
+  "id": 1220,
+  "name": "Kingdom Hearts: Chain of Memories",
+  "year": 2004,
+  "exact": true
+ },
  "Kingdom Hearts: Melody of Memory": {
   "id": 135108,
   "name": "Kingdom Hearts: Melody of Memory",
@@ -9977,10 +10193,22 @@
   "year": 2000,
   "exact": true
  },
+ "Kirby Air Ride": {
+  "id": 2777,
+  "name": "Kirby Air Ride",
+  "year": 2003,
+  "exact": true
+ },
  "Kirby Air Ride #21": {
   "id": 2777,
   "name": "Kirby Air Ride",
   "year": 2003,
+  "exact": true
+ },
+ "Kirby Air Riders": {
+  "id": 338105,
+  "name": "Kirby Air Riders",
+  "year": 2025,
   "exact": true
  },
  "Kirby and the Forgotten Land": {
@@ -10005,6 +10233,12 @@
   "id": 7338,
   "name": "Kirby and the Rainbow Curse",
   "year": 2015,
+  "exact": true
+ },
+ "Kirby Fighters 2": {
+  "id": 139059,
+  "name": "Kirby Fighters 2",
+  "year": 2020,
   "exact": true
  },
  "Kirby Mass Attack": {
@@ -10055,6 +10289,12 @@
   "year": 2008,
   "exact": true
  },
+ "Kirby Tilt 'n' Tumble": {
+  "id": 3729,
+  "name": "Kirby Tilt 'n' Tumble",
+  "year": 2000,
+  "exact": true
+ },
  "Kirby Tilt 'n' Tumble #33,22": {
   "id": 3729,
   "name": "Kirby Tilt 'n' Tumble",
@@ -10091,6 +10331,12 @@
   "year": 2016,
   "exact": true
  },
+ "Kirby: Squeak Squad": {
+  "id": 3723,
+  "name": "Kirby: Squeak Squad",
+  "year": 2006,
+  "exact": true
+ },
  "Kirby: Triple Deluxe": {
   "id": 5440,
   "name": "Kirby: Triple Deluxe",
@@ -10121,10 +10367,34 @@
   "year": 1995,
   "exact": true
  },
+ "Kirby's Blowout Blast": {
+  "id": 28127,
+  "name": "Kirby's Blowout Blast",
+  "year": 2017,
+  "exact": true
+ },
+ "Kirby's Dream Buffet": {
+  "id": 209094,
+  "name": "Kirby's Dream Buffet",
+  "year": 2022,
+  "exact": true
+ },
+ "Kirby's Dream Course": {
+  "id": 3656,
+  "name": "Kirby's Dream Course",
+  "year": 1994,
+  "exact": true
+ },
  "Kirby's Dream Course #19": {
   "id": 3656,
   "name": "Kirby's Dream Course",
   "year": 1994,
+  "exact": true
+ },
+ "Kirby's Dream Land": {
+  "id": 1063,
+  "name": "Kirby's Dream Land",
+  "year": 1992,
   "exact": true
  },
  "Kirby's Dream Land #33,22": {
@@ -10167,6 +10437,18 @@
   "id": 2184,
   "name": "Kirby's Epic Yarn",
   "year": 2010,
+  "exact": true
+ },
+ "Kirby's Pinball Land": {
+  "id": 3715,
+  "name": "Kirby's Pinball Land",
+  "year": 1993,
+  "exact": true
+ },
+ "Kirby's Return to Dream Land": {
+  "id": 3725,
+  "name": "Kirby's Return to Dream Land",
+  "year": 2011,
   "exact": true
  },
  "Kirby's Return to Dream Land #5": {
@@ -10517,6 +10799,12 @@
   "year": 1995,
   "exact": true
  },
+ "Lightning Returns: Final Fantasy XIII": {
+  "id": 2449,
+  "name": "Lightning Returns: Final Fantasy XIII",
+  "year": 2013,
+  "exact": true
+ },
  "Like a Dragon Gaiden: The Man Who Erased His Name": {
   "id": 217624,
   "name": "Like a Dragon Gaiden: The Man Who Erased His Name",
@@ -10563,6 +10851,12 @@
   "id": 1331,
   "name": "Limbo",
   "year": 2010,
+  "exact": true
+ },
+ "Link's Crossbow Training": {
+  "id": 4973,
+  "name": "Link's Crossbow Training",
+  "year": 2007,
   "exact": true
  },
  "Little Busters!": {
@@ -11531,6 +11825,12 @@
   "year": 1987,
   "exact": true
  },
+ "Mega Man & Bass": {
+  "id": 1726,
+  "name": "Mega Man & Bass",
+  "year": 1998,
+  "exact": true
+ },
  "Mega Man 10": {
   "id": 1723,
   "name": "Mega Man 10",
@@ -11615,6 +11915,12 @@
   "year": 1995,
   "exact": true
  },
+ "Mega Man 8": {
+  "id": 1721,
+  "name": "Mega Man 8",
+  "year": 1996,
+  "exact": true
+ },
  "Mega Man 9": {
   "id": 1722,
   "name": "Mega Man 9",
@@ -11627,9 +11933,21 @@
   "year": 2008,
   "exact": true
  },
+ "Mega Man Battle Network": {
+  "id": 1755,
+  "name": "Mega Man Battle Network",
+  "year": 2001,
+  "exact": true
+ },
  "Mega Man Battle Network #24": {
   "id": 1755,
   "name": "Mega Man Battle Network",
+  "year": 2001,
+  "exact": true
+ },
+ "Mega Man Battle Network 2": {
+  "id": 1756,
+  "name": "Mega Man Battle Network 2",
   "year": 2001,
   "exact": true
  },
@@ -11644,6 +11962,12 @@
   "name": "Mega Man Battle Network 3 White",
   "year": 2002,
   "exact": false
+ },
+ "Mega Man Battle Network 6: Cybeast Gregar": {
+  "id": 1765,
+  "name": "Mega Man Battle Network 6: Cybeast Gregar",
+  "year": 2006,
+  "exact": true
  },
  "Mega Man II #33,22": {
   "id": 1734,
@@ -11741,6 +12065,36 @@
   "year": 1997,
   "exact": true
  },
+ "Mega Man X5": {
+  "id": 1745,
+  "name": "Mega Man X5",
+  "year": 2000,
+  "exact": true
+ },
+ "Mega Man X6": {
+  "id": 1746,
+  "name": "Mega Man X6",
+  "year": 2001,
+  "exact": true
+ },
+ "Mega Man X7": {
+  "id": 1747,
+  "name": "Mega Man X7",
+  "year": 2003,
+  "exact": true
+ },
+ "Mega Man X8": {
+  "id": 1748,
+  "name": "Mega Man X8",
+  "year": 2004,
+  "exact": true
+ },
+ "Mega Man Zero": {
+  "id": 1775,
+  "name": "Mega Man Zero",
+  "year": 2002,
+  "exact": true
+ },
  "Mega Man Zero #24": {
   "id": 1775,
   "name": "Mega Man Zero",
@@ -11793,6 +12147,12 @@
   "id": 1779,
   "name": "Mega Man ZX",
   "year": 2006,
+  "exact": true
+ },
+ "Mega Man ZX Advent": {
+  "id": 1780,
+  "name": "Mega Man ZX Advent",
+  "year": 2007,
   "exact": true
  },
  "Mega Man ZX Advent #20": {
@@ -12171,6 +12531,18 @@
   "id": 1110,
   "name": "Metroid Prime Hunters",
   "year": 2006,
+  "exact": true
+ },
+ "Metroid Prime Pinball": {
+  "id": 1109,
+  "name": "Metroid Prime Pinball",
+  "year": 2005,
+  "exact": true
+ },
+ "Metroid Prime Remastered": {
+  "id": 236663,
+  "name": "Metroid Prime Remastered",
+  "year": 2023,
   "exact": true
  },
  "Metroid Prime Remastered #130": {
@@ -13179,6 +13551,18 @@
   "id": 1840,
   "name": "Neverwinter Nights 2: Mask of the Betrayer",
   "year": 2007,
+  "exact": true
+ },
+ "New Pokémon Snap": {
+  "id": 135142,
+  "name": "New Pokémon Snap",
+  "year": 2021,
+  "exact": true
+ },
+ "New Super Luigi U": {
+  "id": 2173,
+  "name": "New Super Luigi U",
+  "year": 2013,
   "exact": true
  },
  "New Super Luigi U #41": {
@@ -14867,6 +15251,18 @@
   "year": 2012,
   "exact": true
  },
+ "Pokémon Brilliant Diamond": {
+  "id": 144051,
+  "name": "Pokémon Brilliant Diamond",
+  "year": 2021,
+  "exact": true
+ },
+ "Pokémon Café ReMix": {
+  "id": 178359,
+  "name": "Pokémon Café ReMix",
+  "year": 2021,
+  "exact": true
+ },
  "Pokémon Colosseum": {
   "id": 2725,
   "name": "Pokémon Colosseum",
@@ -14877,6 +15273,12 @@
   "id": 2725,
   "name": "Pokémon Colosseum",
   "year": 2003,
+  "exact": true
+ },
+ "Pokémon Conquest": {
+  "id": 2288,
+  "name": "Pokémon Conquest",
+  "year": 2012,
   "exact": true
  },
  "Pokémon Conquest #20": {
@@ -15047,10 +15449,22 @@
   "year": 2014,
   "exact": true
  },
+ "Pokémon Pinball": {
+  "id": 4068,
+  "name": "Pokémon Pinball",
+  "year": 1999,
+  "exact": true
+ },
  "Pokémon Pinball #33,22": {
   "id": 4068,
   "name": "Pokémon Pinball",
   "year": 1999,
+  "exact": true
+ },
+ "Pokémon Pinball: Ruby & Sapphire": {
+  "id": 4069,
+  "name": "Pokémon Pinball: Ruby & Sapphire",
+  "year": 2003,
   "exact": true
  },
  "Pokémon Platinum Version": {
@@ -15065,10 +15479,34 @@
   "year": 2008,
   "exact": true
  },
+ "Pokémon Puzzle Challenge": {
+  "id": 49857,
+  "name": "Pokémon Puzzle Challenge",
+  "year": 2000,
+  "exact": true
+ },
  "Pokémon Puzzle Challenge #33,22": {
   "id": 49857,
   "name": "Pokémon Puzzle Challenge",
   "year": 2000,
+  "exact": true
+ },
+ "Pokémon Puzzle League": {
+  "id": 3574,
+  "name": "Pokémon Puzzle League",
+  "year": 2000,
+  "exact": true
+ },
+ "Pokémon Ranger": {
+  "id": 14606,
+  "name": "Pokémon Ranger",
+  "year": 2006,
+  "exact": true
+ },
+ "Pokémon Ranger: Shadows of Almia": {
+  "id": 14699,
+  "name": "Pokémon Ranger: Shadows of Almia",
+  "year": 2008,
   "exact": true
  },
  "Pokémon Red Version": {
@@ -15083,10 +15521,22 @@
   "year": 1996,
   "exact": true
  },
+ "Pokémon Ruby Version": {
+  "id": 1557,
+  "name": "Pokémon Ruby Version",
+  "year": 2002,
+  "exact": true
+ },
  "Pokémon Ruby Version #24": {
   "id": 1557,
   "name": "Pokémon Ruby Version",
   "year": 2002,
+  "exact": true
+ },
+ "Pokémon Rumble World": {
+  "id": 9564,
+  "name": "Pokémon Rumble World",
+  "year": 2015,
   "exact": true
  },
  "Pokémon Scarlet": {
@@ -15095,9 +15545,21 @@
   "year": 2022,
   "exact": true
  },
+ "Pokémon Snap": {
+  "id": 2324,
+  "name": "Pokémon Snap",
+  "year": 1999,
+  "exact": true
+ },
  "Pokémon Snap #4": {
   "id": 2324,
   "name": "Pokémon Snap",
+  "year": 1999,
+  "exact": true
+ },
+ "Pokémon Stadium": {
+  "id": 2289,
+  "name": "Pokémon Stadium",
   "year": 1999,
   "exact": true
  },
@@ -15137,10 +15599,22 @@
   "year": 2019,
   "exact": true
  },
+ "Pokémon Trading Card Game": {
+  "id": 4567,
+  "name": "Pokémon Trading Card Game",
+  "year": 1998,
+  "exact": true
+ },
  "Pokémon Trading Card Game #33,22": {
   "id": 4567,
   "name": "Pokémon Trading Card Game",
   "year": 1998,
+  "exact": true
+ },
+ "Pokémon Trading Card Game Pocket": {
+  "id": 288324,
+  "name": "Pokémon Trading Card Game Pocket",
+  "year": 2024,
   "exact": true
  },
  "Pokémon Ultra Sun": {
@@ -15173,6 +15647,12 @@
   "year": 2013,
   "exact": true
  },
+ "Pokémon XD: Gale of Darkness": {
+  "id": 2724,
+  "name": "Pokémon XD: Gale of Darkness",
+  "year": 2005,
+  "exact": true
+ },
  "Pokémon XD: Gale of Darkness #21": {
   "id": 2724,
   "name": "Pokémon XD: Gale of Darkness",
@@ -15189,6 +15669,12 @@
   "id": 25877,
   "name": "Pokémon: Let's Go, Pikachu!",
   "year": 2018,
+  "exact": true
+ },
+ "PokéPark Wii: Pikachu's Adventure": {
+  "id": 4558,
+  "name": "PokéPark Wii: Pikachu's Adventure",
+  "year": 2009,
   "exact": true
  },
  "Pokkén Tournament #41": {
@@ -15393,6 +15879,12 @@
   "id": 837,
   "name": "Prince of Persia: Warrior Within",
   "year": 2004,
+  "exact": true
+ },
+ "Princess Peach: Showtime!": {
+  "id": 254340,
+  "name": "Princess Peach: Showtime!",
+  "year": 2024,
   "exact": true
  },
  "Prison Architect": {
@@ -16181,6 +16673,12 @@
   "year": 1997,
   "exact": true
  },
+ "Resident Evil 0": {
+  "id": 15108,
+  "name": "Resident Evil 0",
+  "year": 2016,
+  "exact": true
+ },
  "Resident Evil 2 @1998": {
   "id": 880,
   "name": "Resident Evil 2",
@@ -16319,6 +16817,18 @@
   "year": 2001,
   "exact": true
  },
+ "Resident Evil Gaiden": {
+  "id": 969,
+  "name": "Resident Evil Gaiden",
+  "year": 2001,
+  "exact": true
+ },
+ "Resident Evil Outbreak": {
+  "id": 972,
+  "name": "Resident Evil Outbreak",
+  "year": 2003,
+  "exact": true
+ },
  "Resident Evil Requiem": {
   "id": 347668,
   "name": "Resident Evil Requiem",
@@ -16361,10 +16871,28 @@
   "year": 2002,
   "exact": true
  },
+ "Resident Evil: Operation Raccoon City": {
+  "id": 977,
+  "name": "Resident Evil: Operation Raccoon City",
+  "year": 2012,
+  "exact": true
+ },
  "Resident Evil: Revelations #37": {
   "id": 978,
   "name": "Resident Evil: Revelations",
   "year": 2012,
+  "exact": true
+ },
+ "Resident Evil: The Darkside Chronicles": {
+  "id": 497,
+  "name": "Resident Evil: The Darkside Chronicles",
+  "year": 2009,
+  "exact": true
+ },
+ "Resident Evil: The Umbrella Chronicles": {
+  "id": 975,
+  "name": "Resident Evil: The Umbrella Chronicles",
+  "year": 2007,
   "exact": true
  },
  "Resistance: Fall of Man #9": {
@@ -17315,6 +17843,12 @@
   "year": 2016,
   "exact": true
  },
+ "Shadow the Hedgehog": {
+  "id": 4105,
+  "name": "Shadow the Hedgehog",
+  "year": 2005,
+  "exact": true
+ },
  "Shadowrun #19": {
   "id": 7640,
   "name": "Shadowrun",
@@ -18155,6 +18689,12 @@
   "year": 1994,
   "exact": true
  },
+ "Sonic 3D Blast": {
+  "id": 9476,
+  "name": "Sonic 3D Blast",
+  "year": 1996,
+  "exact": true
+ },
  "Sonic Advance": {
   "id": 6283,
   "name": "Sonic Advance",
@@ -18177,6 +18717,12 @@
   "id": 6598,
   "name": "Sonic Advance 2",
   "year": 2002,
+  "exact": true
+ },
+ "Sonic Advance 3": {
+  "id": 6599,
+  "name": "Sonic Advance 3",
+  "year": 2004,
   "exact": true
  },
  "Sonic Advance 3 #24": {
@@ -18219,6 +18765,12 @@
   "id": 5452,
   "name": "Sonic CD",
   "year": 1993,
+  "exact": true
+ },
+ "Sonic Chronicles: The Dark Brotherhood": {
+  "id": 217,
+  "name": "Sonic Chronicles: The Dark Brotherhood",
+  "year": 2008,
   "exact": true
  },
  "Sonic Colors": {
@@ -18275,6 +18827,24 @@
   "year": 2017,
   "exact": true
  },
+ "Sonic Origins": {
+  "id": 150007,
+  "name": "Sonic Origins",
+  "year": 2022,
+  "exact": true
+ },
+ "Sonic Racing: CrossWorlds": {
+  "id": 325608,
+  "name": "Sonic Racing: CrossWorlds",
+  "year": 2025,
+  "exact": true
+ },
+ "Sonic Riders": {
+  "id": 4158,
+  "name": "Sonic Riders",
+  "year": 2006,
+  "exact": true
+ },
  "Sonic Rush": {
   "id": 19258,
   "name": "Sonic Rush",
@@ -18311,6 +18881,12 @@
   "year": 1991,
   "exact": true
  },
+ "Sonic the Hedgehog @2006": {
+  "id": 6231,
+  "name": "Sonic the Hedgehog",
+  "year": 2006,
+  "exact": true
+ },
  "Sonic the Hedgehog #29": {
   "id": 3192,
   "name": "Sonic the Hedgehog",
@@ -18327,6 +18903,24 @@
   "id": 4438,
   "name": "Sonic the Hedgehog 2",
   "year": 1992,
+  "exact": true
+ },
+ "Sonic the Hedgehog 4: Episode II": {
+  "id": 9474,
+  "name": "Sonic the Hedgehog 4: Episode II",
+  "year": 2012,
+  "exact": true
+ },
+ "Sonic the Hedgehog Pocket Adventure": {
+  "id": 43323,
+  "name": "Sonic the Hedgehog Pocket Adventure",
+  "year": 1999,
+  "exact": true
+ },
+ "Sonic the Hedgehog: Spinball": {
+  "id": 16036,
+  "name": "Sonic the Hedgehog: Spinball",
+  "year": 1993,
   "exact": true
  },
  "Sonic Unleashed": {
@@ -19373,6 +19967,12 @@
   "year": 2006,
   "exact": true
  },
+ "Street Fighter Alpha: Warriors' Dreams": {
+  "id": 6702,
+  "name": "Street Fighter Alpha: Warriors' Dreams",
+  "year": 1995,
+  "exact": true
+ },
  "Street Fighter EX Plus Alpha": {
   "id": 38297,
   "name": "Street Fighter EX plus Alpha",
@@ -19397,10 +19997,22 @@
   "year": 1992,
   "exact": true
  },
+ "Street Fighter II: The World Warrior": {
+  "id": 3186,
+  "name": "Street Fighter II",
+  "year": 1991,
+  "exact": true
+ },
  "Street Fighter II': Special Champion Edition #29": {
   "id": 4367,
   "name": "Street Fighter II: Special Champion Edition",
   "year": 1993,
+  "exact": true
+ },
+ "Street Fighter III": {
+  "id": 267546,
+  "name": "Street Fighter III",
+  "year": null,
   "exact": true
  },
  "Street Fighter III: 2nd Impact": {
@@ -19461,6 +20073,12 @@
   "id": 126095,
   "name": "Street Fighter V: Champion Edition",
   "year": 2020,
+  "exact": true
+ },
+ "Street Fighter X Tekken": {
+  "id": 1065,
+  "name": "Street Fighter X Tekken",
+  "year": 2012,
   "exact": true
  },
  "Streets of Rage": {
@@ -19811,16 +20429,34 @@
   "year": 1996,
   "exact": true
  },
+ "Super Mario 64 DS": {
+  "id": 22301,
+  "name": "Super Mario 64 DS",
+  "year": 2004,
+  "exact": true
+ },
  "Super Mario 64 DS #20": {
   "id": 22301,
   "name": "Super Mario 64 DS",
   "year": 2004,
   "exact": true
  },
+ "Super Mario Advance 4: Super Mario Bros. 3": {
+  "id": 16748,
+  "name": "Super Mario Advance 4: Super Mario Bros. 3",
+  "year": 2003,
+  "exact": true
+ },
  "Super Mario Advance 4: Super Mario Bros. 3 #24": {
   "id": 16748,
   "name": "Super Mario Advance 4: Super Mario Bros. 3",
   "year": 2003,
+  "exact": true
+ },
+ "Super Mario All-Stars": {
+  "id": 5199,
+  "name": "Super Mario All-Stars",
+  "year": 1993,
   "exact": true
  },
  "Super Mario All-Stars #19": {
@@ -19863,6 +20499,12 @@
   "id": 1068,
   "name": "Super Mario Bros. 3",
   "year": 1988,
+  "exact": true
+ },
+ "Super Mario Bros. Deluxe": {
+  "id": 49877,
+  "name": "Super Mario Bros. Deluxe",
+  "year": 1999,
   "exact": true
  },
  "Super Mario Bros. Deluxe #33,22": {
@@ -20027,6 +20669,12 @@
   "year": 1996,
   "exact": true
  },
+ "Super Mario Run": {
+  "id": 23796,
+  "name": "Super Mario Run",
+  "year": 2016,
+  "exact": true
+ },
  "Super Mario Sunshine": {
   "id": 1075,
   "name": "Super Mario Sunshine",
@@ -20123,10 +20771,22 @@
   "year": 2007,
   "exact": true
  },
+ "Super Princess Peach": {
+  "id": 20497,
+  "name": "Super Princess Peach",
+  "year": 2005,
+  "exact": true
+ },
  "Super Punch-Out!! #19": {
   "id": 9151,
   "name": "Super Punch-Out!!",
   "year": 1994,
+  "exact": true
+ },
+ "Super Puzzle Fighter II Turbo": {
+  "id": 20803,
+  "name": "Super Puzzle Fighter II Turbo",
+  "year": 1996,
   "exact": true
  },
  "Super Robot Wars 30": {
@@ -20229,6 +20889,12 @@
   "id": 44463,
   "name": "Super Star Wars: The Empire Strikes Back",
   "year": 1993,
+  "exact": true
+ },
+ "Super Street Fighter II": {
+  "id": 322188,
+  "name": "Super Street Fighter II",
+  "year": 1994,
   "exact": true
  },
  "Super Street Fighter II #29": {
@@ -20477,6 +21143,12 @@
   "year": 1997,
   "exact": true
  },
+ "Tales of Destiny 2": {
+  "id": 1203,
+  "name": "Tales of Destiny 2",
+  "year": 2002,
+  "exact": true
+ },
  "Tales of Eternia": {
   "id": 329316,
   "name": "Tales of Eternia",
@@ -20525,6 +21197,12 @@
   "year": 1995,
   "exact": true
  },
+ "Tales of Rebirth": {
+  "id": 1205,
+  "name": "Tales of Rebirth",
+  "year": 2004,
+  "exact": true
+ },
  "Tales of Symphonia": {
   "id": 1204,
   "name": "Tales of Symphonia",
@@ -20535,6 +21213,12 @@
   "id": 1204,
   "name": "Tales of Symphonia",
   "year": 2003,
+  "exact": true
+ },
+ "Tales of Symphonia: Dawn of the New World": {
+  "id": 5210,
+  "name": "Tales of Symphonia: Dawn of the New World",
+  "year": 2008,
   "exact": true
  },
  "Tales of Symphonia: Dawn of the New World #5": {
@@ -20553,6 +21237,12 @@
   "id": 1207,
   "name": "Tales of the Abyss",
   "year": 2005,
+  "exact": true
+ },
+ "Tales of the World: Radiant Mythology": {
+  "id": 19159,
+  "name": "Tales of the World: Radiant Mythology",
+  "year": 2006,
   "exact": true
  },
  "Tales of Vesperia": {
@@ -20625,6 +21315,12 @@
   "id": 891,
   "name": "Team Fortress 2",
   "year": 2007,
+  "exact": true
+ },
+ "Team Sonic Racing": {
+  "id": 103018,
+  "name": "Team Sonic Racing",
+  "year": 2019,
   "exact": true
  },
  "Tearaway": {
@@ -21509,6 +22205,12 @@
   "year": 2024,
   "exact": true
  },
+ "The Legend of Zelda: Four Swords": {
+  "id": 163572,
+  "name": "The Legend of Zelda: Four Swords",
+  "year": 2002,
+  "exact": true
+ },
  "The Legend of Zelda: Four Swords Adventures": {
   "id": 1034,
   "name": "The Legend of Zelda: Four Swords Adventures",
@@ -21765,6 +22467,12 @@
   "id": 317621,
   "name": "The Midnight Walk",
   "year": 2025,
+  "exact": true
+ },
+ "The Misadventures of Tron Bonne": {
+  "id": 1753,
+  "name": "The Misadventures of Tron Bonne",
+  "year": 1999,
   "exact": true
  },
  "The Mortuary Assistant": {
@@ -23117,6 +23825,12 @@
   "year": 2021,
   "exact": true
  },
+ "Umbrella Corps": {
+  "id": 12530,
+  "name": "Umbrella Corps",
+  "year": 2016,
+  "exact": true
+ },
  "Unavowed": {
   "id": 27867,
   "name": "Unavowed",
@@ -24035,6 +24749,12 @@
   "year": 2017,
   "exact": true
  },
+ "World of Final Fantasy": {
+  "id": 11214,
+  "name": "World of Final Fantasy",
+  "year": 2016,
+  "exact": true
+ },
  "World of Goo": {
   "id": 942,
   "name": "World of Goo",
@@ -24275,6 +24995,12 @@
   "year": 2006,
   "exact": true
  },
+ "Yakuza @2005": {
+  "id": 2059,
+  "name": "Yakuza",
+  "year": 2005,
+  "exact": true
+ },
  "Yakuza 0": {
   "id": 11397,
   "name": "Yakuza 0",
@@ -24335,6 +25061,12 @@
   "year": 2016,
   "exact": true
  },
+ "Yakuza Kenzan!": {
+  "id": 7442,
+  "name": "Ryuu ga Gotoku Kenzan!",
+  "year": 2008,
+  "exact": true
+ },
  "Yakuza Kiwami": {
   "id": 12595,
   "name": "Yakuza Kiwami",
@@ -24351,6 +25083,12 @@
   "id": 55090,
   "name": "Yakuza Kiwami 2",
   "year": 2017,
+  "exact": true
+ },
+ "Yakuza: Dead Souls": {
+  "id": 7489,
+  "name": "Yakuza: Dead Souls",
+  "year": 2011,
   "exact": true
  },
  "Yakuza: Like a Dragon": {

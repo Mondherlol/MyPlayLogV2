@@ -156,6 +156,37 @@ Ever Oasis
 `,
   },
   {
+    // Les jeux « à la Ace Attorney » : procès, confrontations, déductions à
+    // choisir soi-même. Indépendant du top de la série (top-ace-attorney).
+    key: "top-deduction",
+    group: "genre",
+    title: "Top {n} des meilleurs jeux de déduction & de procès",
+    size: 20,
+    tags: ["Déduction", "Procès", "Visual novel", "Enquête"],
+    games: `
+Danganronpa 2: Goodbye Despair
+Ghost Trick: Phantom Detective
+AI: The Somnium Files
+Danganronpa: Trigger Happy Havoc
+Master Detective Archives: Rain Code
+Paranormasight: The Seven Mysteries of Honjo
+Danganronpa V3: Killing Harmony
+Famicom Detective Club: The Missing Heir
+Aviary Attorney
+AI: The Somnium Files - nirvanA Initiative
+Famicom Detective Club: Emio - The Smiling Man
+Famicom Detective Club: The Girl Who Stands Behind
+Chaos;Head Noah
+Tangle Tower
+Murder by Numbers
+Hotel Dusk: Room 215
+Last Window: The Secret of Cape West
+Nine Hours, Nine Persons, Nine Doors
+Zero Escape: Virtue's Last Reward
+Contradiction: Spot the Liar!
+`,
+  },
+  {
     key: "top-point-and-click",
     group: "genre",
     title: "Top {n} des meilleurs point & click et jeux d'aventure",

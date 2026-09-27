@@ -40,7 +40,7 @@ export const BOARDS = {
     slots: [
       { key: "favorite", label: "Mon jeu préféré", en: "My favorite game", Icon: Heart },
       { key: "story", label: "Meilleure histoire", en: "Best story", Icon: BookOpen },
-      { key: "art", label: "Plus belle direction artistique", en: "Best art direction", Icon: Palette },
+      { key: "art", label: "Plus belle D.A", en: "Best art direction", Icon: Palette },
       { key: "impact", label: "Le plus marquant pour moi", en: "Most impactful for me", Icon: Sparkles },
       { key: "combat", label: "Meilleurs combats", en: "Best combat", Icon: Swords },
       { key: "overhated", label: "Injustement détesté", en: "Unfairly hated", Icon: Shield },
@@ -53,7 +53,7 @@ export const BOARDS = {
       { key: "soundtrack", label: "Meilleure bande-son", en: "Best soundtrack", Icon: Music },
       { key: "multiplayer", label: "Meilleur multijoueur", en: "Best multiplayer", Icon: Globe },
       { key: "notmything", label: "Pas mon style, mais…", en: "Not my thing, but…", Icon: Shuffle },
-      { key: "brainoff", label: "Pour débrancher le cerveau", en: "Turn my brain off", Icon: Sofa },
+      { key: "brainoff", label: "Débrancher le cerveau", en: "Turn my brain off", Icon: Sofa },
       { key: "friends", label: "À faire entre potes", en: "Best with friends", Icon: Users },
       { key: "retro", label: "Meilleur jeu rétro", en: "Best retro game", Icon: Gamepad2 },
       { key: "nostalgia", label: "Nostalgie d'enfance", en: "Nostalgic childhood game", Icon: ToyBrick },

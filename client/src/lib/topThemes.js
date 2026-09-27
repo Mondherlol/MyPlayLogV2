@@ -178,6 +178,7 @@ const COLORS = {
   "top-immersive-sim": "#3b5bdb",
   "top-action-rpg": "#9c36b5",
   "top-character-action": "#e8590c",
+  "top-deduction": "#1864ab",
   "top-sims-like": "#37b24d",
   "top-simulators": "#1c7ed6",
   "top-parkour": "#e8590c",
