@@ -1163,6 +1163,25 @@
   background: var(--surface-2);
 }
 
+/* La recherche globale, en haut de la page : toute la largeur, un cran plus
+   haute que les filtres — c'est la porte d'entrée de toutes les listes. */
+.lists-search.lists-search-global {
+  flex: none;
+  width: 100%;
+  margin: 0.2rem 0 0.9rem;
+}
+.lists-search-global .lists-search-icon {
+  left: 0.95rem;
+}
+.lists-search-global input {
+  padding: 0.8rem 2.6rem 0.8rem 2.7rem;
+  border-radius: 14px;
+  font-size: 0.98rem;
+}
+.lists-search-global input:focus {
+  border-color: #f2b70b;
+}
+
 .lists-select {
   padding: 0.6rem 0.8rem;
   border-radius: 12px;

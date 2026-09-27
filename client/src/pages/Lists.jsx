@@ -66,6 +66,13 @@ export default function Lists() {
   const query = searchParams.get("q") || "";
   const group = searchParams.get("group") || "";
   const tag = searchParams.get("tag") || "";
+  // ⚠️ UNE RECHERCHE PORTE SUR TOUTES LES LISTES. La barre du haut ne cherche
+  // pas « dans l'onglet » : un mot-clé traverse tops, conférences, palmarès,
+  // cartes de joueur et listes des gens. Tant qu'elle est remplie, l'onglet ne
+  // filtre plus rien ; en cliquer un vide la recherche.
+  const searching = !!query;
+  // L'onglet effectif : « Découvrir » pendant une recherche.
+  const eff = searching ? "feed" : scope;
   const setParam = (key, value, def) =>
     setSearchParams(
       (prev) => {
@@ -86,10 +93,17 @@ export default function Lists() {
         else p.set("sc", v);
         p.delete("group");
         p.delete("tag");
+        p.delete("q");
         return p;
       },
       { replace: true }
     );
+  // Cliquer un onglet sort de la recherche : le champ se vide aussi, sinon
+  // le report (debounce) la remettrait dans l'adresse.
+  const pickScope = (v) => {
+    setSearchInput("");
+    setScope(v);
+  };
   const setTypeFilter = (v) => setParam("type", v, "");
   const setKindFilter = (v) => setParam("kind", v, "");
   const setSort = (v) => setParam("sort", v, "recent");
@@ -151,19 +165,19 @@ export default function Lists() {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
-    if (scope === "mine") params.set("scope", "mine");
+    if (eff === "mine") params.set("scope", "mine");
     // Listes officielles de conférences : le serveur les range par date
     // d'événement, la plus récente en tête.
-    if (scope === "events") params.set("scope", "events");
+    if (eff === "events") params.set("scope", "events");
     // Classements officiels, dans l'ordre éditorial (consoles, genres, sagas).
-    if (scope === "tops") {
+    if (eff === "tops") {
       params.set("scope", "tops");
       if (group) params.set("group", group);
     }
     params.set("sort", sort);
     // L'onglet « PlayLists » ne montre que les playlists (filtres type/contenu ignorés).
-    if (scope === "playlists") params.set("type", "playlist");
-    else if (!FIXED_SCOPES.includes(scope)) {
+    if (eff === "playlists") params.set("type", "playlist");
+    else if (!FIXED_SCOPES.includes(eff)) {
       if (typeFilter) params.set("type", typeFilter);
       if (kindFilter) params.set("itemKind", kindFilter);
     }
@@ -189,7 +203,7 @@ export default function Lists() {
     return () => {
       alive = false;
     };
-  }, [scope, token, typeFilter, kindFilter, sort, query, group, tag]);
+  }, [eff, token, typeFilter, kindFilter, sort, query, group, tag]);
 
   // La page suivante, quand le bas de la grille approche.
   const loadMore = useCallback(() => {
@@ -232,12 +246,34 @@ export default function Lists() {
         </button>
       </header>
 
+      {/* La recherche globale : au-dessus des onglets, parce qu'elle ne dépend
+          d'aucun d'eux. */}
+      <div className="lists-search lists-search-global">
+        <Search size={17} className="lists-search-icon" />
+        <input
+          type="text"
+          placeholder="Chercher dans toutes les listes : titre, jeu, pseudo…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+        />
+        {searchInput && (
+          <button
+            type="button"
+            className="lists-search-clear clickable"
+            onClick={() => setSearchInput("")}
+            aria-label="Effacer"
+          >
+            <X size={15} />
+          </button>
+        )}
+      </div>
+
       <div className="lists-tabs">
         {SCOPES.map((s) => (
           <button
             key={s.value}
-            className={`lists-tab clickable ${scope === s.value ? "active" : ""}`}
-            onClick={() => setScope(s.value)}
+            className={`lists-tab clickable ${!searching && scope === s.value ? "active" : ""}`}
+            onClick={() => pickScope(s.value)}
           >
             {s.label}
           </button>
@@ -246,6 +282,8 @@ export default function Lists() {
 
       {/* La vitrine : seulement sur « Découvrir », tant qu'on ne cherche ni ne
           filtre rien — une recherche veut des résultats, pas des rayons. */}
+      {searching && <h2 className="lists-all-title">Résultats pour « {query} »</h2>}
+
       {scope === "feed" && !query && !tag && !typeFilter && !kindFilter && (
         <>
           <ListsDiscover
@@ -263,26 +301,7 @@ export default function Lists() {
       )}
 
       <div className="lists-toolbar">
-        <div className="lists-search">
-          <Search size={17} className="lists-search-icon" />
-          <input
-            type="text"
-            placeholder="Rechercher une liste…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-          {searchInput && (
-            <button
-              type="button"
-              className="lists-search-clear clickable"
-              onClick={() => setSearchInput("")}
-              aria-label="Effacer"
-            >
-              <X size={15} />
-            </button>
-          )}
-        </div>
-        {scope === "tops" ? (
+        {eff === "tops" ? (
           <div className="lists-seg" role="group" aria-label="Rayon">
             {TOP_GROUPS.map((g) => (
               <button
@@ -300,15 +319,15 @@ export default function Lists() {
             <select
               className="lists-select"
               value={
-                scope === "playlists" ? "playlist" : scope === "events" ? "" : typeFilter
+                eff === "playlists" ? "playlist" : eff === "events" ? "" : typeFilter
               }
               onChange={(e) => setTypeFilter(e.target.value)}
-              disabled={FIXED_SCOPES.includes(scope)}
+              disabled={FIXED_SCOPES.includes(eff)}
               aria-label="Filtrer par type"
               title={
-                scope === "playlists"
+                eff === "playlists"
                   ? "L'onglet PlayLists ne montre que les playlists"
-                  : scope === "events"
+                  : eff === "events"
                     ? "L'onglet Événements ne montre que les listes officielles"
                     : "Filtrer par type"
               }
@@ -321,9 +340,9 @@ export default function Lists() {
             </select>
             <select
               className="lists-select"
-              value={FIXED_SCOPES.includes(scope) ? "" : kindFilter}
+              value={FIXED_SCOPES.includes(eff) ? "" : kindFilter}
               onChange={(e) => setKindFilter(e.target.value)}
-              disabled={FIXED_SCOPES.includes(scope)}
+              disabled={FIXED_SCOPES.includes(eff)}
               aria-label="Filtrer par contenu"
             >
               {LIST_KIND_FILTERS.map((o) => (
@@ -343,7 +362,7 @@ export default function Lists() {
         >
           {LIST_SORTS.map((o) => (
             <option key={o.value} value={o.value}>
-              {scope === "tops" && o.value === "recent" ? "Ordre du site" : o.label}
+              {eff === "tops" && o.value === "recent" ? "Ordre du site" : o.label}
             </option>
           ))}
         </select>
@@ -351,9 +370,9 @@ export default function Lists() {
 
       {/* Tags : toutes les pastilles du rayon dans l'onglet Tops ; ailleurs,
           seulement le tag actif (arrivé depuis une liste) pour pouvoir l'ôter. */}
-      {(scope === "tops" ? tagOptions.length > 0 : !!tag) && (
+      {(eff === "tops" ? tagOptions.length > 0 : !!tag) && (
         <div className="lists-tagbar" role="group" aria-label="Tags">
-          {scope === "tops" ? (
+          {eff === "tops" ? (
             tagOptions.map(({ tag: t, count }) => {
               const on = tag.toLowerCase() === t.toLowerCase();
               return (
@@ -395,34 +414,34 @@ export default function Lists() {
         </div>
       ) : lists.length === 0 ? (
         <div className="lists-empty card">
-          {scope === "playlists" ? (
+          {eff === "playlists" ? (
             <Disc3 size={34} />
-          ) : scope === "events" ? (
+          ) : eff === "events" ? (
             <CalendarDays size={34} />
-          ) : scope === "tops" ? (
+          ) : eff === "tops" ? (
             <ListOrdered size={34} />
           ) : (
             <Layers size={34} />
           )}
           <h3>
-            {scope === "mine"
+            {eff === "mine"
               ? "Tu n'as pas encore de liste"
-              : scope === "playlists"
+              : eff === "playlists"
                 ? "Aucune playlist pour l'instant"
-                : scope === "events"
+                : eff === "events"
                   ? "Aucune conférence pour l'instant"
-                  : scope === "tops"
+                  : eff === "tops"
                     ? "Aucun top ne correspond"
                     : "Rien par ici pour l'instant"}
           </h3>
-          {!["events", "tops"].includes(scope) && (
+          {!["events", "tops"].includes(eff) && (
             <button className="btn btn-primary" onClick={() => setCreating(true)}>
               <Plus size={18} /> Créer une liste
             </button>
           )}
         </div>
       ) : (
-        <div className={scope === "playlists" ? "plc-grid" : "lists-grid"}>
+        <div className={eff === "playlists" ? "plc-grid" : "lists-grid"}>
           {lists.map((l) =>
             l.type === "playlist" ? (
               <PlaylistCard key={l.id} list={l} onDelete={handleDelete} />

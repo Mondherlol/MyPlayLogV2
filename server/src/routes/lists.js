@@ -464,14 +464,35 @@ router.get("/", optionalAuth, async (req, res) => {
     const tag = String(req.query.tag || "").trim();
     if (tag) filter.tags = new RegExp(`^${escapeRx(tag)}$`, "i");
     const search = String(req.query.q || "").trim();
-    // Les tops officiels ont leur onglet : dans le fil « Découvrir », leurs
-    // dizaines de listes publiées d'un coup noieraient celles des joueurs. Ils
-    // y reviennent dès qu'on cherche quelque chose ou qu'on filtre par tag.
-    if (!scope && !author && !search && !tag && !req.query.group)
-      filter["official.kind"] = { $ne: "top" };
+    // ⚠️ « TOUTES LES LISTES », CE SONT CELLES DES JOUEURS. Les tops, les
+    // conférences, les palmarès et les cartes de joueur ont chacun leur rayon
+    // ou leur onglet : les remettre dans la grille du bas les montrait deux
+    // fois, et leurs dizaines de listes officielles noyaient celles des gens.
+    // Tout revient dès qu'on cherche quelque chose ou qu'on filtre par tag —
+    // et un rayon qui DEMANDE les cartes de joueur (?board=) ou les listes
+    // des 9 (?nine=) les obtient évidemment.
+    if (!scope && !author && !search && !tag && !req.query.group && !req.query.board && !req.query.nine) {
+      filter.official = null;
+      filter["event.igdbId"] = { $exists: false };
+      filter.board = null;
+    }
     if (search) {
+      // La recherche fouille tout : le titre, la description, les tags, les
+      // JEUX de la liste (« Hollow Knight » trouve les listes qui le
+      // contiennent) et le pseudo de l'auteur.
       const rx = new RegExp(escapeRx(search), "i");
-      filter.$and = [{ $or: [{ title: rx }, { description: rx }, { tags: rx }] }];
+      const authors = await User.find({ username: rx }).select("_id").limit(50).lean();
+      filter.$and = [
+        {
+          $or: [
+            { title: rx },
+            { description: rx },
+            { tags: rx },
+            { "items.name": rx },
+            ...(authors.length ? [{ user: { $in: authors.map((a) => a._id) } }] : []),
+          ],
+        },
+      ];
     }
     // ⚠️ UN PLAFOND DEMANDABLE. L'accueil n'affiche qu'une rangée des
     // dernières conférences : lui renvoyer deux cents listes peuplées pour en
