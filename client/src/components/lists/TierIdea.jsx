@@ -45,6 +45,12 @@ export default function TierIdea({ idea, token, title, sub }) {
     });
   }
 
+  // Un roster (héros, combattants, champions) : ses portraits n'ont ni le
+  // format ni le cadrage d'une jaquette — un visage carré chez Smash, une
+  // illustration en pied chez LoL. En éventail de jaquettes, ils donnaient des
+  // cartes bancales ; ils ont leur propre carte (cf. RosterIdea).
+  if (idea.itemKind === "character") return <RosterIdea idea={idea} onOpen={open} />;
+
   // Trois jaquettes en éventail, estompées derrière le « + » : on devine de
   // quoi on parle sans que ça ressemble à une liste déjà faite.
   const fan = idea.games.filter((g) => g.cover).slice(0, 3);
@@ -83,6 +89,53 @@ export default function TierIdea({ idea, token, title, sub }) {
         </span>
         <span className="ti-title">{title || idea.label || `Tier list ${idea.saga}`}</span>
         <span className="ti-sub">{sub || `${idea.count} ${idea.unit || "jeux"} à classer`}</span>
+      </span>
+    </button>
+  );
+}
+
+// « Tier list des héros Overwatch » → « Héros Overwatch ».
+const rosterName = (label) => {
+  const t = String(label || "").replace(/^tier list (des |de la |du )?/i, "");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
+/**
+ * La carte d'un roster à classer : même cadre pointillé que les sagas, mais
+ * une rangée de portraits RONDS, cadrés sur le visage, qui se lit d'un coup
+ * d'œil comme « des personnages » — et le nom du jeu en entier, sur deux
+ * lignes s'il le faut, au lieu d'un titre tronqué.
+ */
+function RosterIdea({ idea, onOpen }) {
+  const faces = idea.games.filter((g) => g.cover).slice(0, 5);
+  return (
+    <button type="button" className="ti ti-roster clickable" onClick={onOpen}>
+      <span className="ti-ghost" aria-hidden="true">
+        {DEFAULT_TIERS.slice(0, 4).map((t) => (
+          <span className="ti-row" key={t.id}>
+            <span className="ti-label" style={{ "--tier": t.color }}>
+              {t.label}
+            </span>
+            <span className="ti-slot" />
+          </span>
+        ))}
+      </span>
+
+      <span className="tir-body">
+        <span className="tir-faces" aria-hidden="true">
+          {faces.map((g, i) => (
+            <span key={g.refId} className="tir-face" style={{ "--i": i, "--mid": Math.abs(i - 2) }}>
+              <img src={g.cover} alt="" loading="lazy" draggable="false" />
+            </span>
+          ))}
+          <span className="tir-plus">
+            <Plus size={20} strokeWidth={3} />
+          </span>
+        </span>
+        <span className="tir-title">{rosterName(idea.label || idea.title)}</span>
+        <span className="ti-sub">
+          {idea.count} {idea.unit || "personnages"} à classer
+        </span>
       </span>
     </button>
   );
