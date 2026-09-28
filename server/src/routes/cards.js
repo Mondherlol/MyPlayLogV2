@@ -14,11 +14,7 @@ import {
   RARITY_ORDER,
   getCatalog,
   drawPack,
-  featuredIds,
-  currentWeek,
-  PACK_EDITIONS,
   EDITION_KEYS,
-  FEATURE_BOOST,
   packChances,
   storeCards,
 } from "../lib/cards.js";
@@ -79,21 +75,6 @@ router.get("/", requireAuth, async (req, res) => {
         chance: chances[r],
       })),
       packCovers: packCovers(cat),
-      // Ce que contient chaque booster : ses familles, son nombre de cartes
-      // par rareté, et ses jeux à l'affiche de la semaine (chances ×3).
-      editions: EDITION_KEYS.map((k) => {
-        const e = cat.editions[k];
-        const week = currentWeek();
-        return {
-          key: k,
-          label: PACK_EDITIONS[k].label,
-          size: e.size,
-          counts: Object.fromEntries(RARITY_ORDER.map((r) => [r, e.byRarity[r].length])),
-          featured: featuredIds(cat, k, week.key).map((id) => cat.byId.get(id)),
-          boost: FEATURE_BOOST,
-          endsAt: week.endsAt,
-        };
-      }),
       cards,
     });
   } catch (err) {

@@ -1,42 +1,45 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Coins, Package, Joystick, Shuffle, X } from "lucide-react";
-import { EDITIONS, raritySymbol } from "../../lib/cards";
+import { Coins, Package, Joystick, Shuffle } from "lucide-react";
+import { EDITIONS } from "../../lib/cards";
 import { playCrankNotch } from "../../lib/sfx";
 import BoosterPack from "./BoosterPack";
-import TcgCard, { TypeBadge } from "./TcgCard";
-import CardInspector from "./CardInspector";
 
 // ======================================================================
-//  La vitrine des boosters : choisir, voir ce qu'il y a dedans, ouvrir
+//  La vitrine des boosters : choisir, puis ouvrir
 // ======================================================================
-// Un clic sur un sachet le SÉLECTIONNE (il monte, son contenu s'affiche en
-// dessous), un second clic l'ouvre. Rien de sélectionné : « Ouvrir » fait
-// tourner une petite roulette sur les trois sachets et ouvre celui où elle
-// s'arrête. Le survol montre aussi le contenu, sans rien sélectionner.
+// Chaque sachet porte son thème écrit dessus (Action, Arcade & indé…) : pas
+// besoin d'en dire plus. Un clic sur un sachet le SÉLECTIONNE (il monte, le
+// bouton devient « Ouvrir Braise »), un second l'ouvre ; un clic ailleurs ou
+// Échap le relâche. Rien de sélectionné : « Ouvrir » fait tourner une petite
+// roulette sur les trois sachets et ouvre celui où elle s'arrête.
 
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
 
-// « change dans 3 j » / « dans 5 h »
-function untilLabel(date) {
-  const ms = new Date(date) - Date.now();
-  if (!(ms > 0)) return "bientôt";
-  const h = Math.ceil(ms / 3600000);
-  return h >= 24 ? `${Math.ceil(h / 24)} j` : `${h} h`;
-}
-
 export default function PackShop({ data, covers, canBuy, points, price, onOpen }) {
   const [selected, setSelected] = useState(null);
-  const [hovered, setHovered] = useState(null);
   const [spin, setSpin] = useState(null); // sachet éclairé par la roulette
-  const [inspect, setInspect] = useState(null); // { list, index }
   const packRefs = useRef({});
   const timers = useRef([]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  // Relâcher le sachet : un clic sur autre chose qu'un sachet ou que le
+  // bouton (la vitrine fait toute la largeur — « dehors » ne suffisait pas),
+  // ou Échap.
+  useEffect(() => {
+    if (!selected || spin) return undefined;
+    const onDown = (e) => {
+      if (!e.target.closest?.(".cd-pack, .cd-buy")) setSelected(null);
+    };
+    const onKey = (e) => e.key === "Escape" && setSelected(null);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [selected, spin]);
 
-  const focus = spin || hovered || selected;
-  const info = data?.editions?.find((e) => e.key === focus) || null;
-  const meta = EDITIONS.find((e) => e.key === focus) || null;
+  const focus = spin || selected;
   const chosen = EDITIONS.find((e) => e.key === selected) || null;
 
   function clickPack(key) {
@@ -74,10 +77,8 @@ export default function PackShop({ data, covers, canBuy, points, price, onOpen }
   }
 
   return (
-    // L'aperçu du survol TIENT jusqu'à ce qu'on quitte la vitrine : on doit
-    // pouvoir descendre du sachet jusqu'à ses cartes à l'affiche sans le perdre.
-    <section className="cd-shop" onMouseLeave={() => setHovered(null)}>
-      <div className={`cd-packs ${canBuy ? "" : "poor"} ${focus ? "has-focus" : ""}`}>
+    <section className="cd-shop">
+      <div className={`cd-packs ${canBuy ? "" : "poor"}`}>
         {EDITIONS.map((ed, i) => (
           <button
             key={ed.key}
@@ -86,7 +87,6 @@ export default function PackShop({ data, covers, canBuy, points, price, onOpen }
               spin === ed.key ? "rolling" : ""
             } ${focus && focus !== ed.key ? "dim" : ""}`}
             onClick={() => clickPack(ed.key)}
-            onMouseEnter={() => setHovered(ed.key)}
             disabled={!data}
             aria-pressed={selected === ed.key}
             aria-label={`Booster ${ed.name} — ${ed.label}`}
@@ -117,75 +117,6 @@ export default function PackShop({ data, covers, canBuy, points, price, onOpen }
             <Coins size={15} /> {fmt(price - points)}
           </span>
         </Link>
-      )}
-
-      {/* Le contenu du sachet en vue — sinon, les trois familles côte à côte. */}
-      <div className="cd-edinfo">
-        {info && meta ? (
-          <div className={`cd-ed ed-${meta.key}`}>
-            <div className="cd-ed-head">
-              <b className="cd-ed-name">{meta.name}</b>
-              <span className="cd-ed-label">{meta.label}</span>
-              <span className="cd-ed-types">
-                {meta.types.map((t) => (
-                  <TypeBadge key={t} type={t} />
-                ))}
-              </span>
-              <span className="cd-ed-size">
-                {fmt(info.size)} cartes · <b>{fmt(info.counts.mythic)}</b> {raritySymbol("mythic")}
-              </span>
-              {selected && !spin && (
-                <button className="cd-ed-x clickable" onClick={() => setSelected(null)} aria-label="Désélectionner">
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-            <div className="cd-ed-feat">
-              <span
-                className="cd-ed-feat-tag"
-                title={`Chances ×${info.boost} cette semaine — changent dans ${untilLabel(info.endsAt)}`}
-              >
-                ×{info.boost} <small>{untilLabel(info.endsAt)}</small>
-              </span>
-              <div className="cd-ed-feat-cards">
-                {info.featured.map((c, k) => (
-                  <button
-                    key={c.id}
-                    className="cd-ed-card clickable"
-                    onClick={() => setInspect({ list: info.featured, index: k })}
-                    title={c.name}
-                  >
-                    <TcgCard card={c} lite tilt={false} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="cd-ed-all">
-            {EDITIONS.map((ed) => (
-              <div key={ed.key} className={`cd-ed-mini ed-${ed.key}`}>
-                <b>{ed.name}</b>
-                <span className="cd-ed-types">
-                  {ed.types.map((t) => (
-                    <TypeBadge key={t} type={t} />
-                  ))}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {inspect && (
-        <CardInspector
-          list={inspect.list}
-          index={inspect.index}
-          onIndex={(next) =>
-            setInspect((s) => ({ ...s, index: typeof next === "function" ? next(s.index) : next }))
-          }
-          onClose={() => setInspect(null)}
-        />
       )}
     </section>
   );
