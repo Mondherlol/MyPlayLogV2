@@ -77,13 +77,23 @@
   font: 400 1.3rem/1 "Lilita One", var(--font-display);
   text-transform: uppercase;
 }
+.tr-who {
+  max-width: calc(50% - 30px);
+}
+.tr-ava {
+  flex: none;
+}
 .tr-who-txt {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
 }
 .tr-who-txt b {
-  font: 400 1.1rem/1 "Lilita One", var(--font-display);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 1.1rem/1.1 "Lilita One", var(--font-display);
 }
 .tr-who-txt small {
   color: #9d9da5;
@@ -475,12 +485,72 @@
   width: 10px;
   height: 10px;
 }
+/* Téléphone : plein écran. « Tu donnes ⇄ Tu reçois » tient sur UNE ligne de
+   vignettes, la liste des cartes prend tout le reste et défile seule. */
 @media (max-width: 620px) {
+  .bd-sheet.tc {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    gap: 10px;
+    border-radius: 0;
+  }
+  .tc .bd-sheet-head h3 {
+    font-size: 1.1rem;
+  }
   .tc-board {
-    flex-direction: column;
+    gap: 6px;
+  }
+  .tc-side {
+    gap: 6px;
+    padding: 8px;
+    border-radius: 12px;
+  }
+  .tc-label {
+    font-size: 0.64rem;
+  }
+  .tc-slots {
+    gap: 5px;
+  }
+  .tc-slot {
+    border-radius: 6px;
+  }
+  .tc-x {
+    right: -5px;
+    top: -5px;
+    width: 18px;
+    height: 18px;
+  }
+  .tc-x svg {
+    width: 10px;
+    height: 10px;
   }
   .tc-swap {
-    transform: rotate(90deg);
+    width: 28px;
+    height: 28px;
+  }
+  .tc-swap svg {
+    width: 14px;
+    height: 14px;
+  }
+  .tc-tools {
+    gap: 8px;
+  }
+  .tc-tabs {
+    flex: 1 1 100%;
+  }
+  .tc-tabs .bd-tab {
+    flex: 1;
+    justify-content: center;
+  }
+  .tc-tools .bd-search {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .tc-list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
   }
 }
 
@@ -681,14 +751,21 @@
   color: #161618;
   font: 800 0.92rem/1 var(--font-display);
 }
+.cd-trade-btn {
+  flex: none;
+}
+.cd-trade-btn .short {
+  display: none;
+}
 @media (max-width: 560px) {
-  .cd-trade-btn span {
-    display: none;
+  .cd-trade-btn .short {
+    display: inline;
   }
   .cd-trade-btn {
-    width: 40px;
-    padding: 0;
-    justify-content: center;
+    padding: 0 0.85rem;
+  }
+  .cd-trade-btn .long {
+    display: none;
   }
 }
 .cd-wanted {

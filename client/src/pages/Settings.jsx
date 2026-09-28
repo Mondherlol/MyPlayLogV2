@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   DownloadCloud,
   Download,
@@ -51,6 +51,7 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   PhoneCall,
   Bot,
   MessageCircle,
@@ -130,10 +131,20 @@ function openCentered(url, w = 720, h = 720, name = "mpl-oauth") {
 export default function Settings() {
   // L'onglet actif se lit dans l'URL (?tab=…) → liens profonds vers « Tracking ».
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const urlTab = params.get("tab");
   const tab = TAB_KEYS.includes(urlTab) ? urlTab : "imports";
-  const setTab = (key) => setParams({ tab: key }, { replace: true });
+  // Sur téléphone, sans onglet dans l'URL on montre la liste des sections
+  // (comme les réglages d'un téléphone) ; un onglet choisi s'ouvre en plein
+  // écran avec un retour. Le retour est une vraie entrée d'historique.
+  const picked = TAB_KEYS.includes(urlTab);
+  const location = useLocation();
+  const setTab = (key) =>
+    setParams({ tab: key }, { replace: picked, state: picked ? location.state : { fromMenu: true } });
+  const back = () =>
+    location.state?.fromMenu ? navigate(-1) : setParams({}, { replace: true });
+  const current = TABS.find((t) => t.key === tab);
 
   // Badge « à valider » sur l'onglet Imports : jeux détectés par une synchro
   // PSN, et ce que le compagnon PC a envoyé.
@@ -156,9 +167,16 @@ export default function Settings() {
   }, [token]);
 
   return (
-    <div className="settings-page">
+    <div className={`settings-page ${picked ? "is-picked" : "is-menu"}`}>
       <header className="settings-head">
         <h1>Paramètres</h1>
+        <button
+          className="settings-back clickable"
+          onClick={back}
+        >
+          <ChevronLeft size={22} />
+          <span>{current?.label}</span>
+        </button>
       </header>
 
       <div className="settings-layout">
@@ -179,6 +197,7 @@ export default function Settings() {
                 <span className="settings-tab-badge">{requestCount}</span>
               )}
               {soon && <span className="settings-soon">bientôt</span>}
+              {!soon && <ChevronRight size={16} className="settings-tab-go" />}
             </button>
           ))}
         </nav>

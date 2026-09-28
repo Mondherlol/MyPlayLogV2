@@ -1986,8 +1986,13 @@ button.cd-rar:hover {
   }
 }
 @media (max-width: 640px) {
+  /* Le contenu de l'app a déjà sa marge : on ne la double pas. */
   .cd-page {
-    padding: 1rem 1rem 5rem;
+    padding: 0.25rem 0 5rem;
+    gap: 1.1rem;
+  }
+  .cd-title {
+    font-size: 1.55rem;
   }
   .cd-pack {
     width: 120px;
@@ -1997,7 +2002,7 @@ button.cd-rar:hover {
     width: 138px;
   }
   .cd-grid {
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
     gap: 0.9rem 0.6rem;
   }
   .cd-tools {
@@ -2009,6 +2014,17 @@ button.cd-rar:hover {
   .cd-insp-nav {
     position: absolute;
     bottom: max(20px, env(safe-area-inset-bottom));
+  }
+  /* La rareté sur sa ligne, les boutons dessous : rien ne sort de l'écran. */
+  .cd-insp-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: calc(100vw - 24px);
+    row-gap: 0.7rem;
+  }
+  .cd-insp-rar {
+    flex: 1 1 100%;
+    text-align: center;
   }
   .cd-insp-nav.prev {
     left: 20px;
@@ -2612,6 +2628,19 @@ button.cd-rar:hover {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  min-width: 0;
+}
+.cd-owner-who,
+.cd-owner-who .cd-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cd-back,
+.cd-owner-who img,
+.cd-owner-who .cd-friend-ph {
+  flex: none;
 }
 .cd-back {
   display: grid;

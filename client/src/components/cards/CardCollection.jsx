@@ -534,7 +534,7 @@ function VirtualGrid({ items, renderItem }) {
 
   // Les mêmes gabarits que la grille en CSS (téléphone / reste).
   const small = width > 0 && width < 600;
-  const minCol = small ? 104 : 158;
+  const minCol = small ? 92 : 158;
   const gapX = small ? 10 : 16;
   const gapY = small ? 14 : 19;
   const cols = Math.max(1, Math.floor((width + gapX) / (minCol + gapX)));

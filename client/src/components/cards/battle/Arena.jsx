@@ -122,6 +122,29 @@ function useArenaLayout() {
       zoomY = blockTop + zh / 2 - H / 2;
       dotsY = zoomY + zh / 2 + 26;
     }
+    // Téléphone : toute la main d'un coup d'œil, en grille (3 + 2), sous le
+    // bandeau. Toucher une carte la sort en grand (le carrousel ci-dessus).
+    const grid = (n) => {
+      if (wide || !n) return null;
+      const cols = n <= 3 ? n : Math.ceil(n / 2);
+      const rows = n <= 3 ? 1 : 2;
+      const gap = 10;
+      const gw = Math.floor(
+        Math.min((W - 24 - gap * (cols - 1)) / cols, (H - zTop - 40 - gap * (rows - 1)) / rows / RATIO, zw)
+      );
+      const gh = gw * RATIO;
+      const top = zTop + Math.max(0, (H - zTop - 24 - (rows * gh + (rows - 1) * gap)) / 2);
+      return (i) => {
+        const row = rows === 1 ? 0 : i < cols ? 0 : 1;
+        const inRow = row === 0 ? Math.min(cols, n) : n - cols;
+        const col = row === 0 ? i : i - cols;
+        return {
+          x: (col - (inRow - 1) / 2) * (gw + gap),
+          y: top + row * (gh + gap) + gh / 2 - H / 2,
+          w: gw,
+        };
+      };
+    };
     const base = Math.max(cw, zw);
     // L'élan d'une attaque : un bon quart du chemin vers l'adversaire,
     // exprimé à l'échelle de la carte posée (réduite à cw/base).
@@ -153,6 +176,7 @@ function useArenaLayout() {
       zoomY,
       dotsY,
       base,
+      grid,
     };
   };
   const [lay, setLay] = useState(calc);
@@ -165,7 +189,7 @@ function useArenaLayout() {
 }
 
 // La position d'une pièce selon sa zone (et le choix en grand).
-function place(p, lay, hands, zoom, focus) {
+function place(p, lay, hands, zoom, focus, peek) {
   const B = lay.base;
   if (p.zone === "slot") return { ...lay.slot[p.side], r: 0, s: lay.cw / B, z: 30 };
   if (p.zone === "deck") {
@@ -182,8 +206,10 @@ function place(p, lay, hands, zoom, focus) {
       const spread = Math.min(lay.zw * 1.03, (lay.W - 50 - lay.zw) / Math.max(1, n - 1));
       return { x: off * spread, y: lay.zoomY + off * off * 5, r: off * 2, s: lay.zw / B, z: 70 + i };
     }
-    // Téléphone : un carrousel. La carte au centre en grand, ses voisines
-    // qui dépassent des bords ; on glisse pour passer de l'une à l'autre.
+    // Téléphone : toute la main en grille ; la carte touchée sort en grand
+    // par-dessus (on glisse pour passer à la voisine, qui monte à son tour).
+    const g = lay.grid(n)(i);
+    if (!peek || i !== focus) return { x: g.x, y: g.y, r: 0, s: g.w / B, z: 60 + i };
     const d = i - focus;
     const ad = Math.abs(d);
     return {
@@ -316,6 +342,9 @@ export default function Arena({
   const [timer, setTimer] = useState(null);
   const [focus, setFocusState] = useState(0);
   const focusRef = useRef(0);
+  // Téléphone : une carte de la grille est sortie en grand.
+  const [peek, setPeekState] = useState(false);
+  const peekRef = useRef(false);
   const [kbd, setKbd] = useState(false);
   const [botIn, setBotIn] = useState(false);
   const [plaques, setPlaques] = useState({});
@@ -364,6 +393,10 @@ export default function Arena({
   const setFocus = (i) => {
     focusRef.current = i;
     setFocusState(i);
+  };
+  const setPeek = (v) => {
+    peekRef.current = v;
+    setPeekState(v);
   };
   const mutate = (fn) => {
     const next = fn(piecesRef.current);
@@ -488,6 +521,7 @@ export default function Arena({
     }
     // La main monte en grand, centrée sur la carte du milieu.
     setFocus(Math.floor((myHand().length - 1) / 2));
+    setPeek(false);
     setTimer({ ms, key: `${v.id}-${n}`, at: Date.now() });
     setPhase("pick");
     const mine = ++pickSeq.current;
@@ -747,6 +781,7 @@ export default function Arena({
     setHp(null);
     const p = v.pending;
     setFocus(Math.floor((myHand().length - 1) / 2));
+    setPeek(false);
     setRescue({ ask: p.ask, card: p.card, ms: p.ms, key: nextId(), state: "ask" });
     setPhase("rescue");
     const mine = ++pickSeq.current;
@@ -968,15 +1003,21 @@ export default function Arena({
     if (!d || !choosing()) return;
     const dx = e.clientX - d.x;
     if (Math.abs(dx) > 34) {
-      moveFocus(dx < 0 ? 1 : -1);
+      if (peekRef.current) moveFocus(dx < 0 ? 1 : -1);
       return;
     }
-    if (!d.key) return;
+    // Toucher à côté : la carte en grand retourne dans la grille.
+    if (!d.key) {
+      setPeek(false);
+      return;
+    }
     const hand = myHand();
     const idx = hand.findIndex((x) => x.key === d.key);
     if (idx < 0) return;
-    if (idx !== focusRef.current) setFocus(idx);
-    else act(hand[idx]);
+    if (!peekRef.current || idx !== focusRef.current) {
+      setFocus(idx);
+      setPeek(true);
+    } else act(hand[idx]);
   }
 
   // Clavier : ← → pour parcourir, Entrée pour jouer, Échap pour quitter.
@@ -995,6 +1036,7 @@ export default function Arena({
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         e.preventDefault();
         setKbd(true);
+        setPeek(true);
         moveFocus(e.key === "ArrowLeft" ? -1 : 1);
       } else if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
@@ -1117,16 +1159,16 @@ export default function Arena({
 
           {/* les cartes */}
           {pieces.map((p) => {
-            const pos = place(p, lay, hands, zoom, focus);
+            const pos = place(p, lay, hands, zoom, focus, peek);
             const mine = p.side === "you" && p.zone === "hand";
             const pickable = canChoose && mine;
-            const focused = zoom && mine && hands.you.indexOf(p.key) === focus;
+            const focused = zoom && mine && hands.you.indexOf(p.key) === focus && (lay.wide || peek);
             return (
               <div
                 key={p.key}
                 className={`ba-card ${p.side} z-${p.zone} ${zoom && mine ? "zoomed" : ""} ${pickable ? "pickable" : ""} ${
                   focused ? "focused" : ""
-                } ${focused && kbd ? "kf" : ""} ${pos.far ? "far" : ""} ${p.fx ? `fx-${p.fx}` : ""}`}
+                } ${zoom && mine && !lay.wide && peek && !focused ? "under" : ""} ${focused && kbd ? "kf" : ""} ${pos.far ? "far" : ""} ${p.fx ? `fx-${p.fx}` : ""}`}
                 style={{
                   width: B,
                   height: B * RATIO,
@@ -1262,14 +1304,14 @@ export default function Arena({
           )}
 
           {/* le carrousel (téléphone) : où j'en suis, et le bouton pour jouer */}
-          {zoom && !lay.wide && nHand > 1 && (
+          {zoom && !lay.wide && peek && nHand > 1 && (
             <div className="ba-dots" style={{ transform: `translate(-50%, ${lay.dotsY}px)` }}>
               {hands.you.map((k, i) => (
                 <i key={k} className={i === focus ? "on" : ""} />
               ))}
             </div>
           )}
-          {zoom && !lay.wide && canChoose && (
+          {zoom && !lay.wide && peek && canChoose && (
             <button
               className={`ba-go clickable ${phase === "rescue" ? "rescue" : ""}`}
               style={{ transform: `translate(-50%, ${lay.dotsY + 20}px)` }}

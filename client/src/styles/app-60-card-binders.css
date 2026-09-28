@@ -750,3 +750,40 @@
   white-space: nowrap;
   transform: translateX(-50%);
 }
+
+/* --- Téléphone : les fenêtres montent du bas, sur toute la largeur --- */
+@media (max-width: 620px) {
+  .bd-modal {
+    padding: 0;
+    place-items: end stretch;
+  }
+  .bd-sheet,
+  .bd-sheet.wide {
+    width: 100%;
+    max-height: 100dvh;
+    padding: 14px 12px calc(12px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0;
+    border-width: 1px 0 0;
+  }
+  .bd-found {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px 10px;
+    padding: 8px 6px 6px;
+  }
+  .bd-found-mark {
+    right: -4px;
+    top: -4px;
+    width: 22px;
+    height: 22px;
+  }
+  .bd-found-cell:hover {
+    transform: none;
+  }
+  .bd-sheet-foot .bd-btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .bd-sheet-foot .bd-btn.ghost {
+    flex: 0 0 auto;
+  }
+}

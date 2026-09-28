@@ -84,7 +84,8 @@ export default function CardsUser() {
         {!isMe && data && (
           <button className="cd-trade-btn clickable" onClick={() => setCompose({ want: null })}>
             <ArrowLeftRight size={17} />
-            <span>Proposer un échange</span>
+            <span className="long">Proposer un échange</span>
+            <span className="short">Échanger</span>
           </button>
         )}
       </header>

@@ -991,8 +991,9 @@
     0 0 0 1.1cqw var(--acc),
     0 5cqw 14cqw rgba(0, 0, 0, 0.6);
 }
-.narrow .ba-card.zoomed:not(.focused) .ba-fx {
-  filter: brightness(0.62);
+/* Téléphone : la main en grille, la carte touchée par-dessus en grand. */
+.narrow .ba-card.zoomed.under .ba-fx {
+  filter: brightness(0.35);
 }
 .ba-loan {
   position: absolute;

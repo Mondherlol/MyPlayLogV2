@@ -3291,6 +3291,7 @@
 
 @media (max-width: 720px) {
   .settings-page .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
   }
   .settings-page .settings-nav {
@@ -3311,5 +3312,98 @@
     grid-row: auto;
     flex-wrap: wrap;
     margin-top: 0.6rem;
+  }
+}
+
+/* --- Téléphone : liste des sections → une section en plein écran --------
+   Sans ?tab= on montre la liste (grandes lignes, chevron) ; une section
+   choisie remplace le titre par un retour « ‹ Section ». */
+.settings-back,
+.settings-tab-go {
+  display: none;
+}
+@media (max-width: 720px) {
+  .settings-page {
+    padding: 0.9rem 0.85rem 5.5rem;
+  }
+  .settings-page .settings-head h1 {
+    margin-bottom: 0.9rem;
+  }
+  .settings-page.is-picked .settings-head h1,
+  .settings-page.is-picked .settings-nav,
+  .settings-page.is-picked .settings-section-title {
+    display: none;
+  }
+  .settings-page.is-picked .settings-section-head {
+    justify-content: flex-end;
+  }
+  .settings-page.is-picked .settings-section-head:not(:has(> :not(.settings-section-title))) {
+    display: none;
+  }
+  .settings-page.is-menu .settings-panel {
+    display: none;
+  }
+  .settings-page.is-picked .settings-back {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0 0 0.9rem -0.4rem;
+    padding: 0.35rem 0.5rem 0.35rem 0.2rem;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+  .settings-page.is-picked .settings-back svg {
+    color: #f2b70b;
+  }
+  /* La liste : une section par ligne, pleine largeur, facile au pouce. */
+  .settings-page.is-menu .settings-nav {
+    flex-direction: column;
+    overflow: visible;
+    gap: 0;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .settings-page.is-menu .settings-tab {
+    gap: 0.85rem;
+    padding: 0.95rem 1rem;
+    border-radius: 0;
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: var(--text);
+    background: transparent;
+    box-shadow: none;
+  }
+  .settings-page.is-menu .settings-tab + .settings-tab {
+    border-top: 1px solid var(--border);
+  }
+  .settings-page.is-menu .settings-tab svg {
+    width: 20px;
+    height: 20px;
+    color: #f2b70b;
+  }
+  .settings-page.is-menu .settings-tab .settings-tab-go {
+    display: block;
+    margin-left: auto;
+    width: 16px;
+    height: 16px;
+    color: var(--text-soft);
+  }
+  .settings-page.is-menu .settings-tab-badge + .settings-tab-go {
+    margin-left: 0.5rem;
+  }
+  .settings-page.is-menu .settings-tab-badge {
+    margin-left: auto;
+  }
+  .settings-page.is-menu .settings-tab:disabled svg {
+    color: var(--text-soft);
   }
 }
