@@ -426,7 +426,7 @@ async function forceGo(code, n) {
     }
     st.cur.go = Date.now();
     await afterStep(room, st);
-    emitEach(room, "go", () => ({ n }));
+    emitEach(room, "go", () => ({ n, left: PICK_MS }));
   });
 }
 
@@ -576,14 +576,16 @@ export async function readyDuel(userId, code, nRaw) {
     const cur = st?.cur;
     if (room.status !== "live" || !cur || cur.n !== n) return { go: !!cur?.go, n: cur?.n ?? null };
     if (st.absent) st.absent[side] = 0;
-    if (cur.go) return { go: true, n };
+    // Le chrono est déjà parti (l'autre m'a attendu, puis on a forcé) : je
+    // reçois ce qu'il en reste, pas 15 s neuves.
+    if (cur.go) return { go: true, n, left: Math.max(0, cur.go + PICK_MS - Date.now()) };
     cur.ready[side] = true;
     const both = cur.ready.you && cur.ready.bot;
     if (both) cur.go = Date.now();
     await save(room, { state: st });
     schedule(room, st);
-    if (both) emitEach(room, "go", () => ({ n }));
-    return { go: both, n };
+    if (both) emitEach(room, "go", () => ({ n, left: PICK_MS }));
+    return { go: both, n, left: both ? PICK_MS : null };
   });
 }
 

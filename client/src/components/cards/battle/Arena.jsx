@@ -347,6 +347,12 @@ export default function Arena({
   const doomed = useRef(new Set());
   const seq = useRef(0);
   const botSeq = useRef(0);
+  // ⚠️ UN NUMÉRO PAR PHASE DE CHOIX. Le chrono d'une manche (« temps écoulé :
+  // une carte au hasard ») n'est pas annulé quand on joue vite : il continuait
+  // de courir et tombait en pleine manche SUIVANTE, où il posait une carte tout
+  // seul au bout de quelques secondes. Chaque minuteur retient le numéro de
+  // SA phase et ne fait rien si une autre a commencé depuis.
+  const pickSeq = useRef(0);
   // Chaque déroulé porte le numéro de « vie » du composant : démonté (ou
   // remonté par le mode strict), les étapes en vol s'arrêtent d'elles-mêmes.
   const life = useRef({ run: 0, timers: new Set() });
@@ -434,10 +440,11 @@ export default function Arena({
     // Contre un pote : je me dis prêt dès maintenant — l'attente se fond dans
     // la distribution et l'annonce de la manche.
     const n = v.round.n;
-    const goAt = { t: 0 };
+    const goAt = { t: 0, left: null };
     const go = pvp
-      ? drv.ready(n).then(() => {
-          goAt.t = Date.now();
+      ? drv.ready(n).then((g) => {
+          goAt.t = g?.at || Date.now();
+          goAt.left = g?.left ?? null;
         })
       : null;
     await syncHands(v, R);
@@ -463,8 +470,11 @@ export default function Arena({
       await go;
       setOppWait(false);
       if (dead(R)) return;
-      // Le chrono est le même pour les deux : il part du « go ».
-      ms = Math.max(4000, Math.min(v.round.left ?? ms, goAt.t + ms - Date.now()));
+      // Le chrono est celui du SERVEUR : ce qu'il restait au « go » (moins
+      // l'annonce de la manche). Arrivé en retard, on voit le vrai temps qui
+      // reste — et non 15 s pleines que le serveur couperait avant la fin.
+      const left = goAt.left ?? ms;
+      ms = Math.max(3000, Math.min(ms, left - (Date.now() - goAt.t)));
       // Reprise : ma carte était déjà posée.
       if (v.round.mine != null) {
         const p = myHand().find((x) => x.cardId === v.round.mine);
@@ -480,17 +490,19 @@ export default function Arena({
     setFocus(Math.floor((myHand().length - 1) / 2));
     setTimer({ ms, key: `${v.id}-${n}`, at: Date.now() });
     setPhase("pick");
+    const mine = ++pickSeq.current;
+    const still = () => !dead(R) && pickSeq.current === mine;
     playBattleFan();
     if (pvp) {
       // Mon pote a peut-être déjà posé pendant l'annonce.
       if (v.round.his || drv.picked(n)) placeBot(R);
     } else {
       // Le bot pose sa carte quand il a « réfléchi ».
-      later(() => placeBot(R), 1300 + Math.random() * Math.min(5200, ms - 4000));
+      later(() => still() && placeBot(R), 1300 + Math.random() * Math.min(5200, ms - 4000));
     }
-    // Le temps est écoulé : une carte au hasard part pour moi.
+    // Le temps est écoulé (pour CETTE manche) : une carte au hasard part pour moi.
     later(() => {
-      if (dead(R) || phaseRef.current !== "pick") return;
+      if (!still() || phaseRef.current !== "pick") return;
       const hand = myHand();
       if (hand.length) play(hand[Math.floor(Math.random() * hand.length)]);
     }, ms);
@@ -737,9 +749,10 @@ export default function Arena({
     setFocus(Math.floor((myHand().length - 1) / 2));
     setRescue({ ask: p.ask, card: p.card, ms: p.ms, key: nextId(), state: "ask" });
     setPhase("rescue");
+    const mine = ++pickSeq.current;
     playBattleFan();
     later(() => {
-      if (!dead(R) && phaseRef.current === "rescue") rescuePick(null);
+      if (!dead(R) && pickSeq.current === mine && phaseRef.current === "rescue") rescuePick(null);
     }, p.ms);
   }
 
@@ -975,6 +988,10 @@ export default function Arena({
         return;
       }
       if (!choosing() || confirmQuit) return;
+      // On écrit dans un champ (une fenêtre de discussion par-dessus) : l'espace
+      // ou Entrée ne doivent pas jouer une carte.
+      const t = e.target;
+      if (t?.closest?.("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return;
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         e.preventDefault();
         setKbd(true);

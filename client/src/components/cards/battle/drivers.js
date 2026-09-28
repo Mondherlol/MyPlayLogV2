@@ -66,7 +66,7 @@ export function duelDriver({ token, code, opponent, subscribe }) {
   function absorb(state) {
     if (!state) return;
     const r = state.round;
-    if (r?.go) settle(`go:${r.n}`, true);
+    if (r?.go) settle(`go:${r.n}`, { left: r.left, at: Date.now() });
     if (r?.his) {
       if (!got.has(`picked:${r.n}`)) emit("picked", r.n);
       settle(`picked:${r.n}`, true);
@@ -84,7 +84,7 @@ export function duelDriver({ token, code, opponent, subscribe }) {
     if (event !== "cardduel" || data?.code !== code) return;
     switch (data.kind) {
       case "go":
-        settle(`go:${data.n}`, true);
+        settle(`go:${data.n}`, { left: data.left ?? null, at: Date.now() });
         break;
       case "picked":
         if (!got.has(`picked:${data.n}`)) emit("picked", data.n);
@@ -123,7 +123,7 @@ export function duelDriver({ token, code, opponent, subscribe }) {
         const d = await apiFetch(`${base}/ready`, { method: "POST", token, body: { n } });
         // Le serveur est ailleurs (reprise, manche déjà close) : on n'attend pas
         // un « go » qui ne viendra pas.
-        if (d.go || d.n !== n) settle(`go:${n}`, true);
+        if (d.go || d.n !== n) settle(`go:${n}`, { left: d.left ?? null, at: Date.now() });
       } catch {
         /* le filet prendra le relais */
       }
