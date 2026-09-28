@@ -8,6 +8,7 @@ import AppLayout from "./components/AppLayout";
 import PublicShell from "./components/PublicShell";
 import InstallPrompt from "./components/InstallPrompt";
 import ScrollManager from "./components/ScrollManager";
+import DuelInvites from "./components/cards/battle/DuelInvites";
 
 // Chaque page dans son propre fichier, chargé quand on l'ouvre (cf. lib/lazyPage).
 // L'accueil et la page d'arrivée restent dans le fichier principal : ce sont
@@ -42,6 +43,8 @@ const MotDuJour = lazyPage(() => import("./pages/MotDuJour"));
 const Arcade = lazyPage(() => import("./pages/Arcade"));
 const Cards = lazyPage(() => import("./pages/Cards"));
 const CardsUser = lazyPage(() => import("./pages/CardsUser"));
+const CardBattle = lazyPage(() => import("./pages/CardBattle"));
+const CardDuel = lazyPage(() => import("./pages/CardDuel"));
 const Playtopia = lazyPage(() => import("./pages/Playtopia"));
 const Explorer = lazyPage(() => import("./pages/Explorer"));
 const Releases = lazyPage(() => import("./pages/Releases"));
@@ -175,6 +178,9 @@ export default function App() {
   return (
     <>
       <ScrollManager />
+      {/* « X te défie en duel » : une fenêtre qui arrive sur n'importe quelle
+          page (cartes, combat 1 contre 1). */}
+      <DuelInvites />
       {/* Le temps qu'une page arrive : rien (les pages dans la coquille de
           l'app ont leur propre attente, cf. AppLayout). */}
       <Suspense fallback={<div className="page-fallback" />}>
@@ -312,9 +318,12 @@ export default function App() {
         />
         <Route path="/arcade" element={<Arcade />} />
         {/* Les cartes à collectionner : boosters payés en points d'arcade. */}
-        <Route path="/cartes" element={<FeatureRoute name="cards" element={<Cards />} />} />
+        <Route path="/cartes" element={<Cards />} />
         {/* Le classeur d'un autre joueur, en lecture seule. */}
-        <Route path="/cartes/u/:username" element={<FeatureRoute name="cards" element={<CardsUser />} />} />
+        <Route path="/cartes/u/:username" element={<CardsUser />} />
+        {/* Les combats de cartes, contre le bot. */}
+        <Route path="/cartes/combat" element={<CardBattle />} />
+        <Route path="/cartes/duel/:code" element={<CardDuel />} />
         <Route path="/blindtest" element={<BlindTest />} />
         {/* Salon de versus musical : adresse des liens d'invitation. */}
         <Route path="/blindtest/versus/:code" element={<BlindTestVersus />} />

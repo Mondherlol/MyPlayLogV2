@@ -14,6 +14,8 @@ const cardOwnSchema = new mongoose.Schema(
     lastAt: { type: Date, default: Date.now },
     // Pas encore vue dans le classeur : la pastille « NEW ».
     fresh: { type: Boolean, default: true },
+    // Le cœur : une carte mise en favori.
+    fav: { type: Boolean, default: false },
   },
   { versionKey: false }
 );

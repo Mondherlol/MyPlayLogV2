@@ -27,6 +27,7 @@ import {
   Thermometer,
   Globe2,
   Grid2x2,
+  Layers,
   Trophy,
   Swords,
   Zap,
@@ -1576,7 +1577,9 @@ function useVersusRoom(code, game, token) {
                 ? // L'Imposteur n'a pas de mode solo : pas de « /versus » dans
                   // son chemin, le salon EST le jeu.
                   `/imposteur/${code}/card`
-                : `/geo/versus/${code}/card`;
+                : game === "cd"
+                  ? `/cards/duel/${code}/card`
+                  : `/geo/versus/${code}/card`;
 
     async function pull() {
       try {
@@ -1636,7 +1639,9 @@ function VersusCard({ versus }) {
   const qz = versus.kind === "quiz";
   const pq = versus.kind === "perroquet";
   const im = versus.kind === "imposteur";
-  const game = bt ? "bt" : px ? "px" : qz ? "qz" : pq ? "pq" : im ? "im" : "geo";
+  // Le duel de cartes : 1 contre 1, premier à 3 manches.
+  const cd = versus.kind === "cards";
+  const game = bt ? "bt" : px ? "px" : qz ? "qz" : pq ? "pq" : im ? "im" : cd ? "cd" : "geo";
   const live = useVersusRoom(versus.code, game, token);
 
   // Trois sources, dans cet ordre : le salon s'il a répondu, sinon ce que porte
@@ -1648,7 +1653,7 @@ function VersusCard({ versus }) {
   const rounds = known ? live.rounds : versus.rounds || 8;
   const faces = known ? live.players || [] : [];
   const buzzer =
-    !bt && !px && !qz && !pq && !im && (known ? live.mode : versus.mode) === "buzzer";
+    !bt && !px && !qz && !pq && !im && !cd && (known ? live.mode : versus.mode) === "buzzer";
   const mine = !!live?.mine;
 
   // Une porte n'est ouverte que si le serveur laisserait vraiment entrer : le
@@ -1689,9 +1694,11 @@ function VersusCard({ versus }) {
       <span
         className={`chat-card-cover gv-card-art ${bt ? "bt" : ""} ${px ? "px" : ""} ${
           qz ? "qz" : ""
-        } ${im ? "im" : ""}`}
+        } ${im ? "im" : ""} ${cd ? "cd" : ""}`}
       >
-        {bt ? (
+        {cd ? (
+          <Layers size={22} />
+        ) : bt ? (
           <Music size={22} />
         ) : px ? (
           <Grid2x2 size={22} />
@@ -1718,9 +1725,13 @@ function VersusCard({ versus }) {
                   ? "Le Perroquet"
                   : im
                     ? "L'Imposteur"
-                    : "GeoGamer"}
+                    : cd
+                      ? "Duel de cartes"
+                      : "GeoGamer"}
           <i className="gv-card-mode">
-            {bt || px || pq
+            {cd
+              ? "1 contre 1"
+              : bt || px || pq
               ? "versus"
               : im
                 ? "salon"
@@ -1745,9 +1756,7 @@ function VersusCard({ versus }) {
           <b>
             {count}/{max}
           </b>
-          <em>
-            {rounds} {qz ? "épreuves" : "manches"}
-          </em>
+          <em>{cd ? `premier à ${rounds}` : `${rounds} ${qz ? "épreuves" : "manches"}`}</em>
         </span>
 
         <span className={`gv-card-state ${status.tone}`}>
@@ -1774,7 +1783,9 @@ function VersusCard({ versus }) {
                 ? `/perroquet/versus/${versus.code}`
                 : im
                   ? `/imposteur/${versus.code}`
-                  : `/geo/versus/${versus.code}`
+                  : cd
+                    ? `/cartes/duel/${versus.code}`
+                    : `/geo/versus/${versus.code}`
       }
       className={`${cls} clickable`}
     >

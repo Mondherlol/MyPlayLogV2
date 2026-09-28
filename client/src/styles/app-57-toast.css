@@ -2,25 +2,33 @@
    Une petite carte plate en bas au centre : jaquette, ce qui vient de se
    passer, « Annuler » en doré. Une fine barre dorée en bas décompte le temps
    restant ; elle se fige au survol, le temps de viser le bouton. */
+/* En HAUT À DROITE, sous la barre du haut (demande du 2026-09-28 : en bas
+   au centre, il masquait le contenu). Le plus récent en haut de la pile. */
 .mpl-toasts {
   position: fixed;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 1.4rem);
-  transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top) + 72px);
+  right: 1rem;
   z-index: 1300;
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  flex-direction: column-reverse;
+  align-items: flex-end;
   gap: 0.5rem;
   width: max-content;
   max-width: calc(100vw - 2rem);
   pointer-events: none;
 }
 
-/* Sur téléphone, au-dessus de la barre d'onglets du bas. */
+/* Sur téléphone : en haut, sur toute la largeur. */
 @media (max-width: 760px) {
   .mpl-toasts {
-    bottom: calc(60px + env(safe-area-inset-bottom) + 0.8rem);
+    top: calc(env(safe-area-inset-top) + 64px);
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+    align-items: stretch;
+  }
+  .mpl-toasts .mpl-toast {
+    width: 100%;
   }
 }
 
@@ -44,7 +52,15 @@
 @keyframes mpl-toast-in {
   from {
     opacity: 0;
-    transform: translateY(16px) scale(0.97);
+    transform: translateX(28px) scale(0.97);
+  }
+}
+@media (max-width: 760px) {
+  @keyframes mpl-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(-14px) scale(0.97);
+    }
   }
 }
 

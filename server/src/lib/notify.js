@@ -36,6 +36,8 @@ const VERBS = {
   follow: "s'est abonné[e] à toi",
   follow_request: "demande à s'abonner à toi",
   follow_accepted: "a accepté ta demande d'abonnement",
+  card_trade: "te propose un échange contre",
+  card_trade_done: "a accepté ton échange :",
 };
 
 // ======================================================================

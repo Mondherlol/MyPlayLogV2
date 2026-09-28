@@ -1,0 +1,746 @@
+/* ======================================================================
+   Échanges de cartes entre joueurs
+   ======================================================================
+   La scène (.tr) est toujours sombre, comme l'ouverture d'un booster. Moi en
+   or (#f2b70b), l'autre en rose (#ff5470) — les mêmes couleurs que dans les
+   combats. */
+
+/* ---------------------------------------------------------------------
+   La scène : deux capsules qui se croisent
+   --------------------------------------------------------------------- */
+.tr {
+  --me: #f2b70b;
+  --them: #ff5470;
+  position: fixed;
+  inset: 0;
+  z-index: 470;
+  overflow: hidden;
+  background: rgba(10, 10, 12, 0.96);
+  color: #fff;
+  user-select: none;
+  -webkit-user-select: none;
+  animation: trFade 0.3s ease both;
+}
+@keyframes trFade {
+  from {
+    opacity: 0;
+  }
+}
+.tr-who {
+  position: absolute;
+  top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  animation: trWhoIn 0.5s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+.tr-who.me {
+  left: 22px;
+}
+.tr-who.them {
+  right: 22px;
+  flex-direction: row-reverse;
+  text-align: right;
+  animation-name: trWhoInR;
+}
+@keyframes trWhoIn {
+  from {
+    transform: translateX(-40px);
+    opacity: 0;
+  }
+}
+@keyframes trWhoInR {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+}
+.tr-ava {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #26262c;
+  box-shadow: 0 0 0 3px var(--me);
+}
+.tr-who.them .tr-ava {
+  box-shadow: 0 0 0 3px var(--them);
+}
+.tr-ava img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.tr-ava b {
+  font: 400 1.3rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.tr-who-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tr-who-txt b {
+  font: 400 1.1rem/1 "Lilita One", var(--font-display);
+}
+.tr-who-txt small {
+  color: #9d9da5;
+  font: 700 0.75rem/1 var(--font-display);
+}
+
+/* Les tubes : deux arcs pointillés qui se dessinent. */
+.tr-tubes {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.tr-tube {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 2 12;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.tr-tube.up {
+  stroke: var(--me);
+}
+.tr-tube.down {
+  stroke: var(--them);
+}
+.tr.ph-pack .tr-tube,
+.tr.ph-travel .tr-tube,
+.tr.ph-cross .tr-tube {
+  opacity: 0.55;
+  animation: trDash 0.9s linear infinite;
+}
+@keyframes trDash {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+/* Les cartes. */
+.tr-stack {
+  position: absolute;
+  aspect-ratio: 63 / 88;
+}
+.tr-card {
+  position: absolute;
+  inset: 0;
+}
+.tr-stack.give,
+.tr-stack.get {
+  animation: trStackIn 0.55s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.tr-stack.get {
+  animation-delay: 0.15s;
+}
+@keyframes trStackIn {
+  from {
+    transform: translateY(40px) scale(0.8);
+    opacity: 0;
+  }
+}
+/* Elles se referment dans la capsule. */
+.tr.ph-pack .tr-stack.give,
+.tr.ph-pack .tr-stack.get {
+  animation: trPack 0.6s cubic-bezier(0.5, 0, 0.8, 0.4) forwards;
+}
+@keyframes trPack {
+  to {
+    transform: scale(0.12) rotate(24deg);
+    opacity: 0;
+  }
+}
+.tr-stack.got {
+  animation: trGot 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes trGot {
+  from {
+    transform: scale(0.15) rotate(-20deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+  }
+}
+.tr-stack.gone {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+  animation: trGone 0.5s ease both;
+}
+@keyframes trGone {
+  from {
+    transform: scale(0.15);
+    opacity: 0;
+  }
+}
+
+/* La capsule : une gélule à deux tons (comme celles de la machine à capsules
+   de l'Arcade) — couleur du joueur en haut, blanc en bas, une couture fine. */
+.tr-orb {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 42px;
+  height: 62px;
+  offset-rotate: 0deg;
+  offset-anchor: 50% 50%;
+  offset-distance: 0%;
+  border-radius: 21px;
+  background: var(--me);
+  box-shadow:
+    inset 0 -31px 0 #f4f4f6,
+    inset 0 0 0 2px rgba(0, 0, 0, 0.12),
+    0 10px 24px rgba(0, 0, 0, 0.5);
+  animation: trOrbIn 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.tr-orb.them {
+  background: var(--them);
+}
+.tr-orb::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 50%;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.18);
+  transform: translateY(-50%);
+}
+.tr-orb::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 7px;
+  width: 7px;
+  height: 18px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.45);
+}
+@keyframes trOrbIn {
+  from {
+    transform: scale(0);
+  }
+}
+.tr.ph-travel .tr-orb,
+.tr.ph-cross .tr-orb {
+  animation: trTravel 1.6s cubic-bezier(0.55, 0, 0.35, 1) forwards;
+}
+@keyframes trTravel {
+  0% {
+    offset-distance: 0%;
+    transform: rotate(0deg);
+  }
+  100% {
+    offset-distance: 100%;
+    transform: rotate(720deg);
+  }
+}
+.tr.ph-land .tr-orb {
+  offset-distance: 100%;
+  animation: trLand 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) forwards;
+}
+@keyframes trLand {
+  50% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+}
+.tr-cross,
+.tr-pop {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* Le titre et les boutons. */
+.tr-title {
+  position: absolute;
+  left: 50%;
+  bottom: 16%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+.tr-kicker {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  animation: trSpin 2.4s linear infinite;
+}
+.tr-kicker svg {
+  width: 24px;
+  height: 24px;
+}
+@keyframes trSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.tr-title h2 {
+  margin: 0;
+  font: 400 clamp(2.2rem, 7vw, 3.6rem)/1 "Lilita One", var(--font-display);
+  color: var(--me);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  animation: trTitle 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+@keyframes trTitle {
+  from {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.tr-actions {
+  position: absolute;
+  left: 50%;
+  bottom: 7%;
+  display: flex;
+  gap: 0.6rem;
+  transform: translateX(-50%);
+  animation: trFade 0.4s 0.2s both;
+}
+.tr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.3rem;
+  border: 0;
+  border-radius: 14px;
+  font: 400 1.1rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tr-btn svg {
+  width: 19px;
+  height: 19px;
+}
+.tr-btn.gold {
+  background: var(--me);
+  color: #161618;
+}
+.tr-btn.ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.tr-close {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  transform: translateX(-50%);
+}
+.tr-close svg {
+  width: 20px;
+  height: 20px;
+}
+@media (max-width: 620px) {
+  .tr-who-txt small {
+    display: none;
+  }
+  .tr-btn {
+    font-size: 0.95rem;
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Proposer un échange
+   --------------------------------------------------------------------- */
+.tc-friend {
+  color: #ff5470;
+}
+.tc-board {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+.tc-side {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.tc-side.give {
+  box-shadow: inset 0 3px 0 #f2b70b;
+}
+.tc-side.want {
+  box-shadow: inset 0 3px 0 #ff5470;
+}
+.tc-label {
+  font: 800 0.8rem/1 var(--font-display);
+  color: var(--text-soft);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.tc-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.tc-slot {
+  position: relative;
+  aspect-ratio: 63 / 88;
+  border-radius: 8px;
+  border: 2px dashed var(--border-strong);
+}
+.tc-slot.full {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.tc-x {
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 0 0 2px var(--border);
+}
+.tc-x svg {
+  width: 12px;
+  height: 12px;
+}
+.tc-swap {
+  align-self: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.tc-swap svg {
+  width: 18px;
+  height: 18px;
+}
+.tc-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.tc-tabs {
+  display: flex;
+  gap: 8px;
+}
+.tc-tools .bd-search {
+  flex: 1;
+  min-width: 180px;
+}
+.tc-list {
+  max-height: 42vh;
+}
+.bd-found-tag.want {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #f2b70b;
+  color: #161618;
+}
+.bd-found-tag.want svg {
+  width: 10px;
+  height: 10px;
+}
+@media (max-width: 620px) {
+  .tc-board {
+    flex-direction: column;
+  }
+  .tc-swap {
+    transform: rotate(90deg);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Les échanges en cours (page Cartes)
+   --------------------------------------------------------------------- */
+.tx {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.tx-h {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font: 800 1.15rem/1 var(--font-display);
+}
+.tx-h svg {
+  width: 19px;
+  height: 19px;
+  color: #f2b70b;
+}
+.tx-h b {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #ff5470;
+  color: #fff;
+  font-size: 0.78rem;
+}
+.tx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.tx-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.tx-row.in {
+  box-shadow: inset 4px 0 0 #ff5470;
+}
+.tx-who {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  width: 170px;
+  color: var(--text);
+  text-decoration: none;
+}
+.tx-ava {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--bg);
+}
+.tx-ava img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.tx-ava b {
+  font: 800 1rem/1 var(--font-display);
+  text-transform: uppercase;
+}
+.tx-who-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.tx-who-txt b {
+  font: 800 0.95rem/1.1 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tx-who-txt small {
+  color: var(--text-soft);
+  font: 700 0.76rem/1 var(--font-display);
+}
+.tx-deal {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+.tx-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.tx-side small {
+  color: var(--text-soft);
+  font: 800 0.66rem/1 var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.tx-cards {
+  display: flex;
+  gap: 6px;
+}
+.tx-mini {
+  width: 54px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  transition: transform 0.15s;
+}
+.tx-mini:hover {
+  transform: translateY(-3px);
+}
+.tx-arrow {
+  width: 20px;
+  height: 20px;
+  color: var(--text-soft);
+}
+.tx-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 38px;
+  padding: 0 0.95rem;
+  border-radius: 999px;
+  border: 0;
+  font: 800 0.88rem/1 var(--font-display);
+}
+.tx-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.tx-btn.gold {
+  background: #f2b70b;
+  color: #161618;
+}
+.tx-btn.ghost {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+@media (max-width: 700px) {
+  .tx-row {
+    flex-wrap: wrap;
+  }
+  .tx-who {
+    width: auto;
+    flex: 1;
+  }
+  .tx-deal {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .tx-btn span {
+    display: none;
+  }
+  .tx-btn {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Chez un ami : ce que je cherche, et proposer un échange
+   --------------------------------------------------------------------- */
+.cd-trade-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 40px;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: #f2b70b;
+  color: #161618;
+  font: 800 0.92rem/1 var(--font-display);
+}
+@media (max-width: 560px) {
+  .cd-trade-btn span {
+    display: none;
+  }
+  .cd-trade-btn {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+.cd-wanted {
+  position: absolute;
+  left: -6px;
+  top: -7px;
+  z-index: 3;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  background: #f2b70b;
+  color: #161618;
+  font: 800 0.64rem/1 var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.cd-cell.wanted .tcg-face {
+  box-shadow:
+    0 0 0 1.4cqw #f2b70b,
+    0 1.6cqw 5cqw rgba(0, 0, 0, 0.42);
+}
+.cd-want-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 40px;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: 800 0.86rem/1 var(--font-display);
+}
+.cd-want-filter b {
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: #f2b70b;
+  color: #161618;
+  font-size: 0.74rem;
+}
+.cd-want-filter.on {
+  border-color: #f2b70b;
+  background: #f2b70b;
+}
+.cd-want-filter.on b {
+  background: #161618;
+  color: #f2b70b;
+}
+.cd-insp-trade {
+  background: #ff5470;
+  color: #fff;
+}
+.cd-insp-trade:hover {
+  background: #ff6f86;
+}

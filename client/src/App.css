@@ -67,4 +67,9 @@
 /* Toasts de confirmation avec « Annuler ». */
 @import "./styles/app-57-toast.css";
 @import "./styles/app-58-cards.css";
+@import "./styles/app-59-card-battle.css";
+/* Classeurs perso et favoris des cartes. */
+@import "./styles/app-60-card-binders.css";
+/* Échanges de cartes entre joueurs. */
+@import "./styles/app-61-card-trades.css";
 @import "./styles/app-99-mobile-perf.css";

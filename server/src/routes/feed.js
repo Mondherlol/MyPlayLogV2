@@ -20,8 +20,6 @@ import Reward from "../models/Reward.js";
 // d'une fournée de caisses.
 import { RARITY_KEYS } from "../lib/rarity.js";
 import { getCatalog, RARITY_ORDER as CARD_RARITIES } from "../lib/cards.js";
-import { isEnabled } from "../lib/features.js";
-import { isUserAdmin } from "../lib/admin.js";
 import GemDiscovery from "../models/GemDiscovery.js";
 import GemSkip from "../models/GemSkip.js";
 import Recommendation from "../models/Recommendation.js";
@@ -1465,14 +1463,9 @@ async function buildTimeline(
 
   // --- Boosters de cartes : même logique que les caisses — les ouvertures
   //     rapprochées d'un même joueur font UNE carte, qui montre ses plus
-  //     belles prises. Tant que la section « Cartes » est éteinte, seuls les
-  //     admins (qui la préparent) les voient passer. ---
+  //     belles prises. ---
   if (cardpacks.length) {
-    let visible = await isEnabled("cards");
-    if (!visible && req.userId) {
-      visible = isUserAdmin(await User.findById(req.userId).select("isAdmin isSuperAdmin").lean());
-    }
-    const cat = visible ? await getCatalog().catch(() => null) : null;
+    const cat = await getCatalog().catch(() => null);
     if (cat) {
       const clusters = burstsByUser(cardpacks);
       const rank = (c) => CARD_RARITIES.indexOf(c.rarity) * 1e6 - c.no;

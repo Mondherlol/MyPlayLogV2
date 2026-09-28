@@ -23,13 +23,8 @@ export const FEATURES = {
     // Cachée par défaut : le rayon se garnit avant de s'ouvrir.
     default: false,
   },
-  cards: {
-    label: "Cartes",
-    hint: "Les boosters de cartes à collectionner, payés en points d'arcade.",
-    // Ouverte à tous (demande du 2026-09-27). L'interrupteur de la page Cartes
-    // (admin) peut toujours la masquer : un réglage enregistré prime.
-    default: true,
-  },
+  // (Les cartes n'ont plus de drapeau : ouvertes à tous, tout le temps —
+  // décision du 2026-09-28.)
 };
 
 const TTL = 10_000;

@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { Coins } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
-import { EDITIONS } from "../lib/cards";
+import { EDITIONS, cardCover } from "../lib/cards";
+import { useToast } from "../context/ToastContext";
 import PackOpening from "../components/cards/PackOpening";
 import CardCollection from "../components/cards/CardCollection";
 import FriendsBinders from "../components/cards/FriendsBinders";
-import CardsVisibility from "../components/cards/CardsVisibility";
 import PackShop from "../components/cards/PackShop";
+import TradeInbox from "../components/cards/TradeInbox";
 
 // ======================================================================
 //  Cartes — les boosters à ouvrir et le classeur
@@ -29,6 +30,9 @@ export default function Cards() {
   const [err, setErr] = useState("");
   const [opening, setOpening] = useState(null); // { edition, origin, run }
   const [focusRecent, setFocusRecent] = useState(0);
+  // Un échange conclu : on recharge le classeur (les cartes reçues arrivent).
+  const [reload, setReload] = useState(0);
+  const refresh = useCallback(() => setReload((n) => n + 1), []);
 
   const commit = useCallback(
     (next) =>
@@ -56,7 +60,43 @@ export default function Cards() {
     return () => {
       alive = false;
     };
-  }, [token, meId, commit]);
+  }, [token, meId, commit, reload]);
+
+  const toast = useToast();
+
+  // Le cœur : posé tout de suite, rendu si le serveur refuse, « Annuler » dans
+  // le toast.
+  const setFavLocal = useCallback(
+    (id, on) => commit((d) => (d ? { ...d, cards: d.cards.map((c) => (c.id === id ? { ...c, fav: on } : c)) } : d)),
+    [commit]
+  );
+  const onFav = useCallback(
+    async (card) => {
+      const on = !card.fav;
+      setFavLocal(card.id, on);
+      try {
+        await apiFetch("/cards/fav", { method: "POST", token, body: { card: card.id, on } });
+        toast.show({
+          title: card.name,
+          cover: cardCover(card.cover, "t_cover_small"),
+          text: on ? "Ajoutée aux favoris" : "Retirée des favoris",
+          undo: async () => {
+            await apiFetch("/cards/fav", { method: "POST", token, body: { card: card.id, on: !on } });
+            setFavLocal(card.id, !on);
+          },
+        });
+      } catch (e) {
+        setFavLocal(card.id, !on);
+        toast.show({ title: card.name, text: e.message, error: true });
+      }
+    },
+    [token, toast, setFavLocal]
+  );
+  // Les classeurs perso vivent dans la même réponse que les cartes.
+  const onBinders = useCallback(
+    (fn) => commit((d) => (d ? { ...d, binders: typeof fn === "function" ? fn(d.binders || []) : fn } : d)),
+    [commit]
+  );
 
   const points = data?.points ?? user?.points ?? 0;
   const price = data?.price ?? 500;
@@ -111,9 +151,10 @@ export default function Cards() {
         </Link>
       </header>
 
-      <CardsVisibility />
 
       {err && <p className="cd-err">{err}</p>}
+
+      <TradeInbox token={token} me={user} onChanged={refresh} onBinder={() => setFocusRecent((n) => n + 1)} />
 
       {/* ---------- Les boosters ---------- */}
       <PackShop
@@ -126,6 +167,11 @@ export default function Cards() {
       />
 
       <CardCollection
+        editable
+        token={token}
+        binders={data?.binders || []}
+        onBinders={onBinders}
+        onFav={onFav}
         cards={data?.cards || []}
         rarities={data?.rarities || []}
         setSize={data?.setSize || 0}

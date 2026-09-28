@@ -273,7 +273,16 @@ const SECTIONS = [
         <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">
           CC BY 3.0
         </a>
-        . Les autres, de Phosphor Icons et Lucide (licence MIT).
+        . Les autres, de Phosphor Icons et Lucide (licence MIT). Les bruitages
+        des combats de cartes viennent de{" "}
+        <a href="https://kenney.nl" target="_blank" rel="noreferrer">
+          Kenney
+        </a>{" "}
+        (domaine public, CC0) et de{" "}
+        <a href="https://mixkit.co" target="_blank" rel="noreferrer">
+          Mixkit
+        </a>
+        .
       </p>
     ),
   },

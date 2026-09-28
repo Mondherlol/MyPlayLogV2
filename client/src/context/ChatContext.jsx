@@ -50,6 +50,9 @@ const VERSUS_EVENTS = [
   "listen", // Écouter à plusieurs (routes/listen.js) : les repères de lecture
   // de l'hôte. Sans cette ligne, l'auditeur reste bloqué sur la piste avec
   // laquelle il est entré — le changement de morceau n'arrive jamais.
+  "cardduel", // Les duels de cartes (lib/cardDuel.js) : l'invité arrive, « go »,
+  // la carte d'en face est posée, le verdict. Sans cette ligne, chacun attend
+  // l'autre indéfiniment (seul le filet de 4 s ferait avancer la partie).
 ];
 
 // Durée d'affichage d'une bulle « X t'a écrit » (ms).
@@ -103,7 +106,12 @@ function toastTextOf(m) {
   // l'hôte lance, et la pop-up est souvent le seul endroit où elle sera lue à
   // temps pour y être.
   if (m.versus)
-    return m.text || `t'invite à un versus ${m.versus.kind === "blindtest" ? "blind test" : "GeoGamer"}`;
+    return (
+      m.text ||
+      (m.versus.kind === "cards"
+        ? "te défie en duel de cartes"
+        : `t'invite à un versus ${m.versus.kind === "blindtest" ? "blind test" : "GeoGamer"}`)
+    );
   // Aussi périssable qu'une invitation de versus, et même davantage : une
   // séance d'écoute meurt avec l'onglet de son hôte. La pop-up est souvent le
   // seul endroit où elle sera lue à temps.

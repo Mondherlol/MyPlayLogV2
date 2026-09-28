@@ -35,6 +35,9 @@ import {
   Library,
   Lock,
   Layers,
+  Bot,
+  Flame,
+  Gift,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCosmetics } from "../context/CosmeticsContext";
@@ -154,6 +157,8 @@ const SOURCE_LABELS = {
   imposteur: "L'Imposteur",
   case: "Ouverture de caisse",
   cards: "Booster de cartes",
+  cardbattle: "Combat de cartes",
+  cardduel: "Duel de cartes",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",
   backfill: "Parties d'avant l'arcade",
@@ -489,7 +494,12 @@ export default function Arcade() {
               cover2={covers.length ? covers[(i + 1) % covers.length] : null}
             />
           ))}
-          <MysteryCard />
+          {/* Le combat de cartes prend la place du « jeu mystère ». */}
+          <BattleCard
+            token={token}
+            cover={covers.length ? covers[GAMES.length % covers.length] : null}
+            cover2={covers.length ? covers[(GAMES.length + 1) % covers.length] : null}
+          />
         </div>
 
         {/* ---------- La caisse de collection ----------
@@ -506,19 +516,18 @@ export default function Arcade() {
         )}
 
         {/* ---------- Les caisses (et la porte des cartes) ---------- */}
-        {(data?.cases?.length > 0 || hasFeature("cards")) && (
-          <div className="arc-crates">
-            {hasFeature("cards") && <CardsDoor points={points} />}
-            {(data?.cases || []).map((c) => (
-              <Crate
-                key={c.id}
-                crate={c}
-                points={points}
-                onOpen={() => setOpeningBox(c)}
-              />
-            ))}
-          </div>
-        )}
+        {/* Les cartes sont ouvertes à tous : la porte est toujours là. */}
+        <div className="arc-crates">
+          <CardsDoor points={points} />
+          {(data?.cases || []).map((c) => (
+            <Crate
+              key={c.id}
+              crate={c}
+              points={points}
+              onOpen={() => setOpeningBox(c)}
+            />
+          ))}
+        </div>
 
         {/* ---------- Collection ----------
             Les curseurs ne sont plus ici mais dans leur modale (bouton du
@@ -715,36 +724,81 @@ function GameCard({ game, mine, cover, cover2 }) {
   );
 }
 
-// ---------- La carte « jeu mystère » ----------
-// Un emplacement réservé, pas un mini-jeu : ni <Link>, ni classement, ni
-// record. Elle ferme la grille (les mini-jeux sont en nombre pair sans elle)
-// et sert d'appât — d'où le « ? » qui respire et la bordure en pointillé qui
-// dit clairement « ce n'est pas encore cliquable ».
-function MysteryCard() {
+// ---------- La carte « Combat de cartes » ----------
+// Un duel contre le bot plutôt qu'un score à battre : pas de classement, mais
+// le niveau du bot et la série en cours. L'art : deux vraies jaquettes de la
+// bibliothèque, en cartes qui se croisent comme deux lames, et qui
+// s'entrechoquent au survol.
+function BattleCard({ token, cover, cover2 }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    apiFetch("/cards/battle", { token })
+      .then(
+        (d) =>
+          alive &&
+          setInfo({ ...d.stats, live: !!d.live && !d.live.end, locked: (d.cards ?? 0) < (d.minCards || 15), min: d.minCards || 15 })
+      )
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [token]);
   return (
-    <div className="arc-game arc-game-soon g-mystery">
+    <Link to="/cartes/combat" className="arc-game g-battle clickable">
+      <span className="arc-game-glow" aria-hidden="true" />
       <span className="arc-game-top">
-        <span className="arc-game-art soon" aria-hidden="true">
-          <span className="arc-art-soon-deck" />
-          <b>?</b>
+        <span className="arc-game-art arc-art-battle" aria-hidden="true">
+          <span className="arc-battle-card a">
+            {cover && <img src={cover.cover} alt="" loading="lazy" draggable="false" />}
+          </span>
+          <span className="arc-battle-card b">
+            {cover2 && <img src={cover2.cover} alt="" loading="lazy" draggable="false" />}
+          </span>
+          <span className="arc-battle-vs">
+            <Swords size={15} strokeWidth={2.6} />
+          </span>
         </span>
         <span className="arc-game-head">
-          <span className="arc-game-name">Jeu mystère</span>
+          <span className="arc-game-name">Combat de cartes</span>
           <span className="arc-game-pitch">
-            Un huitième mini-jeu se monte dans l'arrière-salle. Pas encore
-            d'indice — repasse traîner par ici.
+            Un défi tombe, tu poses ta carte face cachée, on retourne. Bats le bot avec ton classeur.
           </span>
         </span>
       </span>
       <span className="arc-game-foot">
         <span className="arc-game-stat">
-          <Lock size={13} /> Bientôt
+          {info?.locked ? (
+            <>
+              <Lock size={13} /> À partir de <b>{info.min}</b> cartes
+            </>
+          ) : info?.claimable > 0 ? (
+            <span className="arc-battle-gift">
+              <Gift size={13} /> Booster à récupérer
+            </span>
+          ) : info?.streak > 0 ? (
+            <>
+              <Flame size={13} /> Série <b>{fmt(info.streak)}</b>
+            </>
+          ) : info ? (
+            <>
+              <Bot size={13} /> Bot niv. <b>{info.level}</b>
+            </>
+          ) : (
+            <>
+              <Sparkles size={13} /> Nouveau
+            </>
+          )}
         </span>
-        <span className="arc-game-cta soon">En préparation</span>
+        <span className="arc-game-cta">
+          {info?.live ? "Reprendre" : "Jouer"} <ArrowRight size={16} className="arc-game-arrow" />
+        </span>
       </span>
-    </div>
+    </Link>
   );
 }
+
 
 // Format du canvas de la jaquette pixelisée : 3/4, comme une jaquette.
 const ART_CV_W = 186;

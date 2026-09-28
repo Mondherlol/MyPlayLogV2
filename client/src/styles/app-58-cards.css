@@ -378,38 +378,41 @@
   inset: 0;
   pointer-events: none;
 }
+/* Un reflet, pas un arc-en-ciel : tons pastel, bandes larges, intensité
+   basse. (Avant : couleurs saturées en color-dodge jusqu'à 50 % au survol —
+   l'illustration virait au néon, « trop violent ».) */
 .tcg-holo,
 .tcg-art-holo {
   background-image: repeating-linear-gradient(
     110deg,
-    #ff7773 0%,
-    #ffed5f 4%,
-    #a8ff5f 8%,
-    #83fff7 12%,
-    #7894ff 16%,
-    #d875ff 20%,
-    #ff7773 24%
+    #ffc9c6 0%,
+    #fff4bf 6%,
+    #d6ffc4 12%,
+    #c9fffb 18%,
+    #c9d4ff 24%,
+    #f0d0ff 30%,
+    #ffc9c6 36%
   );
-  background-size: 320% 320%;
+  background-size: 260% 260%;
   background-position: var(--hx) var(--hy);
-  mix-blend-mode: color-dodge;
+  mix-blend-mode: soft-light;
   transition: opacity 0.35s;
 }
 .tcg-holo {
   z-index: 3;
-  opacity: 0.1;
+  opacity: 0.12;
 }
 .tcg-art-holo {
-  opacity: 0.14;
+  opacity: 0.16;
 }
 .tcg.r-epic .tcg-art-holo {
-  opacity: 0.06;
+  opacity: 0.1;
 }
 .tcg.live .tcg-holo {
-  opacity: 0.34;
+  opacity: 0.3;
 }
 .tcg.live .tcg-art-holo {
-  opacity: 0.5;
+  opacity: 0.4;
 }
 /* Rare : le holo ne touche que l'illustration. */
 .tcg.r-rare .tcg-holo {
@@ -432,7 +435,7 @@
   transition: opacity 0.3s;
 }
 .tcg.live .tcg-sparkle {
-  opacity: 1;
+  opacity: 0.45;
 }
 .tcg-shimmer {
   z-index: 4;

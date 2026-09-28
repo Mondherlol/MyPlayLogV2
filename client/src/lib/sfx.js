@@ -865,6 +865,7 @@ export function playPackTear() {
 
 // Les cartes qui sortent du sachet et se posent.
 export function playCardDeal(i = 0) {
+  if (sample("deal", { gain: 0.75, rate: 1 + i * 0.015 })) return;
   play((ac, t) => {
     noise(ac, { start: t, dur: 0.07, gain: 0.07, freq: 3000 + i * 250, q: 1.2, sweep: 1400 });
     note(ac, { freq: 140 - i * 6, start: t + 0.04, dur: 0.07, gain: 0.05, type: "sine" });
@@ -873,6 +874,7 @@ export function playCardDeal(i = 0) {
 
 // La carte qui se retourne : un souffle d'air.
 export function playCardFlip() {
+  if (sample("flip", { gain: 0.85 })) return;
   play((ac, t) => {
     noise(ac, { start: t, dur: 0.16, gain: 0.1, freq: 1400, q: 0.8, sweep: 4200 });
   });
@@ -945,4 +947,198 @@ export function playGoldenPack() {
     );
     noise(ac, { start: t, dur: 0.8, gain: 0.04, freq: 8000, q: 0.5, type: "highpass" });
   });
+}
+
+// ======================================================================
+//  Les combats de cartes (et les cartes qu'on manipule) : de VRAIS sons
+// ======================================================================
+// Les bips synthétisés sonnaient « jeu 8 bits ». Ici, tout est ENREGISTRÉ,
+// comme le papier plus haut : des cartes qu'on glisse, pose, étale ; des
+// coups, du verre ; des jingles joués par de vrais instruments (pizzicato,
+// steel drum, saxo — jamais les jingles chiptune).
+//
+// PROVENANCE : Kenney (kenney.nl), packs « Casino Audio », « Impact Sounds »,
+// « Interface Sounds », « RPG Audio » et « Music Jingles » — domaine public
+// (CC0). Convertis en mp3 mono, crêtes normalisées, dans `public/sfx/battle/`.
+//
+// Chaque son a une ou plusieurs PRISES (`deal-1` … `deal-4`) : on en tire
+// une au hasard, avec un soupçon de variation de vitesse, pour qu'une même
+// action ne sonne jamais deux fois à l'identique.
+//
+// ÉCOUTÉ ET TRIÉ (2026-09-28) : de Kenney ne restent que les sons validés —
+// cartes distribuées, posées, retournées, le « hors sujet » et les jetons.
+// Tout le reste vient de MIXKIT (mixkit.co, licence Sound Effects Free :
+// usage commercial libre, sans attribution obligatoire), coupé court,
+// volume harmonisé (loudnorm -16 LUFS) : les coups, le papier froissé d'une
+// carte détruite, la lame du « DUEL », les notes d'un point, les trompettes
+// de la victoire, le marimba de la défaite.
+// (Pour en changer : public/sfx/choix.html propose d'autres candidats.)
+const BANK = {
+  // Kenney
+  deal: 4,
+  place: 4,
+  shove: 2,
+  flip: 2,
+  error: 1,
+  swoosh: 2,
+  chips: 2,
+  chip: 2,
+  // Mixkit
+  fan: 1,
+  question: 1,
+  tick: 1,
+  vs: 1,
+  punch: 1,
+  "punch-heavy": 1,
+  soft: 1,
+  glass: 1,
+  slice: 1,
+  "point-win": 1,
+  "point-lose": 1,
+  save: 1,
+  fail: 1,
+  win: 1,
+  lose: 1,
+  draw: 1,
+  tier: 1,
+};
+const bank = new Map(); // nom → [AudioBuffer]
+let banking = null;
+
+// Les prises arrivent AVANT le geste (même raison que le papier) : à
+// appeler à l'ouverture de l'arène ou d'un booster.
+export function primeBattleSounds() {
+  if (banking) return banking;
+  const ac = audio();
+  if (!ac) return null;
+  banking = Promise.all(
+    Object.entries(BANK).flatMap(([name, n]) =>
+      Array.from({ length: n }, (_, i) =>
+        fetch(`/sfx/battle/${n > 1 ? `${name}-${i + 1}` : name}.mp3`)
+          .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+          .then((b) => ac.decodeAudioData(b))
+          .then((buf) => {
+            const list = bank.get(name) || [];
+            list.push(buf);
+            bank.set(name, list);
+          })
+          .catch(() => {})
+      )
+    )
+  );
+  return banking;
+}
+
+// Joue une prise. Rend `false` si elle n'est pas (encore) là : l'appelant
+// peut alors retomber sur l'ancien son synthétisé plutôt que de se taire.
+function sample(name, { gain = 1, rate = 1, delay = 0 } = {}) {
+  if (isSfxMuted()) return true;
+  try {
+    const ac = audio();
+    if (!ac) return false;
+    const list = bank.get(name);
+    if (!list?.length) {
+      primeBattleSounds();
+      return false;
+    }
+    const buf = list[Math.floor(Math.random() * list.length)];
+    shot(ac, buf, { at: ac.currentTime + delay, gain, rate: rate * (0.97 + Math.random() * 0.06) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// La carte qu'on pose sur le plateau : posée (le bot) ou claquée (moi).
+export function playBattleSlam(soft = false) {
+  sample(soft ? "place" : "shove", { gain: soft ? 0.8 : 1 });
+}
+
+// La main qui monte en grand : un éventail de cartes.
+export function playBattleFan() {
+  sample("fan", { gain: 0.75 });
+}
+
+// L'objectif qui s'allume : une petite question.
+export function playBattleObjective() {
+  sample("question", { gain: 0.55 });
+}
+
+// Le chrono, dans les dernières secondes.
+export function playBattleTick() {
+  sample("tick", { gain: 0.7 });
+}
+
+// Le face-à-face : un coup d'orchestre et le métal qui résonne.
+export function playBattleVs() {
+  sample("vs", { gain: 0.85 });
+}
+
+// Les cartes qu'on retourne.
+export function playBattleFlip() {
+  sample("flip", { gain: 0.9 });
+  sample("place", { gain: 0.5, delay: 0.12 });
+}
+
+// Le coup : plus c'est efficace, plus ça cogne.
+export function playBattleHit(mult = 1) {
+  if (mult >= 1.5) sample("punch-heavy");
+  else if (mult < 1) sample("soft", { gain: 0.9 });
+  else sample("punch", { gain: 0.9 });
+}
+
+// Une carte détruite : du verre qui éclate.
+export function playBattleShatter() {
+  sample("glass", { gain: 0.85 });
+}
+
+// Hors sujet : le « non » de l'interface, et la carte balayée.
+export function playBattleWipe() {
+  sample("error", { gain: 0.6 });
+  sample("swoosh", { gain: 0.9, delay: 0.35 });
+}
+
+// Le point : quelques notes de pizzicato, qui montent pour moi, descendent
+// pour le bot. Et le jeton qui se pose dans la pastille.
+export function playBattlePoint(win = true) {
+  sample(win ? "point-win" : "point-lose", { gain: 0.7 });
+}
+export function playBattleChip() {
+  sample("chip", { gain: 0.7 });
+}
+
+// « DUEL » : une lame qu'on tire.
+export function playBattleDuel() {
+  sample("slice", { gain: 0.9 });
+}
+
+// Le sauvetage : réussi ou raté.
+export function playBattleRescue(ok = true) {
+  sample(ok ? "save" : "fail", { gain: 0.75 });
+}
+
+// Fin de partie : steel drum, qui monte ou qui retombe.
+export function playBattleVictory() {
+  sample("win", { gain: 0.85 });
+}
+export function playBattleDefeat() {
+  sample("lose", { gain: 0.8 });
+}
+export function playBattleDraw() {
+  sample("draw", { gain: 0.8 });
+}
+
+// Les points qui défilent : une poignée de jetons.
+export function playBattleChips() {
+  sample("chips", { gain: 0.8 });
+}
+
+// Les capsules d'un échange qui filent d'un joueur à l'autre.
+export function playTradeWhoosh() {
+  sample("swoosh", { gain: 0.8 });
+}
+
+// Un palier de la passe franchi.
+export function playBattleTier() {
+  sample("tier", { gain: 0.8 });
 }

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Search, Gem, Clock, Star, Hash, Package, X, Loader2 } from "lucide-react";
+import { Search, Gem, Clock, Star, Hash, Package, X, Loader2, Heart, Plus, Pencil, Trash2 } from "lucide-react";
 import {
   TYPES,
   CARD_RARITIES,
@@ -9,10 +9,14 @@ import {
   raritySymbol,
   fmtChance,
   oneIn,
+  cardCover,
 } from "../../lib/cards";
+import { apiFetch } from "../../lib/api";
+import { useToast } from "../../context/ToastContext";
 import TcgCard, { TypeBadge } from "./TcgCard";
 import BoosterPack from "./BoosterPack";
 import CardInspector from "./CardInspector";
+import { BinderShelf, BinderEditor, BinderAddCards, MissingCell, BINDER_COLORS } from "./Binders";
 
 // ======================================================================
 //  Un classeur : les chiffres du set, puis les cartes, puis la carte en grand
@@ -21,6 +25,10 @@ import CardInspector from "./CardInspector";
 // props : les chances par booster et le booster doré n'ont de sens que chez
 // soi (`drops`), et `focusRecent` (un compteur) ramène aux dernières cartes
 // tirées quand on sort d'une ouverture.
+//
+// Chez soi (`editable`), une ÉTAGÈRE au-dessus des cartes : Toutes, Favoris
+// (les cœurs) et les classeurs perso — « Ace Attorney » liste les 14 jeux de
+// la série, ceux qu'on n'a pas encore en creux.
 
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
 
@@ -40,17 +48,33 @@ export default function CardCollection({
   goldenChance = null,
   focusRecent = 0,
   between = null,
+  // Chez soi seulement : favoris et classeurs.
+  editable = false,
+  token = null,
+  binders = [],
+  onBinders = null,
+  onFav = null,
+  // Chez un ami : les cartes que je cherche, et proposer un échange.
+  wants = null,
+  onRequest = null,
 }) {
   const [inspect, setInspect] = useState(null);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("rarity");
   const [rarity, setRarity] = useState(null);
   const [type, setType] = useState(null);
+  const [view, setView] = useState("all"); // all | fav | <id de classeur>
+  const [binderCards, setBinderCards] = useState({});
+  const [editor, setEditor] = useState(null); // null | { binder }
+  const [adding, setAdding] = useState(false);
+  const [onlyWanted, setOnlyWanted] = useState(false);
   const binderRef = useRef(null);
+  const toast = useToast();
 
   // Sortie d'une ouverture : les dernières cartes en tête, et on y descend.
   useEffect(() => {
     if (!focusRecent) return;
+    setView("all");
     setSort("recent");
     setRarity(null);
     setType(null);
@@ -59,6 +83,47 @@ export default function CardCollection({
       binderRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
     );
   }, [focusRecent]);
+
+  const current = binders.find((b) => b.id === view) || null;
+  // Un classeur supprimé ailleurs (ou pas encore chargé) : retour à « Toutes ».
+  useEffect(() => {
+    if (view !== "all" && view !== "fav" && !current && !editor) setView("all");
+  }, [view, current, editor]);
+
+  // Les cartes d'un classeur : chargées à l'ouverture, rechargées quand son
+  // contenu change.
+  const currentId = current?.id;
+  const currentTotal = current?.total;
+  useEffect(() => {
+    if (!currentId || !token) return;
+    let alive = true;
+    apiFetch(`/cards/binders/${currentId}`, { token })
+      .then((d) => alive && setBinderCards((m) => ({ ...m, [currentId]: d.cards })))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [currentId, currentTotal, token]);
+
+  const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
+  const favCount = useMemo(() => cards.filter((c) => c.fav).length, [cards]);
+
+  // La base de la vue : toutes, les favorites, ou le classeur (celles qu'on a
+  // — à jour : cœur, nombre — et celles qu'on n'a pas encore).
+  const base = useMemo(() => {
+    if (onlyWanted && wants) return cards.filter((c) => wants.has(c.id));
+    if (view === "fav") return cards.filter((c) => c.fav);
+    if (current) {
+      const list = binderCards[current.id];
+      if (!list) return null;
+      return list.map((c) => {
+        const mine = byId.get(c.id);
+        return mine ? { ...mine, owned: true } : { ...c, owned: false };
+      });
+    }
+    return cards;
+  }, [view, current, binderCards, cards, byId, onlyWanted, wants]);
+  const wantedHere = useMemo(() => (wants ? cards.filter((c) => wants.has(c.id)).length : 0), [cards, wants]);
 
   const ownedBy = useMemo(() => {
     const o = Object.fromEntries(CARD_RARITY_ORDER.map((r) => [r, 0]));
@@ -72,13 +137,17 @@ export default function CardCollection({
   }, [cards]);
 
   const shown = useMemo(() => {
+    if (!base) return [];
     const needle = q.trim().toLowerCase();
-    const list = cards.filter(
+    const list = base.filter(
       (c) =>
         (!rarity || c.rarity === rarity) &&
-        (!type || cardTypes(c).includes(type)) &&
+        (current || !type || cardTypes(c).includes(type)) &&
         (!needle || c.name.toLowerCase().includes(needle))
     );
+    // Un classeur perso garde SON ordre (une série : de la plus ancienne à la
+    // plus récente).
+    if (current) return list;
     const cmp = {
       rarity: (a, b) => cardRarityRank(b.rarity) - cardRarityRank(a.rarity) || a.no - b.no,
       recent: (a, b) => new Date(b.firstAt || 0) - new Date(a.firstAt || 0) || a.no - b.no,
@@ -86,10 +155,97 @@ export default function CardCollection({
       no: (a, b) => a.no - b.no,
     }[sort];
     return list.sort(cmp);
-  }, [cards, q, rarity, type, sort]);
+  }, [base, q, rarity, type, sort, current]);
+
+  // La carte en grand ne défile que parmi celles qu'on possède.
+  const inspectable = useMemo(() => shown.filter((c) => c.owned !== false), [shown]);
+  const inspectIndex = useMemo(() => new Map(inspectable.map((c, i) => [c.id, i])), [inspectable]);
+
+  // --- classeurs : modifier, avec « Annuler » -------------------------------
+  const replaceBinder = useCallback(
+    (b) => onBinders?.((list) => list.map((x) => (x.id === b.id ? b : x))),
+    [onBinders]
+  );
+
+  const setMembership = useCallback(
+    async (b, card, on, silent = false) => {
+      const res = await apiFetch(`/cards/binders/${b.id}`, {
+        method: "PATCH",
+        token,
+        body: on ? { add: [card.id] } : { remove: [card.id] },
+      });
+      replaceBinder(res);
+      setBinderCards((m) => {
+        const list = m[b.id];
+        if (!list) return m;
+        return { ...m, [b.id]: on ? [...list.filter((c) => c.id !== card.id), card] : list.filter((c) => c.id !== card.id) };
+      });
+      if (!silent)
+        toast.show({
+          title: b.name,
+          cover: cardCover(card.cover, "t_cover_small"),
+          text: on ? `${card.name} ajoutée` : `${card.name} retirée`,
+          undo: () => setMembership(b, card, !on, true),
+        });
+      return res;
+    },
+    [token, replaceBinder, toast]
+  );
+
+  function onSaved(res, { created, before }) {
+    setEditor(null);
+    if (created) {
+      onBinders?.((list) => [...list, res]);
+      setView(res.id);
+      toast.show({
+        title: res.name,
+        cover: res.covers?.[0] ? cardCover(res.covers[0], "t_cover_small") : undefined,
+        text: res.total ? `Classeur créé · ${res.total} cartes` : "Classeur créé",
+        undo: async () => {
+          await apiFetch(`/cards/binders/${res.id}`, { method: "DELETE", token });
+          onBinders?.((list) => list.filter((x) => x.id !== res.id));
+          setView("all");
+        },
+      });
+    } else {
+      replaceBinder(res);
+      toast.show({
+        title: res.name,
+        text: "Classeur modifié",
+        undo: async () => {
+          const back = await apiFetch(`/cards/binders/${res.id}`, {
+            method: "PATCH",
+            token,
+            body: { name: before.name, color: before.color },
+          });
+          replaceBinder(back);
+        },
+      });
+    }
+  }
+
+  async function removeBinder(b) {
+    const saved = await apiFetch(`/cards/binders/${b.id}`, { method: "DELETE", token });
+    onBinders?.((list) => list.filter((x) => x.id !== b.id));
+    setView("all");
+    toast.show({
+      title: b.name,
+      text: "Classeur supprimé",
+      undo: async () => {
+        const again = await apiFetch("/cards/binders", {
+          method: "POST",
+          token,
+          body: { name: saved.name, color: saved.color, cards: saved.cards },
+        });
+        onBinders?.((list) => [...list, again]);
+        setView(again.id);
+      },
+    });
+  }
 
   const owned = cards.length;
   const pct = setSize ? owned / setSize : 0;
+  const color = current ? BINDER_COLORS[current.color] || BINDER_COLORS.gold : null;
 
   return (
     <>
@@ -163,7 +319,57 @@ export default function CardCollection({
 
       {/* ---------- Le classeur ---------- */}
       <section className="cd-binder" ref={binderRef}>
+        {editable && (
+          <BinderShelf
+            view={view}
+            onView={(v) => {
+              setView(v);
+              setInspect(null);
+            }}
+            total={cards.length}
+            favs={favCount}
+            binders={binders}
+            onCreate={() => setEditor({ binder: null })}
+          />
+        )}
+
+        {current && (
+          <div className="bd-head" style={{ "--bc": color }}>
+            <div className="bd-head-main">
+              <h2 className="bd-head-name">{current.name}</h2>
+              <div className="bd-head-prog">
+                <span className="bd-bar">
+                  <i style={{ "--p": current.total ? current.owned / current.total : 0 }} />
+                </span>
+                <b>
+                  {fmt(current.owned)}/{fmt(current.total)}
+                </b>
+                {current.total > 0 && current.owned === current.total && <span className="bd-done">Complet</span>}
+              </div>
+            </div>
+            <div className="bd-head-actions">
+              <button className="bd-act clickable" onClick={() => setAdding(true)} title="Ajouter des cartes">
+                <Plus />
+                <span>Ajouter</span>
+              </button>
+              <button className="bd-act icon clickable" onClick={() => setEditor({ binder: current })} title="Modifier">
+                <Pencil />
+              </button>
+              <button className="bd-act icon clickable" onClick={() => removeBinder(current)} title="Supprimer">
+                <Trash2 />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="cd-tools">
+          {wantedHere > 0 && (
+            <button className={`cd-want-filter clickable ${onlyWanted ? "on" : ""}`} onClick={() => setOnlyWanted((v) => !v)}>
+              <Search size={15} />
+              Je cherche
+              <b>{wantedHere}</b>
+            </button>
+          )}
           <label className="cd-search">
             <Search size={16} />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher" />
@@ -173,56 +379,104 @@ export default function CardCollection({
               </button>
             )}
           </label>
-          <div className="cd-types">
-            {typesOwned.map((t) => (
-              <button
-                key={t}
-                className={`cd-type clickable ${type === t ? "on" : ""} ${type && type !== t ? "dim" : ""}`}
-                onClick={() => setType((v) => (v === t ? null : t))}
-                title={TYPES[t].label}
-              >
-                <TypeBadge type={t} />
-              </button>
-            ))}
-          </div>
-          <div className="cd-sorts">
-            {SORTS.map(({ key, Icon, label }) => (
-              <button
-                key={key}
-                className={`cd-sort clickable ${sort === key ? "on" : ""}`}
-                onClick={() => setSort(key)}
-                title={label}
-              >
-                <Icon size={16} />
-              </button>
-            ))}
-          </div>
+          {!current && (
+            <>
+              <div className="cd-types">
+                {typesOwned.map((t) => (
+                  <button
+                    key={t}
+                    className={`cd-type clickable ${type === t ? "on" : ""} ${type && type !== t ? "dim" : ""}`}
+                    onClick={() => setType((v) => (v === t ? null : t))}
+                    title={TYPES[t].label}
+                  >
+                    <TypeBadge type={t} />
+                  </button>
+                ))}
+              </div>
+              <div className="cd-sorts">
+                {SORTS.map(({ key, Icon, label }) => (
+                  <button
+                    key={key}
+                    className={`cd-sort clickable ${sort === key ? "on" : ""}`}
+                    onClick={() => setSort(key)}
+                    title={label}
+                  >
+                    <Icon size={16} />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
-        {loading ? (
+        {loading || base === null ? (
           <div className="cd-state">
             <Loader2 size={22} className="spin" />
           </div>
-        ) : cards.length === 0 ? (
-          <div className="cd-empty">
-            <span className="cd-empty-slot" />
-            <span className="cd-empty-slot" />
-            <span className="cd-empty-slot" />
-          </div>
+        ) : shown.length === 0 ? (
+          current ? (
+            <div className="bd-empty">
+              <button className="bd-empty-add clickable" onClick={() => setAdding(true)}>
+                <Plus />
+                <span>Ajouter des cartes</span>
+              </button>
+            </div>
+          ) : view === "fav" ? (
+            <div className="bd-empty">
+              <span className="bd-empty-heart">
+                <Heart />
+              </span>
+            </div>
+          ) : (
+            <div className="cd-empty">
+              <span className="cd-empty-slot" />
+              <span className="cd-empty-slot" />
+              <span className="cd-empty-slot" />
+            </div>
+          )
         ) : (
           <VirtualGrid
             items={shown}
-            renderItem={(c, i) => <BinderCell key={c.id} card={c} index={i} onOpen={setInspect} />}
+            renderItem={(c) =>
+              c.owned === false ? (
+                <MissingCell key={c.id} card={c} />
+              ) : (
+                <BinderCell
+                  key={c.id}
+                  card={c}
+                  index={inspectIndex.get(c.id)}
+                  onOpen={setInspect}
+                  onFav={editable ? onFav : null}
+                  wanted={!!wants?.has(c.id)}
+                />
+              )
+            }
           />
         )}
       </section>
 
-      {inspect != null && shown[inspect] && (
+      {inspect != null && inspectable[inspect] && (
         <CardInspector
-          list={shown}
+          list={inspectable}
           index={inspect}
           onIndex={setInspect}
           onClose={() => setInspect(null)}
+          onFav={editable ? onFav : null}
+          binders={editable ? binders : null}
+          onToggleBinder={editable ? setMembership : null}
+          onRequest={onRequest}
+        />
+      )}
+
+      {editor && (
+        <BinderEditor token={token} binder={editor.binder} onClose={() => setEditor(null)} onSaved={onSaved} />
+      )}
+      {adding && current && (
+        <BinderAddCards
+          token={token}
+          binder={current}
+          onClose={() => setAdding(false)}
+          onToggle={(card, on) => setMembership(current, card, on)}
         />
       )}
     </>
@@ -232,13 +486,27 @@ export default function CardCollection({
 // Une case du classeur. MÉMORISÉE : quand une rangée entre à l'écran, seules
 // ses cartes se dessinent — celles déjà là ne bougent pas. (Une fonction de
 // clic recréée à chaque rendu faisait tout redessiner à chaque cran.)
-const BinderCell = memo(function BinderCell({ card, index, onOpen }) {
+const BinderCell = memo(function BinderCell({ card, index, onOpen, onFav, wanted = false }) {
   const open = useCallback(() => onOpen(index), [onOpen, index]);
   return (
-    <div className="cd-cell">
+    <div className={`cd-cell ${wanted ? "wanted" : ""}`}>
       <TcgCard card={card} lite onClick={open} />
       {card.fresh && <span className="cd-new">NEW</span>}
+      {wanted && <span className="cd-wanted">Je cherche</span>}
       {card.count > 1 && <span className="cd-count">×{card.count}</span>}
+      {onFav && (
+        <button
+          className={`cd-heart clickable ${card.fav ? "on" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFav(card);
+          }}
+          aria-label={card.fav ? "Retirer des favoris" : "Ajouter aux favoris"}
+          aria-pressed={!!card.fav}
+        >
+          <Heart />
+        </button>
+      )}
     </div>
   );
 });

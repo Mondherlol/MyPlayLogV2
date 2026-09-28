@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Info, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Info, X, Heart, Layers, Check, Loader2, ArrowLeftRight } from "lucide-react";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { useBackClose } from "../../hooks/useBackClose";
 import { CARD_RARITIES, raritySymbol, cardCover } from "../../lib/cards";
 import { playCardDeal } from "../../lib/sfx";
 import TcgCard from "./TcgCard";
 import GameDrawer, { useGameDrawer, siteModalOpen } from "./GameDrawer";
+import { BINDER_COLORS } from "./Binders";
 
 // ======================================================================
 //  Une carte en grand, par-dessus tout — du classeur, d'un ami ou du fil
@@ -15,7 +16,64 @@ import GameDrawer, { useGameDrawer, siteModalOpen } from "./GameDrawer";
 // voisine avec les flèches, et on tire la fiche du jeu depuis la droite.
 const typing = (e) => !!e.target.closest?.("input, textarea, select, [contenteditable]");
 
-export default function CardInspector({ list, index, onIndex, onClose }) {
+// Ranger la carte dans ses classeurs : une petite liste à cocher.
+function BinderPicker({ card, binders, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(null);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const on = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    document.addEventListener("pointerdown", on);
+    return () => document.removeEventListener("pointerdown", on);
+  }, [open]);
+  const count = binders.filter((b) => b.cards?.includes(card.id)).length;
+  return (
+    <span className="cd-insp-binders" ref={ref}>
+      <button className={`cd-insp-game clickable ${open ? "on" : ""}`} onClick={() => setOpen((v) => !v)}>
+        <Layers size={16} /> Classeurs{count ? <b>{count}</b> : null}
+      </button>
+      {open && (
+        <span className="cd-insp-pop">
+          {binders.length === 0 && <span className="cd-insp-pop-none">Crée un classeur depuis l'étagère.</span>}
+          {binders.map((b) => {
+            const inside = b.cards?.includes(card.id);
+            return (
+              <button
+                key={b.id}
+                className={`cd-insp-pop-row clickable ${inside ? "on" : ""}`}
+                style={{ "--bc": BINDER_COLORS[b.color] || BINDER_COLORS.gold }}
+                onClick={async () => {
+                  setBusy(b.id);
+                  try {
+                    await onToggle(b, card, !inside);
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+              >
+                <i className="cd-insp-pop-dot" />
+                <span>{b.name}</span>
+                {busy === b.id ? <Loader2 size={14} className="spin" /> : inside ? <Check size={15} /> : null}
+              </button>
+            );
+          })}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export default function CardInspector({
+  list,
+  index,
+  onIndex,
+  onClose,
+  onFav = null,
+  binders = null,
+  onToggleBinder = null,
+  onRequest = null,
+}) {
   useScrollLock(true);
   useBackClose(onClose, "card");
   const card = list[index];
@@ -144,6 +202,27 @@ export default function CardInspector({ list, index, onIndex, onClose }) {
             {raritySymbol(card.rarity)} <span>{meta.label}</span>
           </span>
           {card.count > 1 && <span className="cd-insp-count">×{card.count}</span>}
+          {onFav && (
+            <button
+              className={`cd-insp-fav clickable ${card.fav ? "on" : ""}`}
+              onClick={() => onFav(card)}
+              aria-label={card.fav ? "Retirer des favoris" : "Ajouter aux favoris"}
+              aria-pressed={!!card.fav}
+            >
+              <Heart size={17} />
+            </button>
+          )}
+          {binders && onToggleBinder && <BinderPicker card={card} binders={binders} onToggle={onToggleBinder} />}
+          {onRequest && (
+            <button
+              className="cd-insp-game cd-insp-trade clickable"
+              // Par-dessus la carte en grand (pas à sa place) : fermer l'une
+              // puis ouvrir l'autre faisait « retour » sur la nouvelle.
+              onClick={() => onRequest(card)}
+            >
+              <ArrowLeftRight size={16} /> Échanger
+            </button>
+          )}
           <button
             className={`cd-insp-game clickable ${drawerOpen ? "on" : ""}`}
             onClick={drawer.toggle}

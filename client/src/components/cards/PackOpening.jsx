@@ -87,6 +87,9 @@ export default function PackOpening({
   onClose,
   onOpened,
   onAgain,
+  // Un booster déjà GAGNÉ (la passe des combats) : la requête qui le tire,
+  // à la place de l'achat. Pas de prix, pas de bouton « Encore ».
+  request = null,
   onBinder,
 }) {
   useScrollLock(true);
@@ -141,7 +144,9 @@ export default function PackOpening({
   useEffect(() => {
     if (!buyRef.current) {
       playPackGrab();
-      buyRef.current = apiFetch("/cards/open", { method: "POST", token, body: { edition } });
+      buyRef.current = request
+        ? request()
+        : apiFetch("/cards/open", { method: "POST", token, body: { edition } });
     }
     let cancelled = false;
     buyRef.current
@@ -501,13 +506,15 @@ export default function PackOpening({
             <button className="po-btn clickable" onClick={onBinder || onClose}>
               <GalleryVerticalEnd size={18} /> Classeur
             </button>
-            <button
-              className="po-btn gold clickable"
-              onClick={onAgain}
-              disabled={(res?.points ?? 0) < price}
-            >
-              Encore <Coins size={16} /> {fmt(price)}
-            </button>
+            {!request && (
+              <button
+                className="po-btn gold clickable"
+                onClick={onAgain}
+                disabled={(res?.points ?? 0) < price}
+              >
+                Encore <Coins size={16} /> {fmt(price)}
+              </button>
+            )}
           </>
         )}
       </div>

@@ -4,7 +4,6 @@ import User from "../models/User.js";
 import { recordActivity } from "../lib/activity.js";
 import { blockIfPrivate } from "../lib/privacy.js";
 import { requireAuth } from "../middleware/auth.js";
-import { requireFeature } from "../lib/features.js";
 import { grantPoints, spendPoints } from "../lib/points.js";
 import {
   PACK_PRICE,
@@ -18,12 +17,61 @@ import {
   packChances,
   storeCards,
 } from "../lib/cards.js";
+import {
+  BattleError,
+  battleHome,
+  startBattle,
+  playRound,
+  rescueRound,
+  quitBattle,
+  claimPassTier,
+  TO_WIN,
+} from "../lib/cardBattle.js";
+import {
+  createDuel,
+  getDuel,
+  joinDuel,
+  readyDuel,
+  pickDuel,
+  rescueDuel,
+  quitDuel,
+  rematchDuel,
+  liveDuelOf,
+  duelCard,
+  duelStats,
+  duelFriends,
+  challengeDuel,
+  declineDuel,
+} from "../lib/cardDuel.js";
+import CardBattleStat from "../models/CardBattleStat.js";
+import { deliverCard, deliverCardToConversation } from "./chat.js";
+import {
+  BinderError,
+  listBinders,
+  getBinder,
+  createBinder,
+  updateBinder,
+  deleteBinder,
+  setFav,
+  searchSeries,
+  searchCards,
+} from "../lib/cardBinders.js";
+import {
+  TradeError,
+  listTrades,
+  proposeTrade,
+  acceptTrade,
+  declineTrade,
+  cancelTrade,
+  markTradeSeen,
+} from "../lib/cardTrades.js";
 
 // ======================================================================
 //  /api/cards — le classeur et les boosters
 // ======================================================================
 const router = express.Router();
-router.use(requireAuth, requireFeature("cards"));
+// Ouvert à tous, tout le temps (plus de drapeau « cards » depuis le 2026-09-28).
+router.use(requireAuth);
 
 // De quoi habiller les sachets : une vingtaine de jaquettes de grosses cartes,
 // tirées au hasard à chaque visite (la mosaïque du fond et l'éventail).
@@ -58,11 +106,13 @@ router.get("/", requireAuth, async (req, res) => {
       const c = cat.byId.get(o.card);
       if (!c) continue;
       ownedBy[c.rarity]++;
-      cards.push({ ...c, count: o.count, firstAt: o.firstAt, fresh: !!o.fresh });
+      cards.push({ ...c, count: o.count, firstAt: o.firstAt, fresh: !!o.fresh, fav: !!o.fav });
     }
+    const binders = await listBinders(req.userId, new Map(owned.map((o) => [o.card, o])));
 
     res.json({
       points: user.points || 0,
+      binders,
       price: PACK_PRICE,
       packSize: PACK_SIZE,
       set: CURRENT_SET,
@@ -230,6 +280,213 @@ router.post("/seen", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("cards seen error:", err.message);
     res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// ----------------------------------------------------------------------
+//  Favoris et classeurs perso (lib/cardBinders.js)
+// ----------------------------------------------------------------------
+const binder = (fn) => async (req, res) => {
+  try {
+    res.json(await fn(req));
+  } catch (err) {
+    if (err instanceof BinderError) return res.status(err.status).json({ error: err.message });
+    console.error("cards binder error:", err.message);
+    res.status(500).json({ error: "Impossible de modifier le classeur." });
+  }
+};
+
+// POST /api/cards/fav { card, on } — le cœur.
+router.post("/fav", binder((req) => setFav(req.userId, req.body?.card, req.body?.on)));
+// GET /api/cards/find?q= — une carte du set, qu'on l'ait ou non.
+router.get("/find", binder((req) => searchCards(req.userId, req.query.q)));
+// GET /api/cards/series?q= — les séries qui ont des cartes (Ace Attorney…).
+router.get("/series", binder((req) => searchSeries(req.userId, req.query.q)));
+// Les classeurs.
+router.get("/binders", binder(async (req) => ({ binders: await listBinders(req.userId) })));
+router.post("/binders", binder((req) => createBinder(req.userId, req.body)));
+router.get("/binders/:id", binder((req) => getBinder(req.userId, req.params.id)));
+router.patch("/binders/:id", binder((req) => updateBinder(req.userId, req.params.id, req.body)));
+router.delete("/binders/:id", binder((req) => deleteBinder(req.userId, req.params.id)));
+
+// GET /api/cards/lite — ce que j'ai (id → nombre) et ce que je cherche (les
+// cartes de mes classeurs que je n'ai pas) : pour repérer, chez un ami, les
+// cartes qui m'intéressent.
+router.get(
+  "/lite",
+  binder(async (req) => {
+    const owned = await CardOwn.find({ user: req.userId }).select("card count").lean();
+    const have = new Map(owned.map((o) => [o.card, o.count]));
+    const binders = await listBinders(req.userId, new Map(owned.map((o) => [o.card, o])));
+    const wants = [...new Set(binders.flatMap((b) => b.cards))].filter((id) => !have.has(id));
+    return { owned: [...have], wants };
+  })
+);
+
+// ----------------------------------------------------------------------
+//  Les échanges entre joueurs (lib/cardTrades.js)
+// ----------------------------------------------------------------------
+const trade = (fn) => async (req, res) => {
+  try {
+    res.json(await fn(req));
+  } catch (err) {
+    if (err instanceof TradeError) return res.status(err.status).json({ error: err.message });
+    console.error("cards trade error:", err.message);
+    res.status(500).json({ error: "L'échange a échoué." });
+  }
+};
+router.get("/trades", trade((req) => listTrades(req.userId)));
+router.post("/trades", trade((req) => proposeTrade(req.userId, req.body)));
+router.post("/trades/:id/accept", trade((req) => acceptTrade(req.userId, req.params.id)));
+router.post("/trades/:id/decline", trade((req) => declineTrade(req.userId, req.params.id)));
+router.post(
+  "/trades/:id/cancel",
+  trade((req) => cancelTrade(req.userId, req.params.id, { restore: !!req.body?.restore }))
+);
+router.post("/trades/:id/seen", trade((req) => markTradeSeen(req.userId, req.params.id)));
+
+// ----------------------------------------------------------------------
+//  Les combats contre le bot (tout se décide dans lib/cardBattle.js)
+// ----------------------------------------------------------------------
+const battle = (fn) => async (req, res) => {
+  try {
+    res.json(await fn(req));
+  } catch (err) {
+    if (err instanceof BattleError) return res.status(err.status).json({ error: err.message });
+    console.error("cards battle error:", err.message);
+    res.status(500).json({ error: "Le combat a planté, réessaie." });
+  }
+};
+
+// GET /api/cards/battle — mon palmarès, ma passe, et ma partie en cours
+// (+ de quoi habiller les boosters de la passe).
+router.get(
+  "/battle",
+  battle(async (req) => ({
+    ...(await battleHome(req.userId)),
+    duel: await liveDuelOf(req.userId),
+    duels: duelStats(await CardBattleStat.findOne({ user: req.userId }).select("pvpWins pvpLosses pvpDraws").lean()),
+    packCovers: packCovers(await getCatalog()),
+  }))
+);
+// POST /api/cards/battle/pass/claim { tier } — le booster d'un palier.
+router.post("/battle/pass/claim", battle((req) => claimPassTier(req.userId, req.body?.tier)));
+// POST /api/cards/battle — nouvelle partie.
+router.post("/battle", battle((req) => startBattle(req.userId)));
+// POST /api/cards/battle/:id/play { card } — je pose une carte.
+router.post("/battle/:id/play", battle((req) => playRound(req.userId, req.params.id, req.body?.card)));
+// POST /api/cards/battle/:id/rescue { card | null } — le sauvetage.
+router.post("/battle/:id/rescue", battle((req) => rescueRound(req.userId, req.params.id, req.body?.card)));
+// POST /api/cards/battle/:id/quit — j'abandonne.
+router.post("/battle/:id/quit", battle((req) => quitBattle(req.userId, req.params.id)));
+
+// ----------------------------------------------------------------------
+//  Les duels entre joueurs, en temps réel (lib/cardDuel.js)
+// ----------------------------------------------------------------------
+// La carte « viens m'affronter » dans la messagerie — pour un pote hors ligne
+// (en ligne, la fenêtre de défi suffit : pas de doublon).
+async function inviteCard(fromId, room, toId) {
+  await deliverCard({
+    fromId,
+    toId,
+    text: "",
+    versus: { kind: "cards", code: room.code, hostName: room.host?.username || "", players: 1, maxPlayers: 2, rounds: TO_WIN },
+  });
+}
+
+// GET /api/cards/duel/friends — les potes à défier (en ligne, prêts, occupés).
+router.get("/duel/friends", battle((req) => duelFriends(req.userId)));
+// POST /api/cards/duel { invite? } — j'ouvre un salon (et je défie un pote).
+router.post(
+  "/duel",
+  battle(async (req) => {
+    const out = await createDuel(req.userId);
+    if (!req.body?.invite) return out;
+    const c = await challengeDuel(req.userId, out.room.code, req.body.invite);
+    if (!c.online) await inviteCard(req.userId, c.room, req.body.invite).catch(() => {});
+    return { room: c.room, target: c.target, online: c.online };
+  })
+);
+// GET /api/cards/duel/:code — le salon (et ma partie si j'en suis).
+router.get("/duel/:code", battle((req) => getDuel(req.userId, req.params.code)));
+// GET /api/cards/duel/:code/card — pour la carte d'invitation de la messagerie.
+router.get("/duel/:code/card", async (req, res) => {
+  try {
+    res.json(await duelCard(req.userId, req.params.code));
+  } catch {
+    res.json({ state: "gone" });
+  }
+});
+// POST /api/cards/duel/:code/join — je rejoins : la partie commence.
+router.post("/duel/:code/join", battle((req) => joinDuel(req.userId, req.params.code)));
+// POST /api/cards/duel/:code/ready { n } — mes animations sont finies.
+router.post("/duel/:code/ready", battle((req) => readyDuel(req.userId, req.params.code, req.body?.n)));
+// POST /api/cards/duel/:code/pick { n, card } — je pose ma carte.
+router.post(
+  "/duel/:code/pick",
+  battle((req) => pickDuel(req.userId, req.params.code, req.body?.n, req.body?.card))
+);
+// POST /api/cards/duel/:code/rescue { card | null } — le sauvetage.
+router.post("/duel/:code/rescue", battle((req) => rescueDuel(req.userId, req.params.code, req.body?.card)));
+// POST /api/cards/duel/:code/quit — fermer le salon, ou abandonner.
+router.post("/duel/:code/quit", battle((req) => quitDuel(req.userId, req.params.code)));
+// POST /api/cards/duel/:code/challenge { user } — défier un pote depuis le salon.
+router.post(
+  "/duel/:code/challenge",
+  battle(async (req) => {
+    const c = await challengeDuel(req.userId, req.params.code, req.body?.user);
+    if (!c.online) await inviteCard(req.userId, c.room, req.body.user).catch(() => {});
+    return c;
+  })
+);
+// POST /api/cards/duel/:code/decline — je refuse le défi.
+router.post("/duel/:code/decline", battle((req) => declineDuel(req.userId, req.params.code)));
+// POST /api/cards/duel/:code/rematch — la revanche.
+router.post("/duel/:code/rematch", battle((req) => rematchDuel(req.userId, req.params.code)));
+
+// POST /api/cards/duel/:code/invite { userIds, conversationIds } — la carte
+// « viens m'affronter » dans la messagerie, comme les autres versus.
+router.post("/duel/:code/invite", async (req, res) => {
+  try {
+    const { room } = await getDuel(req.userId, req.params.code);
+    if (!room.member) return res.status(403).json({ error: "Ce n'est pas ton duel." });
+    if (room.status !== "lobby") return res.status(409).json({ error: "Le duel a déjà commencé." });
+    const userIds = [...new Set((req.body?.userIds || []).map(String))].slice(0, 10);
+    const conversationIds = [...new Set((req.body?.conversationIds || []).map(String))].slice(0, 10);
+    if (!userIds.length && !conversationIds.length) return res.status(400).json({ error: "Personne à inviter." });
+
+    const targets = await User.find({ _id: { $in: userIds } }).select("username following").lean();
+    const card = {
+      kind: "cards",
+      code: room.code,
+      hostName: room.host?.username || "",
+      players: 1,
+      maxPlayers: 2,
+      rounds: TO_WIN,
+    };
+    const text = String(req.body?.text || "").slice(0, 300);
+    const sent = [];
+    const skipped = [];
+    for (const target of targets) {
+      // La règle de la messagerie : on n'écrit qu'à ses abonnés.
+      const allowed = (target.following || []).some((id) => String(id) === String(req.userId));
+      if (!allowed) {
+        skipped.push({ id: String(target._id), username: target.username });
+        continue;
+      }
+      await deliverCard({ fromId: req.userId, toId: target._id, text, versus: card });
+      sent.push({ id: String(target._id), username: target.username });
+    }
+    const groups = [];
+    for (const cid of conversationIds) {
+      const ok = await deliverCardToConversation({ fromId: req.userId, conversationId: cid, text, versus: card });
+      if (ok) groups.push(cid);
+    }
+    res.json({ sent, skipped, groups });
+  } catch (err) {
+    if (err instanceof BattleError) return res.status(err.status).json({ error: err.message });
+    console.error("cards duel invite error:", err.message);
+    res.status(500).json({ error: "Invitation non envoyée." });
   }
 });
 

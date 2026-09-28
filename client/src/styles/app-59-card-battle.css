@@ -1,0 +1,2800 @@
+/* ======================================================================
+   Combats de cartes — le hall (page) et l'arène (plein écran)
+   ======================================================================
+   L'arène est toujours sombre (comme l'ouverture des boosters) : c'est une
+   scène de jeu. Les cartes sont posées en absolu sur une scène centrée ;
+   leur `transform` (position) vit sur `.ba-card`, le survol sur `.ba-lift`,
+   les effets (élan, coup, éclats) sur `.ba-fx` — trois étages, trois
+   transformations qui ne s'écrasent jamais. */
+
+/* ---------------------------------------------------------------------
+   Le hall
+   --------------------------------------------------------------------- */
+.bl-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.bl-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.bl-back {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.bl-back svg {
+  width: 20px;
+  height: 20px;
+}
+.bl-title {
+  flex: 1;
+  margin: 0;
+  font: 400 2rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.01em;
+}
+.bl-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.15rem;
+  padding: 1.75rem 1rem 1.5rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.bl-vs {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 7vw, 3.2rem);
+}
+.bl-fighter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.bl-fighter > b {
+  max-width: 9rem;
+  font: 700 0.95rem/1.1 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bl-ava {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #26262c;
+  color: #fff;
+  box-shadow:
+    0 0 0 3px var(--surface),
+    0 0 0 6px #f2b70b;
+}
+.bl-fighter.bot .bl-ava {
+  background: #2a1a20;
+  color: #ff5470;
+  box-shadow:
+    0 0 0 3px var(--surface),
+    0 0 0 6px #ff5470;
+}
+.bl-ava img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bl-ava b {
+  font: 400 2.3rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.bl-ava svg {
+  width: 46px;
+  height: 46px;
+}
+.bl-vs-x {
+  color: var(--text-soft);
+}
+.bl-vs-x svg {
+  width: 34px;
+  height: 34px;
+}
+.bl-level {
+  display: flex;
+  gap: 4px;
+}
+.bl-level i {
+  width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+}
+.bl-level i.on {
+  background: #ff5470;
+}
+.bl-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+}
+.bl-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  width: min(340px, 100%);
+  padding: 1.05rem 2rem;
+  border: 0;
+  border-radius: 16px;
+  background: #f2b70b;
+  color: #161618;
+  font: 400 1.65rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition:
+    background 0.15s,
+    transform 0.12s;
+}
+.bl-play:hover {
+  background: var(--amber, #ffc933);
+}
+.bl-play:active {
+  transform: scale(0.97);
+}
+.bl-play:disabled {
+  opacity: 0.6;
+}
+.bl-play svg {
+  width: 26px;
+  height: 26px;
+}
+.bl-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: 600 0.95rem/1 var(--font-display);
+}
+.bl-new svg {
+  width: 17px;
+  height: 17px;
+}
+.bl-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+}
+.bl-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+.bl-stats b {
+  color: var(--text);
+  font: 800 1rem/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.bl-stats svg {
+  width: 18px;
+  height: 18px;
+}
+.bl-stats span:first-child svg {
+  color: #f2b70b;
+}
+.bl-stats span.hot svg {
+  color: #ff7a2f;
+}
+.bl-h2 {
+  margin: 0 0 0.75rem;
+  font: 800 1.15rem/1 var(--font-display);
+}
+.bl-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+.bl-type-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.bl-type-row .tcg-type {
+  width: 28px;
+  height: 28px;
+  box-shadow: none;
+}
+.bl-type-row .tcg-type:first-child {
+  width: 36px;
+  height: 36px;
+}
+.bl-beats {
+  margin: 0 0.1rem 0 0.25rem;
+  font: 800 0.8rem/1 var(--font-display);
+  color: var(--text-soft);
+}
+
+/* ---------------------------------------------------------------------
+   L'arène
+   --------------------------------------------------------------------- */
+.ba {
+  --acc: #f2b70b;
+  --foe: #ff5470;
+  --ok: #3ddc97;
+  position: fixed;
+  inset: 0;
+  /* Même étage que l'ouverture des boosters : sous les modales du site. */
+  z-index: 460;
+  overflow: hidden;
+  background: #0d0d10;
+  color: #fff;
+  font-family: var(--font-body);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  animation: baFade 0.25s ease both;
+}
+/* Le motif de l'appli (symboles de manette), en bas, qui s'efface en montant. */
+.ba::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--app-motif);
+  background-size: 182px 182px;
+  -webkit-mask-image: linear-gradient(to top, #000, transparent 55%);
+  mask-image: linear-gradient(to top, #000, transparent 55%);
+}
+.ba-shake {
+  position: absolute;
+  inset: 0;
+}
+.ba-shake.shake-0 {
+  animation: poShakeA 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+.ba-shake.shake-1 {
+  animation: poShakeB 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* --- la barre du haut --- */
+.ba-hud {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 80;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.6rem;
+}
+.ba-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+.ba-icon:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.ba-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.ba-side {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.ba-side.bot {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.ba-ava {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #26262c;
+  box-shadow: 0 0 0 2px var(--acc);
+}
+.ba-side.bot .ba-ava {
+  background: #2a1a20;
+  color: var(--foe);
+  box-shadow: 0 0 0 2px var(--foe);
+}
+.ba-ava img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.ba-ava b {
+  font: 400 1.1rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.ba-ava svg {
+  width: 20px;
+  height: 20px;
+}
+/* Le niveau du bot, en pastille sur son avatar. */
+.ba-lvl {
+  position: absolute;
+  right: -6px;
+  bottom: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--foe);
+  color: #fff;
+  box-shadow: 0 0 0 2px #0d0d10;
+  font: 400 0.72rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+}
+.ba-who {
+  min-width: 0;
+}
+.ba-who b {
+  display: block;
+  font: 700 0.88rem/1.1 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ba-pips {
+  display: flex;
+  gap: 5px;
+  margin-left: auto;
+}
+.ba-side.bot .ba-pips {
+  margin-left: 0;
+  margin-right: auto;
+}
+.ba-pips i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.14);
+}
+.ba-side .ba-pips i.on {
+  box-shadow: none;
+  animation: baPip 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.ba-side.you .ba-pips i.on {
+  background: var(--acc);
+}
+.ba-side.bot .ba-pips i.on {
+  background: var(--foe);
+}
+@keyframes baPip {
+  0% {
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.6);
+  }
+}
+.ba-hud-vs {
+  flex: none;
+  font: 400 0.95rem/1 "Lilita One", var(--font-display);
+  color: rgba(255, 255, 255, 0.3);
+}
+@media (max-width: 620px) {
+  .ba-who {
+    display: none;
+  }
+}
+
+/* --- la scène --- */
+.ba-stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+/* --- le tapis : deux camps, une ligne au milieu --- */
+.ba-board {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 34px;
+  background: #16161b;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+/* Mon camp teinté d'or, celui du bot de rose : on sait d'un coup d'œil qui
+   est où. */
+.ba-board::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(242, 183, 11, 0.06), transparent 42%, transparent 58%, rgba(255, 84, 112, 0.06));
+}
+.narrow .ba-board::before {
+  background: linear-gradient(0deg, rgba(242, 183, 11, 0.06), transparent 42%, transparent 58%, rgba(255, 84, 112, 0.06));
+}
+/* Le liseré intérieur. */
+.ba-board::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.ba-board-line {
+  position: absolute;
+  left: 50%;
+  top: 22px;
+  bottom: 22px;
+  border-left: 2px dashed rgba(255, 255, 255, 0.08);
+}
+.narrow .ba-board-line {
+  left: 22px;
+  right: 22px;
+  top: 50%;
+  bottom: auto;
+  border-left: 0;
+  border-top: 2px dashed rgba(255, 255, 255, 0.08);
+}
+
+/* --- les cases : encastrées, quatre coins aux couleurs du camp --- */
+.ba-slot {
+  --zc: var(--acc);
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: calc(var(--cw) * 0.055);
+  background: #0e0e12;
+  box-shadow:
+    inset 0 3px 14px rgba(0, 0, 0, 0.75),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.ba-slot.bot {
+  --zc: var(--foe);
+}
+.ba-slot::before {
+  --t: 3px;
+  --l: 22px;
+  content: "";
+  position: absolute;
+  inset: -7px;
+  pointer-events: none;
+  opacity: 0.4;
+  background:
+    linear-gradient(var(--zc) 0 0) top left / var(--l) var(--t),
+    linear-gradient(var(--zc) 0 0) top left / var(--t) var(--l),
+    linear-gradient(var(--zc) 0 0) top right / var(--l) var(--t),
+    linear-gradient(var(--zc) 0 0) top right / var(--t) var(--l),
+    linear-gradient(var(--zc) 0 0) bottom left / var(--l) var(--t),
+    linear-gradient(var(--zc) 0 0) bottom left / var(--t) var(--l),
+    linear-gradient(var(--zc) 0 0) bottom right / var(--l) var(--t),
+    linear-gradient(var(--zc) 0 0) bottom right / var(--t) var(--l);
+  background-repeat: no-repeat;
+  transition: opacity 0.3s;
+}
+.ba-slot.lit::before {
+  opacity: 1;
+  animation: baCorners 1.2s ease-in-out infinite;
+}
+@keyframes baCorners {
+  50% {
+    inset: -13px;
+  }
+}
+/* Le propriétaire de la case, en filigrane. */
+.ba-slot-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 2px var(--zc);
+  color: var(--zc);
+  opacity: 0.18;
+  transform: translate(-50%, -50%);
+}
+.ba-slot-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(0.5);
+}
+.ba-slot-mark svg {
+  width: 55%;
+  height: 55%;
+}
+.ba-slot-mark b {
+  font: 400 calc(var(--cw) * 0.14) / 1 "Lilita One", var(--font-display);
+  color: #fff;
+  text-transform: uppercase;
+}
+
+/* --- la plaque de l'objectif --- */
+.ba-obj {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 22px;
+  background: #1d1d23;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 18px 40px rgba(0, 0, 0, 0.5);
+  perspective: 700px;
+  transition: box-shadow 0.4s;
+}
+.ba-obj.o-in,
+.ba-obj.o-lit,
+.ba-obj.o-focus {
+  box-shadow:
+    0 0 0 2px var(--acc),
+    0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.ba-obj.o-lit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, 0.1) 48%, transparent 64%);
+  transform: translateX(-100%);
+  animation: baSweep 3s ease-in-out 0.3s infinite;
+}
+@keyframes baSweep {
+  45%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+.ba-obj-in {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  transition: opacity 0.2s;
+  animation: baObjIn 0.65s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.ba-obj.o-flash .ba-obj-in {
+  opacity: 0.12;
+}
+@keyframes baObjIn {
+  from {
+    transform: rotateX(90deg) scale(0.8);
+    opacity: 0;
+  }
+}
+.ba-objface {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.ba-obj-ico {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--acc);
+  color: #161618;
+}
+.ba-obj-ico svg {
+  width: 24px;
+  height: 24px;
+}
+.ba-objface .ba-obj-type.tcg-type {
+  width: 42px;
+  height: 42px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9);
+}
+.ba-obj-label {
+  min-width: 0;
+  font: 400 1.7rem/1.05 "Lilita One", var(--font-display);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ba-objface.long .ba-obj-label {
+  font-size: 1.35rem;
+}
+.ba-objface.xlong .ba-obj-label {
+  font-size: 1.1rem;
+  white-space: normal;
+}
+.ba-objface.big {
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+}
+.ba-objface.big .ba-obj-ico,
+.ba-objface.big .ba-obj-type.tcg-type {
+  width: 58px;
+  height: 58px;
+}
+.ba-objface.big .ba-obj-ico svg {
+  width: 32px;
+  height: 32px;
+}
+.ba-objface.big .ba-obj-label {
+  font-size: 2rem;
+  white-space: normal;
+}
+.ba-objface.big.long .ba-obj-label {
+  font-size: 1.6rem;
+}
+.ba-objface.big.xlong .ba-obj-label {
+  font-size: 1.3rem;
+}
+.ba-timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: var(--acc);
+  transform-origin: left center;
+  animation: baTimer linear both;
+}
+@keyframes baTimer {
+  from {
+    transform: scaleX(1);
+  }
+  70% {
+    background: var(--acc);
+  }
+  82% {
+    background: var(--foe);
+  }
+  to {
+    transform: scaleX(0);
+    background: var(--foe);
+  }
+}
+
+/* --- le choix en grand : voile, bandeau, carrousel --- */
+/* Pendant le choix, les gestes sont à nous : sans ça, le navigateur garde le
+   glissé horizontal pour lui et le carrousel ne tourne pas. */
+.ba.zooming {
+  touch-action: none;
+}
+.ba-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(8, 8, 10, 0.82);
+  animation: baFade 0.3s both;
+}
+.ba-focus {
+  position: absolute;
+  left: 50%;
+  z-index: 75;
+  width: min(calc(100vw - 24px), 560px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 58px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #1d1d23;
+  box-shadow:
+    0 0 0 2px var(--acc),
+    0 20px 50px rgba(0, 0, 0, 0.6);
+  transform: translateX(-50%);
+  animation: baFocusIn 0.45s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+@keyframes baFocusIn {
+  from {
+    transform: translate(-50%, -30px) scale(0.9);
+    opacity: 0;
+  }
+}
+.ba-focus .ba-obj-label {
+  font-size: 1.9rem;
+}
+.ba-focus .long .ba-obj-label {
+  font-size: 1.5rem;
+}
+.ba-focus .xlong .ba-obj-label {
+  font-size: 1.2rem;
+}
+.narrow .ba-focus {
+  padding: 0 50px 0 14px;
+}
+.narrow .ba-focus .ba-obj-label {
+  font-size: 1.45rem;
+}
+.narrow .ba-focus .long .ba-obj-label {
+  font-size: 1.15rem;
+}
+.narrow .ba-focus .xlong .ba-obj-label {
+  font-size: 1rem;
+}
+/* Le bot réfléchit… puis a posé. */
+.ba-focus-bot {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 84, 112, 0.12);
+  color: var(--foe);
+  box-shadow: 0 0 0 2px rgba(255, 84, 112, 0.35);
+  transform: translateY(-50%);
+}
+.ba-focus-bot:not(.in) {
+  animation: baThink 1s ease-in-out infinite;
+}
+@keyframes baThink {
+  50% {
+    opacity: 0.4;
+  }
+}
+.ba-focus-bot svg {
+  width: 18px;
+  height: 18px;
+}
+.ba-focus-bot .ok {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 17px;
+  height: 17px;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--ok);
+  color: #0c2b1d;
+  stroke-width: 4;
+  animation: baPopIn 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.ba-focus.rescue {
+  justify-content: flex-start;
+  padding: 0 16px;
+  box-shadow:
+    0 0 0 2px var(--ok),
+    0 20px 50px rgba(0, 0, 0, 0.6);
+}
+.ba-focus.rescue.st-ok {
+  box-shadow:
+    0 0 0 3px var(--ok),
+    0 20px 50px rgba(0, 0, 0, 0.6);
+}
+.ba-focus.rescue.st-fail {
+  box-shadow:
+    0 0 0 3px var(--foe),
+    0 20px 50px rgba(0, 0, 0, 0.6);
+}
+.ba-focus-thumb {
+  flex: none;
+  width: 44px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #26262c;
+  box-shadow: 0 0 0 2px var(--foe);
+  animation: baDanger 0.45s ease-in-out infinite;
+}
+.st-ok .ba-focus-thumb {
+  box-shadow: 0 0 0 2px var(--ok);
+  animation: none;
+}
+.ba-focus-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ba-focus-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ba-focus-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ok);
+  font: 400 0.95rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.st-fail .ba-focus-head {
+  color: var(--foe);
+}
+.ba-focus-head svg {
+  width: 17px;
+  height: 17px;
+}
+.ba-focus-ask {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font: 400 1.8rem/1.05 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.narrow .ba-focus-ask {
+  font-size: 1.4rem;
+}
+.ba-focus-ask svg {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: var(--ok);
+}
+.ba-focus-ask span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ba-focus.rescue .ba-timer {
+  background: var(--ok);
+  animation-name: baTimerG;
+}
+@keyframes baTimerG {
+  to {
+    transform: scaleX(0);
+  }
+}
+.ba-dots {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 85;
+  display: flex;
+  gap: 7px;
+  animation: baFade 0.3s 0.2s both;
+}
+.ba-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  transition:
+    width 0.25s,
+    background 0.25s;
+}
+.ba-dots i.on {
+  width: 20px;
+  background: var(--acc);
+}
+.ba-go {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 85;
+  padding: 0.85rem 2.6rem;
+  border: 0;
+  border-radius: 14px;
+  background: var(--acc);
+  color: #161618;
+  font: 400 1.25rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  animation: baFade 0.3s 0.25s both;
+}
+.ba-go.rescue {
+  background: var(--ok);
+  color: #0c2b1d;
+}
+
+/* --- les cartes --- */
+.ba-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition:
+    transform 0.62s cubic-bezier(0.2, 0.9, 0.25, 1.08),
+    opacity 0.3s;
+}
+.ba-lift,
+.ba-fx {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.ba-lift {
+  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25);
+}
+.ba-fx {
+  transition: filter 0.3s;
+}
+.ba-card.pickable {
+  cursor: pointer;
+}
+.ba-card.far {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .wide .ba-card.zoomed.pickable:hover {
+    z-index: 90 !important;
+  }
+  .wide .ba-card.zoomed.pickable:hover .ba-lift {
+    transform: translateY(-6%) scale(1.05);
+  }
+}
+.wide .ba-card.zoomed.kf {
+  z-index: 90 !important;
+}
+.wide .ba-card.zoomed.kf .ba-lift {
+  transform: translateY(-6%) scale(1.05);
+}
+.wide .ba-card.zoomed.kf .tcg-face,
+.narrow .ba-card.zoomed.focused .tcg-face {
+  box-shadow:
+    0 0 0 1.1cqw var(--acc),
+    0 5cqw 14cqw rgba(0, 0, 0, 0.6);
+}
+.narrow .ba-card.zoomed:not(.focused) .ba-fx {
+  filter: brightness(0.62);
+}
+.ba-loan {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -45%);
+  padding: 0.3em 0.7em;
+  border-radius: 999px;
+  background: #2c2c33;
+  color: #cfd3da;
+  font: 800 calc(var(--bw) * 0.065) / 1 var(--font-display);
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Les effets, sur l'étage `.ba-fx`. */
+.fx-rise .ba-fx {
+  animation: baRise 0.7s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes baRise {
+  40% {
+    transform: translateY(-7%) scale(1.1);
+  }
+}
+.fx-win .ba-fx {
+  animation: baWin 0.7s cubic-bezier(0.2, 1.5, 0.4, 1) forwards;
+}
+@keyframes baWin {
+  50% {
+    transform: scale(1.13);
+  }
+  100% {
+    transform: scale(1.05);
+  }
+}
+.fx-win .tcg-face {
+  box-shadow:
+    0 0 0 1.2cqw var(--acc),
+    0 5cqw 14cqw rgba(0, 0, 0, 0.55);
+}
+.bot.fx-win .tcg-face {
+  box-shadow:
+    0 0 0 1.2cqw var(--foe),
+    0 5cqw 14cqw rgba(0, 0, 0, 0.55);
+}
+.fx-lunge {
+  z-index: 35 !important;
+}
+.fx-lunge .ba-fx {
+  animation: baLunge 0.44s cubic-bezier(0.3, 0, 0.3, 1);
+}
+@keyframes baLunge {
+  45% {
+    transform: translate(var(--lx), var(--ly)) scale(1.07) rotate(-2deg);
+  }
+}
+.fx-hit .ba-fx {
+  animation: baHit 0.46s ease;
+}
+@keyframes baHit {
+  0% {
+    filter: brightness(3) saturate(0);
+  }
+  15% {
+    transform: translate(-4%, 1%) rotate(-3deg);
+  }
+  30% {
+    transform: translate(4%, -1%) rotate(3deg);
+    filter: brightness(1.7);
+  }
+  50% {
+    transform: translate(-2%, 0);
+  }
+  100% {
+    transform: none;
+    filter: none;
+  }
+}
+.fx-shatter .ba-fx {
+  animation: baShatter 0.7s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+@keyframes baShatter {
+  0% {
+    filter: brightness(2.6);
+  }
+  22% {
+    transform: scale(1.08) rotate(3deg);
+    filter: brightness(1.6) saturate(0.4);
+  }
+  100% {
+    transform: scale(0.45) rotate(-16deg) translateY(12%);
+    opacity: 0;
+    filter: brightness(0.6) blur(4px);
+  }
+}
+.fx-wipe-l .ba-fx,
+.fx-wipe-r .ba-fx,
+.fx-wipe-u .ba-fx,
+.fx-wipe-d .ba-fx {
+  animation: baWipeL 0.55s cubic-bezier(0.5, 0, 0.85, 0.3) forwards;
+}
+.fx-wipe-r .ba-fx {
+  animation-name: baWipeR;
+}
+.fx-wipe-u .ba-fx {
+  animation-name: baWipeU;
+}
+.fx-wipe-d .ba-fx {
+  animation-name: baWipeD;
+}
+@keyframes baWipeL {
+  to {
+    transform: translateX(-150%) rotate(-28deg);
+    opacity: 0;
+    filter: grayscale(1);
+  }
+}
+@keyframes baWipeR {
+  to {
+    transform: translateX(150%) rotate(28deg);
+    opacity: 0;
+    filter: grayscale(1);
+  }
+}
+@keyframes baWipeU {
+  to {
+    transform: translateY(-130%) rotate(-20deg);
+    opacity: 0;
+    filter: grayscale(1);
+  }
+}
+@keyframes baWipeD {
+  to {
+    transform: translateY(130%) rotate(20deg);
+    opacity: 0;
+    filter: grayscale(1);
+  }
+}
+.fx-danger .ba-fx {
+  animation: baDanger 0.45s ease-in-out infinite;
+}
+@keyframes baDanger {
+  25% {
+    transform: translateX(-2%) rotate(-1.5deg);
+  }
+  75% {
+    transform: translateX(2%) rotate(1.5deg);
+  }
+}
+.fx-danger .tcg-face {
+  box-shadow:
+    0 0 0 1.3cqw var(--foe),
+    0 5cqw 14cqw rgba(0, 0, 0, 0.55);
+}
+.fx-shield .ba-fx {
+  animation: baShield 0.7s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes baShield {
+  40% {
+    transform: scale(1.12);
+  }
+}
+.fx-shield .tcg-face,
+.fx-good .tcg-face,
+.fx-answer .tcg-face {
+  box-shadow:
+    0 0 0 1.4cqw var(--ok),
+    0 5cqw 14cqw rgba(0, 0, 0, 0.55);
+}
+.fx-probe .ba-lift,
+.fx-good .ba-lift {
+  transform: translateY(-8%) scale(1.06);
+}
+.fx-answer .ba-lift {
+  transform: translateY(-5%);
+}
+.fx-answer .ba-fx {
+  filter: none !important;
+}
+.fx-bad .ba-fx {
+  animation: baNo 0.42s;
+}
+.fx-bad .tcg-face {
+  box-shadow:
+    0 0 0 1.4cqw var(--foe),
+    0 5cqw 14cqw rgba(0, 0, 0, 0.55);
+}
+@keyframes baNo {
+  20% {
+    transform: translateX(-6%);
+  }
+  40% {
+    transform: translateX(6%);
+  }
+  60% {
+    transform: translateX(-4%);
+  }
+  80% {
+    transform: translateX(4%);
+  }
+}
+
+/* --- ce qui s'accroche aux cases --- */
+.ba-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.ba-hp {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(var(--cw) * 0.82);
+  height: 24px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(12, 12, 14, 0.94);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
+  animation: baFade 0.3s ease both;
+}
+.ba-hp i {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  bottom: 3px;
+  width: calc((100% - 6px) * var(--p));
+  border-radius: 999px;
+  background: var(--ok);
+  transition:
+    width 0.45s cubic-bezier(0.3, 0.9, 0.3, 1),
+    background 0.3s;
+}
+.ba-hp i.mid {
+  background: var(--acc);
+}
+.ba-hp i.low {
+  background: var(--foe);
+}
+.ba-hp b {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font: 400 0.98rem/1 "Lilita One", var(--font-display);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.ba-plaque-at {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.ba-plaque {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  animation: baPopIn 0.42s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.ba-plaque.year {
+  padding: 0.4rem 0.8rem;
+  border-radius: 12px;
+  background: #111114;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.22),
+    0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.ba-plaque.year b {
+  font: 400 1.75rem/1 "Lilita One", var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.ba-plaque.year em {
+  padding: 0.22rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  font: 800 0.8rem/1 var(--font-display);
+  font-style: normal;
+  color: #c9cad0;
+  animation: baPopIn 0.3s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.ba-plaque.year em.bull {
+  background: var(--acc);
+  color: #161618;
+}
+.ba-plaque.check {
+  width: 48px;
+  height: 48px;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 4px #111114,
+    0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.ba-plaque.check.ok {
+  background: var(--ok);
+  color: #0c2b1d;
+}
+.ba-plaque.check.ko {
+  background: var(--foe);
+  color: #fff;
+}
+.ba-plaque.check svg {
+  width: 28px;
+  height: 28px;
+  stroke-width: 3.4;
+}
+@keyframes baPopIn {
+  from {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+}
+.ba-stamp {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  padding: 0.45rem 0.9rem;
+  border: 4px solid var(--foe);
+  border-radius: 10px;
+  background: rgba(17, 17, 20, 0.88);
+  color: var(--foe);
+  font: 400 1.45rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  animation: baStamp 0.36s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes baStamp {
+  from {
+    transform: translate(-50%, -50%) rotate(-14deg) scale(2.6);
+    opacity: 0;
+  }
+}
+.ba-crown {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  color: var(--acc);
+}
+.ba-anchor.bot .ba-crown {
+  color: var(--foe);
+}
+.ba-crown svg {
+  display: block;
+  width: 42px;
+  height: 42px;
+  fill: currentColor;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.55));
+  animation: baCrown 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+@keyframes baCrown {
+  from {
+    transform: translateY(30px) scale(0.3) rotate(-30deg);
+    opacity: 0;
+  }
+}
+.ba-banner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem 0.45rem 0.5rem;
+  border-radius: 999px;
+  background: var(--tc, #333);
+  color: #fff;
+  font: 400 1.05rem/1 "Lilita One", var(--font-display);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+  animation: baBanner 0.95s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.ba-banner .tcg-type.mini {
+  width: 22px;
+  height: 22px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+@keyframes baBanner {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 1;
+  }
+  32% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -95%);
+    opacity: 0;
+  }
+}
+.ba-pop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  transform: translate(-50%, -50%);
+  animation: baDmg 1.25s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.ba-pop b {
+  font: 400 3rem/1 "Lilita One", var(--font-display);
+  color: #fff;
+  -webkit-text-stroke: 7px #111114;
+  paint-order: stroke fill;
+}
+.ba-pop.super b {
+  font-size: 3.7rem;
+  color: var(--acc);
+}
+.ba-pop.weak b {
+  font-size: 2.4rem;
+  color: #b9c0cb;
+}
+.ba-pop em {
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: #111114;
+  font: 800 0.85rem/1 var(--font-display);
+  font-style: normal;
+}
+.ba-pop.super em {
+  background: var(--acc);
+  color: #161618;
+}
+@keyframes baDmg {
+  0% {
+    transform: translate(-50%, -10%) scale(0.3);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(-50%, -60%) scale(1.25);
+    opacity: 1;
+  }
+  30% {
+    transform: translate(-50%, -60%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -125%);
+    opacity: 0;
+  }
+}
+.ba-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--cw);
+  height: var(--ch);
+  border-radius: calc(var(--cw) * 0.05);
+  box-shadow: 0 0 0 3px var(--acc);
+  transform: translate(-50%, -50%);
+  animation: baRing 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.ba-ring.bot {
+  box-shadow: 0 0 0 3px var(--foe);
+}
+@keyframes baRing {
+  from {
+    transform: translate(-50%, -50%) scale(0.96);
+    opacity: 0.9;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.22);
+    opacity: 0;
+  }
+}
+.ba-burst {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+.ba-burst .burst i {
+  animation-duration: 0.95s;
+}
+.ba-botsave {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  background: #111114;
+  box-shadow: 0 0 0 2px #9d9da5;
+  font: 400 1.1rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  animation: baFade 0.3s both;
+}
+.ba-botsave svg {
+  width: 20px;
+  height: 20px;
+}
+.ba-botsave.st-ok {
+  box-shadow: 0 0 0 2px var(--ok);
+  color: var(--ok);
+}
+.ba-botsave.st-fail {
+  box-shadow: 0 0 0 2px var(--foe);
+  color: var(--foe);
+}
+.ba-orb {
+  position: absolute;
+  left: -11px;
+  top: -11px;
+  z-index: 90;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--acc);
+  box-shadow: 0 0 0 5px rgba(242, 183, 11, 0.22);
+  transition: transform 0.6s cubic-bezier(0.5, 0, 0.3, 1);
+}
+.ba-orb.bot {
+  background: var(--foe);
+  box-shadow: 0 0 0 5px rgba(255, 84, 112, 0.22);
+}
+.ba-flash {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+.ba-flash span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font: 400 4.6rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--acc);
+  -webkit-text-stroke: 10px #0d0d10;
+  paint-order: stroke fill;
+  transform: translate(-50%, -50%);
+  animation: baFlash 0.85s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.ba-flash.small span {
+  font-size: 2.6rem;
+  color: #fff;
+  -webkit-text-stroke-width: 8px;
+}
+.narrow .ba-flash span {
+  font-size: 3rem;
+  -webkit-text-stroke-width: 8px;
+}
+.narrow .ba-flash.small span {
+  font-size: 2rem;
+  -webkit-text-stroke-width: 7px;
+}
+@keyframes baFlash {
+  0% {
+    transform: translate(-50%, -50%) scale(3);
+    opacity: 0;
+  }
+  25% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 1;
+  }
+  35% {
+    transform: translate(-50%, -50%) scale(1.03);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.25);
+    opacity: 0;
+  }
+}
+
+/* --- le face-à-face --- */
+.ba-vs {
+  position: absolute;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.4rem, 8vw, 6rem);
+  overflow: hidden;
+  background: #0d0d10;
+}
+/* Les deux camps entrent en biais, chacun sa couleur. */
+.ba-vs::before,
+.ba-vs::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.1;
+  animation: baVsL 0.5s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+/* Deux pans en biais, séparés par une fente sombre (ils ne se chevauchent
+   pas : l'or et le rose mêlés donnaient du marron). */
+.ba-vs::before {
+  background: var(--acc);
+  clip-path: polygon(0 0, 55% 0, 44% 100%, 0 100%);
+}
+.ba-vs::after {
+  background: var(--foe);
+  clip-path: polygon(57% 0, 100% 0, 100% 100%, 46% 100%);
+  animation-name: baVsR;
+}
+.ba-vs.st-out {
+  animation: baFadeOut 0.38s ease forwards;
+}
+.ba-vs-side {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  animation: baVsL 0.5s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+.ba-vs-side.bot {
+  animation-name: baVsR;
+}
+@keyframes baVsL {
+  from {
+    transform: translateX(-60vw);
+    opacity: 0;
+  }
+}
+@keyframes baVsR {
+  from {
+    transform: translateX(60vw);
+    opacity: 0;
+  }
+}
+.ba-vs-ava {
+  position: relative;
+  width: clamp(92px, 16vw, 150px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #26262c;
+  box-shadow:
+    0 0 0 4px #0d0d10,
+    0 0 0 8px var(--acc);
+}
+.ba-vs-side.bot .ba-vs-ava {
+  background: #2a1a20;
+  color: var(--foe);
+  box-shadow:
+    0 0 0 4px #0d0d10,
+    0 0 0 8px var(--foe);
+}
+.ba-vs-ava img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.ba-vs-ava b {
+  font: 400 3rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.ba-vs-ava > svg {
+  width: 50%;
+  height: 50%;
+}
+.ba-vs-ava .ba-lvl {
+  right: 2px;
+  bottom: 2px;
+  min-width: 32px;
+  height: 32px;
+  font-size: 1.05rem;
+  box-shadow: 0 0 0 3px #0d0d10;
+}
+.ba-vs-side > b {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 clamp(1.2rem, 3vw, 1.7rem)/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.ba-vs-x {
+  position: relative;
+  z-index: 2;
+  font: 400 clamp(3.4rem, 12vw, 6.5rem)/1 "Lilita One", var(--font-display);
+  color: #fff;
+  -webkit-text-stroke: 10px #0d0d10;
+  paint-order: stroke fill;
+  animation: baVsX 0.45s 0.3s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+@keyframes baVsX {
+  from {
+    transform: scale(3.2) rotate(-12deg);
+    opacity: 0;
+  }
+}
+
+/* --- fin de partie --- */
+.ba-end {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(10, 10, 12, 0.88);
+  animation: baFade 0.35s both;
+}
+.ba-end-burst {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  width: 0;
+  height: 0;
+}
+.ba-end-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  animation: baPopIn 0.5s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.ba-end-crown {
+  width: 58px;
+  height: 58px;
+  color: var(--acc);
+  fill: var(--acc);
+  animation: baCrown 0.7s 0.25s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.ba-end-title {
+  display: flex;
+  margin: 0;
+  font: 400 clamp(3rem, 13vw, 5.6rem)/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.ba-end-title span {
+  display: inline-block;
+  animation: baLetter 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.w-you .ba-end-title {
+  color: var(--acc);
+}
+.w-bot .ba-end-title {
+  color: var(--foe);
+}
+@keyframes baLetter {
+  from {
+    transform: translateY(60%) scale(0.3) rotate(-12deg);
+    opacity: 0;
+  }
+}
+.ba-end-score {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font: 400 2.5rem/1 "Lilita One", var(--font-display);
+}
+.ba-end-score .you {
+  color: var(--acc);
+}
+.ba-end-score .bot {
+  color: var(--foe);
+}
+.ba-end-score i {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+.ba-end-gain {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 999px;
+  background: #1b1b20;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  font: 400 2rem/1 "Lilita One", var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.ba-end-gain svg {
+  width: 28px;
+  height: 28px;
+  color: var(--acc);
+}
+.ba-end-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.ba-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.42rem 0.8rem;
+  border-radius: 999px;
+  background: #1b1b20;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  font: 800 0.9rem/1 var(--font-display);
+  animation: baPopIn 0.4s 0.9s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.ba-chip svg {
+  width: 16px;
+  height: 16px;
+}
+.ba-chip.gold {
+  background: var(--acc);
+  color: #161618;
+  box-shadow: none;
+}
+.ba-chip.flame svg {
+  color: #ff7a2f;
+}
+.ba-chip.lvl.up {
+  color: var(--ok);
+}
+.ba-chip.lvl.down {
+  color: var(--foe);
+}
+.ba-chip.dim {
+  color: #9d9da5;
+}
+.ba-end-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+.ba-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.4rem;
+  border: 0;
+  border-radius: 14px;
+  font: 400 1.2rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.ba-btn svg {
+  width: 20px;
+  height: 20px;
+}
+.ba-btn.gold {
+  background: var(--acc);
+  color: #161618;
+}
+.ba-btn.gold:hover {
+  background: #ffc933;
+}
+.ba-btn.ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.ba-btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.ba-btn.danger {
+  background: var(--foe);
+  color: #fff;
+}
+.ba-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 99;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 8, 10, 0.72);
+  animation: baFade 0.2s both;
+}
+.ba-confirm-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.4rem 1.6rem;
+  border-radius: 18px;
+  background: #1b1b20;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: baPopIn 0.3s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.ba-confirm-box > b {
+  font: 400 1.6rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.ba-confirm-row {
+  display: flex;
+  gap: 0.6rem;
+}
+.ba-err {
+  position: absolute;
+  left: 50%;
+  top: 70px;
+  z-index: 85;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  background: var(--foe);
+  color: #fff;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+@keyframes baFade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes baFadeOut {
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ba-shake.shake-0,
+  .ba-shake.shake-1 {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   La passe (dans le hall) : dix boosters sur une piste
+   --------------------------------------------------------------------- */
+.bp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.1rem 1.1rem 0.9rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.bp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.bp-head .bl-h2 {
+  margin: 0;
+}
+.bp-head .bl-h2 em {
+  margin-left: 0.45rem;
+  font-style: normal;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+.bp-stars {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font: 800 1.1rem/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.bp-stars svg {
+  align-self: center;
+  width: 18px;
+  height: 18px;
+  color: #f2b70b;
+  fill: #f2b70b;
+}
+.bp-stars small {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+/* Les dix paliers tiennent TOUJOURS sur une ligne, sans défilement : les
+   colonnes se partagent la largeur et les sachets rétrécissent avec. */
+.bp-track {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  padding: 18px 8px 6px 2px;
+}
+/* Trois rangées alignées d'un palier à l'autre : le sachet (posé en bas de
+   sa rangée — le doré, plus grand, ne décale pas la barre), la barre, le
+   nombre d'étoiles. */
+.bp-tier {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  justify-items: center;
+  row-gap: 10px;
+}
+.bp-tier .bp-pack {
+  align-self: end;
+}
+/* Le sachet : éteint tant que le palier n'est pas atteint, qui se dandine
+   quand il attend d'être ouvert, terni une fois récupéré. */
+.bp-pack {
+  position: relative;
+  width: min(50px, calc(100% - 6px));
+  padding: 0;
+  border: 0;
+  background: none;
+  filter: grayscale(1) brightness(0.5);
+  opacity: 0.75;
+  transition:
+    transform 0.2s cubic-bezier(0.3, 1.5, 0.5, 1),
+    filter 0.3s,
+    opacity 0.3s;
+}
+.bp-pack:disabled {
+  cursor: default;
+}
+/* Le doré, un peu plus grand — sans bouger la barre (échelle, pas largeur). */
+.bp-tier.gold .bst {
+  transform: scale(1.14);
+  transform-origin: 50% 100%;
+}
+.bp-tier.done .bp-pack {
+  filter: none;
+  opacity: 1;
+}
+.bp-tier.claimed .bp-pack {
+  filter: grayscale(0.7) brightness(0.75);
+  opacity: 0.55;
+}
+.bp-tier.ready .bp-pack {
+  animation: bpBob 1.8s ease-in-out infinite;
+}
+.bp-tier.ready .bp-pack:hover {
+  animation: none;
+  transform: translateY(-5px) scale(1.08) rotate(-2deg);
+}
+@keyframes bpBob {
+  50% {
+    transform: translateY(-5px) rotate(1.5deg);
+  }
+}
+.bp-badge {
+  position: absolute;
+  right: -7px;
+  bottom: -5px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-soft);
+  box-shadow: 0 0 0 2px var(--border);
+}
+.bp-badge svg {
+  width: 12px;
+  height: 12px;
+}
+.bp-badge.ok {
+  background: #f2b70b;
+  color: #161618;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+/* La barre : un segment par palier, un rond au bout de chacun. */
+.bp-seg {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: var(--border);
+}
+.bp-tier:first-child .bp-seg {
+  border-radius: 4px 0 0 4px;
+}
+.bp-seg i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--p) * 100%);
+  background: #f2b70b;
+  transition: width 0.6s cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+.bp-tier:first-child .bp-seg i {
+  border-radius: 4px 0 0 4px;
+}
+.bp-seg::after {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 3px var(--border);
+  transform: translateY(-50%);
+}
+.bp-tier.done .bp-seg::after {
+  background: #f2b70b;
+  box-shadow: 0 0 0 3px var(--surface);
+}
+.bp-need,
+.bp-go {
+  font: 800 0.72rem/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.bp-need {
+  color: var(--text-soft);
+}
+.bp-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: #f2b70b;
+  color: #161618;
+  white-space: nowrap;
+}
+.bp-go svg {
+  width: 12px;
+  height: 12px;
+}
+/* Colonnes étroites (téléphone) : l'icône seule. */
+@media (max-width: 720px) {
+  .bp-go {
+    padding: 0.28rem;
+  }
+  .bp-go span {
+    display: none;
+  }
+}
+
+/* --- la passe, sur l'écran de fin --- */
+.ba-pass {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  animation: baPopIn 0.4s 0.8s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.ba-pass-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.ba-pass-gain {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font: 400 1.35rem/1 "Lilita One", var(--font-display);
+  color: var(--acc);
+}
+.ba-pass-gain svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+.ba-pass-bar {
+  position: relative;
+  width: min(220px, 52vw);
+  height: 12px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.ba-pass-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--p) * 100%);
+  border-radius: 6px;
+  background: var(--acc);
+  transition: width 0.8s cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+.ba-pass-tier {
+  min-width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #1b1b20;
+  box-shadow: inset 0 0 0 2px var(--acc);
+  font: 400 0.9rem/1 "Lilita One", var(--font-display);
+}
+.ba-pass-unlock {
+  animation-delay: 0s;
+}
+@media (max-width: 720px) {
+  .bp-badge {
+    right: -4px;
+    bottom: -3px;
+    width: 14px;
+    height: 14px;
+    box-shadow: 0 0 0 1.5px var(--border);
+  }
+  .bp-badge svg {
+    width: 8px;
+    height: 8px;
+  }
+}
+
+/* --- le hall, sous 15 cartes : pas de combat, le chemin des boosters --- */
+.bl-lock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  width: min(340px, 100%);
+}
+.bl-lock-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  color: var(--text-soft);
+}
+.bl-lock-row svg {
+  width: 18px;
+  height: 18px;
+}
+.bl-lock-row b {
+  color: var(--text);
+  font: 800 1rem/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bl-lock-bar {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--border);
+}
+.bl-lock-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--p) * 100%);
+  border-radius: 4px;
+  background: #f2b70b;
+}
+.bl-lock p {
+  margin: 0;
+  color: var(--text-soft);
+  font: 700 0.92rem/1.3 var(--font-display);
+}
+.bl-lock .bl-play {
+  text-decoration: none;
+  font-size: 1.3rem;
+}
+
+/* ======================================================================
+   Duel entre joueurs (pages/CardDuel.jsx, Arena en mode pote)
+   ====================================================================== */
+/* Le hall : « Défier un pote », ou le duel en cours à reprendre. */
+.bl-duel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: min(340px, 100%);
+  padding: 0.75rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 84, 112, 0.45);
+  background: transparent;
+  color: #ff5470;
+  font: 700 0.98rem/1 var(--font-display);
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.bl-duel:hover {
+  background: rgba(255, 84, 112, 0.08);
+}
+.bl-duel svg {
+  width: 18px;
+  height: 18px;
+}
+.bl-duel.live {
+  border-color: #ff5470;
+  color: var(--text);
+}
+.bl-duel.live > b {
+  margin-left: auto;
+  color: #ff5470;
+  font-variant-numeric: tabular-nums;
+}
+.bl-duel-ava {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #2a1a20;
+  color: #ff5470;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.bl-duel-ava img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Le salon */
+.dl-code {
+  margin-left: auto;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font: 800 0.85rem/1 var(--font-display);
+  letter-spacing: 0.12em;
+}
+.dl-hero {
+  min-height: 300px;
+  justify-content: center;
+}
+.dl-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.dl-msg {
+  margin: 0;
+  color: var(--text-soft);
+  font: 700 0.95rem/1.3 var(--font-display);
+  text-align: center;
+}
+.bl-fighter.opp .bl-ava {
+  background: #2a1a20;
+  color: #ff5470;
+  box-shadow:
+    0 0 0 3px var(--surface),
+    0 0 0 6px #ff5470;
+}
+.bl-ava.empty {
+  background: transparent;
+  box-shadow: none;
+  border: 2px dashed rgba(255, 84, 112, 0.5);
+}
+.bl-fighter.waiting > b {
+  color: var(--text-soft);
+}
+.dl-dots,
+.ba-think-dots {
+  display: inline-flex;
+  gap: 5px;
+}
+.dl-dots i,
+.ba-think-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff5470;
+  animation: dlDot 1.2s ease-in-out infinite;
+}
+.dl-dots i:nth-child(2),
+.ba-think-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.dl-dots i:nth-child(3),
+.ba-think-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes dlDot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+/* L'arène : mon pote choisit (ou n'est pas encore prêt). */
+.ba-think {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.8rem 0.35rem 0.35rem;
+  border-radius: 999px;
+  background: #111114;
+  box-shadow: 0 0 0 2px rgba(255, 84, 112, 0.55);
+  color: #fff;
+  font: 400 1rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  animation: baFade 0.3s both;
+}
+.ba-think-ava {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #2a1a20;
+  color: #ff5470;
+  font-size: 0.8rem;
+}
+.ba-think-ava img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ba-think-dots i {
+  width: 5px;
+  height: 5px;
+}
+.ba-focus-bot.opp {
+  overflow: visible;
+}
+.ba-focus-bot.opp > img,
+.ba-focus-bot.opp > b {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+/* L'écran de fin : il veut sa revanche. */
+.ba-end-rematch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.2rem;
+  padding: 0.4rem 0.9rem 0.4rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(255, 84, 112, 0.1);
+  box-shadow: 0 0 0 1px rgba(255, 84, 112, 0.45);
+  color: #fff;
+  font: 700 0.92rem/1 var(--font-display);
+  animation: baPopIn 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.ba-end-rematch b {
+  color: #ff5470;
+}
+.ba-end-rematch-ava {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #2a1a20;
+  color: #ff5470;
+  text-transform: uppercase;
+}
+.ba-end-rematch-ava img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* La carte d'invitation dans la messagerie. */
+.gv-card-art.cd {
+  color: #fff;
+  background: #ff5470;
+}
+
+/* Les gros boutons du salon tiennent sur une ligne, même sur téléphone. */
+.dl-hero .bl-play {
+  font-size: clamp(1.1rem, 5.2vw, 1.5rem);
+  white-space: nowrap;
+}
+.dl-hero .bl-fighter > b {
+  max-width: min(9rem, 36vw);
+}
+/* La revanche : sa tête, un peu éteinte, et les points qui attendent. */
+.dl-rival {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.dl-rival .bl-ava {
+  opacity: 0.45;
+}
+.dl-rival .dl-dots {
+  position: absolute;
+}
+.bl-stats span.duel svg {
+  color: #ff5470;
+}
+
+/* ======================================================================
+   Défier un pote : le bouton, la liste, la fenêtre de défi
+   ====================================================================== */
+/* Le bouton rose plein, frère du « Jouer » doré. */
+.bl-duel.cta {
+  gap: 0.6rem;
+  padding: 0.95rem 1.2rem;
+  border: 0;
+  border-radius: 16px;
+  background: #ff5470;
+  color: #fff;
+  font: 400 1.3rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition:
+    background 0.15s,
+    transform 0.12s;
+}
+.bl-duel.cta:hover {
+  background: #ff6b83;
+}
+.bl-duel.cta:active {
+  transform: scale(0.98);
+}
+.bl-duel.cta svg {
+  width: 22px;
+  height: 22px;
+}
+.bl-duel-faces {
+  display: inline-flex;
+  margin-left: 0.3rem;
+}
+.bl-duel-faces .df-face {
+  margin-left: -8px;
+  box-shadow: 0 0 0 2px #ff5470;
+}
+.bl-duel-faces .df-face:first-child {
+  margin-left: 0;
+}
+.bl-duel-faces .df-dot {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 0 2px #ff5470;
+}
+
+/* Le salon : où en est le défi. */
+.dl-sent {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: -0.3rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-soft);
+  font: 700 0.85rem/1 var(--font-display);
+}
+.dl-sent.on {
+  color: #ff5470;
+  background: rgba(255, 84, 112, 0.1);
+}
+
+/* La liste des potes */
+.bd-sheet.df {
+  width: min(440px, 100%);
+}
+.df-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  margin: 0 -6px;
+}
+.df-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 6px;
+  border-radius: 12px;
+}
+.df-row:hover {
+  background: var(--bg);
+}
+.df-row.off {
+  opacity: 0.45;
+}
+.df-face {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #2a1a20;
+  color: #ff5470;
+  font: 400 1rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.df-face img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.df-dot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #3ddc97;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.df-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.df-who b {
+  font: 800 0.98rem/1.15 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.df-who small {
+  color: var(--text-soft);
+  font: 700 0.78rem/1 var(--font-display);
+}
+.df-who small.on {
+  color: #3ddc97;
+}
+.df-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 36px;
+  padding: 0 0.95rem;
+  border: 0;
+  border-radius: 999px;
+  background: #ff5470;
+  color: #fff;
+  font: 800 0.88rem/1 var(--font-display);
+}
+.df-go:hover:not(:disabled) {
+  background: #ff6b83;
+}
+.df-go:disabled {
+  background: var(--bg);
+  color: var(--text-soft);
+}
+.df-go svg {
+  width: 16px;
+  height: 16px;
+}
+.df-foot {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.df-foot .bd-btn {
+  margin-top: 10px;
+}
+
+/* La fenêtre « X te défie en duel », sur n'importe quelle page. */
+.dinv-stack {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 72px);
+  right: 1rem;
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(340px, calc(100vw - 2rem));
+}
+.dinv {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px 12px;
+  padding: 14px 14px 16px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #17171b;
+  border: 1px solid rgba(255, 84, 112, 0.55);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  animation: dinvIn 0.35s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+@keyframes dinvIn {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+.dinv-art {
+  position: relative;
+}
+.dinv-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #ff5470;
+  box-shadow: 0 0 0 2px #17171b;
+}
+.dinv-badge svg {
+  width: 13px;
+  height: 13px;
+  color: #fff;
+}
+.dinv-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dinv-txt b {
+  font: 400 1.15rem/1.1 "Lilita One", var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dinv-txt span {
+  color: #b9b9c2;
+  font: 700 0.88rem/1.2 var(--font-display);
+}
+.dinv-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+}
+.dinv-btn {
+  flex: 1;
+  height: 40px;
+  border: 0;
+  border-radius: 12px;
+  font: 800 0.92rem/1 var(--font-display);
+}
+.dinv-btn.gold {
+  background: #f2b70b;
+  color: #161618;
+}
+.dinv-btn.gold:hover {
+  background: #ffc933;
+}
+.dinv-btn.ghost {
+  background: #232329;
+  color: #fff;
+}
+.dinv-timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: #ff5470;
+  transform-origin: left;
+  animation: dinvTime linear both;
+}
+@keyframes dinvTime {
+  to {
+    transform: scaleX(0);
+  }
+}
+@media (max-width: 600px) {
+  .dinv-stack {
+    top: calc(env(safe-area-inset-top, 0px) + 64px);
+    right: 8px;
+    left: 8px;
+    width: auto;
+  }
+}

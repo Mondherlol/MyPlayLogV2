@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  ArrowLeftRight,
   Search,
   Bell,
   User,
@@ -76,6 +77,8 @@ const NOTIF_META = {
   follow: { Icon: UserPlus, verb: "s'est abonné[e] à toi" },
   follow_request: { Icon: UserPlus, verb: "demande à s'abonner à toi" },
   follow_accepted: { Icon: UserCheck, verb: "a accepté ta demande d'abonnement" },
+  card_trade: { Icon: ArrowLeftRight, verb: "te propose un échange contre" },
+  card_trade_done: { Icon: ArrowLeftRight, verb: "a accepté ton échange :" },
   // Notif système (pas d'acteur) : le titre vient de `title`, le détail du snippet.
   import_pending: { Icon: Gamepad2, verb: "", system: true, title: "Jeux à valider" },
   psn_ready: { Icon: Gamepad2, verb: "", system: true, title: "Jeux à valider" },
@@ -327,6 +330,11 @@ export default function Topbar() {
     // Demande d'abonnement à valider → Paramètres > Confidentialité.
     if (n.type === "follow_request") {
       navigate("/settings?tab=privacy");
+      return;
+    }
+    // Échange de cartes → la page Cartes, sur les échanges.
+    if (n.type === "card_trade" || n.type === "card_trade_done") {
+      navigate("/cartes?echanges");
       return;
     }
     // Demande acceptée → le profil enfin accessible.

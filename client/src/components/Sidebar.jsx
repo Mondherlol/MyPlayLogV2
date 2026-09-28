@@ -98,7 +98,6 @@ const NAV = [
     to: "/cartes",
     label: "Cartes",
     Icon: GalleryVerticalEnd,
-    feature: "cards",
     noMobile: true,
     more: true,
     hint: "Boosters et classeur de cartes",

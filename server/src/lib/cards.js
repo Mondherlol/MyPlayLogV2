@@ -7,6 +7,7 @@ import { onRecoCatalogSynced } from "./recoCatalog.js";
 import { igdbQuery } from "./igdb.js";
 import { rulesForKeyword, movesFromRules } from "./cardMoves.js";
 import { coverFocus } from "./cardFocus.js";
+import { buildFacts, tagsForKeyword } from "./cardFacts.js";
 
 // ======================================================================
 //  Cartes à collectionner — le set, les boosters, le tirage
@@ -275,7 +276,7 @@ async function loadCatalog() {
   const cards = await Card.find({}).lean();
   const ids = cards.map((c) => c._id);
   const games = await GameFeatures.find({ _id: { $in: ids } })
-    .select("name slug cover date type parent genres themes keywords devs rating ratingCount")
+    .select("name slug cover date type parent genres themes keywords devs rating ratingCount platforms modes persp franchises collections")
     .lean();
   const gById = new Map(games.map((g) => [g._id, g]));
   const companyIds = [...new Set(games.map((g) => g.devs?.[0]).filter(Boolean))];
@@ -288,12 +289,27 @@ async function loadCatalog() {
   const company = new Map(terms.map((t) => [t.id, t.name]));
   // Mot-clé → règles d'attaque touchées, calculé une fois par mot-clé.
   const kwRules = new Map();
+  // … et les étiquettes des combats (#Zombies, #Pixel art), jamais affichées.
+  const kwTags = new Map();
   for (const t of kwTerms) {
     const r = rulesForKeyword(t.name);
     if (r.length) kwRules.set(t.id, r);
+    const tags = tagsForKeyword(t.name);
+    if (tags.length) kwTags.set(t.id, tags);
   }
 
   const byId = new Map();
+  // Ce que la carte cache (année, consoles, tags…) : pour les combats, jamais
+  // envoyé avec la carte (cf. lib/cardFacts.js).
+  const facts = new Map();
+  // Les séries (franchises et collections IGDB) → leurs cartes : de quoi
+  // remplir un classeur « Ace Attorney » d'un coup. Clés « f:<id> », « c:<id> ».
+  const series = new Map();
+  const inSeries = (key, id) => {
+    const list = series.get(key);
+    if (list) list.push(id);
+    else series.set(key, [id]);
+  };
   const byRarity = Object.fromEntries(RARITY_ORDER.map((r) => [r, []]));
   const editions = Object.fromEntries(
     EDITION_KEYS.map((k) => [k, { byRarity: Object.fromEntries(RARITY_ORDER.map((r) => [r, []])), size: 0 }])
@@ -326,6 +342,9 @@ async function loadCatalog() {
       variant: g.type === 8 ? "ex" : g.type === 9 ? "hd" : null,
     };
     byId.set(c._id, card);
+    facts.set(c._id, buildFacts(g, kwTags));
+    for (const f of g.franchises || []) inSeries(`f:${f}`, c._id);
+    for (const s of g.collections || []) inSeries(`c:${s}`, c._id);
     byRarity[c.rarity]?.push(c._id);
     const gs = g.genres || [];
     let placed = false;
@@ -341,7 +360,7 @@ async function loadCatalog() {
         editions[k].size++;
       }
   }
-  return { byId, byRarity, editions, size: byId.size };
+  return { byId, byRarity, editions, facts, series, size: byId.size };
 }
 
 export async function getCatalog() {
@@ -387,8 +406,10 @@ function rollRarity(odds, available) {
  * Tire un booster d'une édition : 5 ids de cartes distinctes, de la moins
  * rare à la plus rare, pris dans les seules familles de l'édition.
  */
-export function drawPack(cat, edition) {
-  const golden = Math.random() < GOLDEN_CHANCE;
+// `forceGolden` : le dernier palier de la passe des combats donne un booster
+// doré, pas une chance sur 250.
+export function drawPack(cat, edition, forceGolden) {
+  const golden = forceGolden ?? Math.random() < GOLDEN_CHANCE;
   const pools = cat.editions?.[edition]?.byRarity || cat.byRarity;
   const picked = new Set();
   const out = [];
