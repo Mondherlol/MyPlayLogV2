@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Coins, Package, Joystick } from "lucide-react";
+import { Coins } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import { EDITIONS } from "../lib/cards";
-import BoosterPack from "../components/cards/BoosterPack";
 import PackOpening from "../components/cards/PackOpening";
 import CardCollection from "../components/cards/CardCollection";
 import FriendsBinders from "../components/cards/FriendsBinders";
 import CardsVisibility from "../components/cards/CardsVisibility";
+import PackShop from "../components/cards/PackShop";
 
 // ======================================================================
 //  Cartes — les boosters à ouvrir et le classeur
@@ -116,42 +116,14 @@ export default function Cards() {
       {err && <p className="cd-err">{err}</p>}
 
       {/* ---------- Les boosters ---------- */}
-      <section className="cd-shop">
-        <div className={`cd-packs ${canBuy ? "" : "poor"}`}>
-          {EDITIONS.map((ed, i) => (
-            <button
-              key={ed.key}
-              className={`cd-pack p${i} clickable`}
-              onClick={(e) => openPack(ed.key, e.currentTarget.querySelector(".bst"))}
-              disabled={!data || !canBuy}
-              aria-label={`Ouvrir un booster ${ed.name}`}
-            >
-              <BoosterPack edition={ed.key} covers={covers} />
-            </button>
-          ))}
-        </div>
-        {canBuy ? (
-          <button
-            className="cd-buy clickable"
-            disabled={!data}
-            onClick={(e) =>
-              openPack(EDITIONS[1].key, e.currentTarget.parentElement.querySelector(".cd-pack.p1 .bst"))
-            }
-          >
-            <Package size={18} /> Ouvrir
-            <span className="cd-buy-price">
-              <Coins size={15} /> {fmt(price)}
-            </span>
-          </button>
-        ) : (
-          <Link to="/arcade" className="cd-buy poor clickable">
-            <Joystick size={18} /> Il manque
-            <span className="cd-buy-price">
-              <Coins size={15} /> {fmt(price - points)}
-            </span>
-          </Link>
-        )}
-      </section>
+      <PackShop
+        data={data}
+        covers={covers}
+        canBuy={canBuy}
+        points={points}
+        price={price}
+        onOpen={openPack}
+      />
 
       <CardCollection
         cards={data?.cards || []}

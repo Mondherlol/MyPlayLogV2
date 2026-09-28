@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Search, Gem, Clock, Star, Hash, Package, X, Loader2 } from "lucide-react";
 import {
   TYPES,
@@ -212,13 +212,7 @@ export default function CardCollection({
         ) : (
           <VirtualGrid
             items={shown}
-            renderItem={(c, i) => (
-              <div className="cd-cell" key={c.id}>
-                <TcgCard card={c} lite onClick={() => setInspect(i)} />
-                {c.fresh && <span className="cd-new">NEW</span>}
-                {c.count > 1 && <span className="cd-count">×{c.count}</span>}
-              </div>
-            )}
+            renderItem={(c, i) => <BinderCell key={c.id} card={c} index={i} onOpen={setInspect} />}
           />
         )}
       </section>
@@ -234,6 +228,20 @@ export default function CardCollection({
     </>
   );
 }
+
+// Une case du classeur. MÉMORISÉE : quand une rangée entre à l'écran, seules
+// ses cartes se dessinent — celles déjà là ne bougent pas. (Une fonction de
+// clic recréée à chaque rendu faisait tout redessiner à chaque cran.)
+const BinderCell = memo(function BinderCell({ card, index, onOpen }) {
+  const open = useCallback(() => onOpen(index), [onOpen, index]);
+  return (
+    <div className="cd-cell">
+      <TcgCard card={card} lite onClick={open} />
+      {card.fresh && <span className="cd-new">NEW</span>}
+      {card.count > 1 && <span className="cd-count">×{card.count}</span>}
+    </div>
+  );
+});
 
 // ======================================================================
 //  La grille du classeur, virtualisée

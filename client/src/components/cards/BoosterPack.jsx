@@ -88,7 +88,7 @@ export default function BoosterPack({
           <span className="bst-word">
             My<b>PlayLog</b>
           </span>
-          <span className="bst-tag">Jeu de cartes</span>
+          <span className="bst-tag">{ed.label}</span>
         </div>
 
         <div className="bst-ribbon">

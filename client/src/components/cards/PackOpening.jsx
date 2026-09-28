@@ -141,7 +141,7 @@ export default function PackOpening({
   useEffect(() => {
     if (!buyRef.current) {
       playPackGrab();
-      buyRef.current = apiFetch("/cards/open", { method: "POST", token });
+      buyRef.current = apiFetch("/cards/open", { method: "POST", token, body: { edition } });
     }
     let cancelled = false;
     buyRef.current

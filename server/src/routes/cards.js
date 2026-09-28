@@ -14,6 +14,11 @@ import {
   RARITY_ORDER,
   getCatalog,
   drawPack,
+  featuredIds,
+  currentWeek,
+  PACK_EDITIONS,
+  EDITION_KEYS,
+  FEATURE_BOOST,
   packChances,
   storeCards,
 } from "../lib/cards.js";
@@ -74,6 +79,21 @@ router.get("/", requireAuth, async (req, res) => {
         chance: chances[r],
       })),
       packCovers: packCovers(cat),
+      // Ce que contient chaque booster : ses familles, son nombre de cartes
+      // par rareté, et ses jeux à l'affiche de la semaine (chances ×3).
+      editions: EDITION_KEYS.map((k) => {
+        const e = cat.editions[k];
+        const week = currentWeek();
+        return {
+          key: k,
+          label: PACK_EDITIONS[k].label,
+          size: e.size,
+          counts: Object.fromEntries(RARITY_ORDER.map((r) => [r, e.byRarity[r].length])),
+          featured: featuredIds(cat, k, week.key).map((id) => cat.byId.get(id)),
+          boost: FEATURE_BOOST,
+          endsAt: week.endsAt,
+        };
+      }),
       cards,
     });
   } catch (err) {
@@ -89,9 +109,14 @@ router.post("/open", requireAuth, async (req, res) => {
     if (cat.size < PACK_SIZE)
       return res.status(503).json({ error: "Le set se prépare, reviens dans un instant." });
 
+    // L'édition choisie ; sans choix valable, une au hasard.
+    const edition = EDITION_KEYS.includes(req.body?.edition)
+      ? req.body.edition
+      : EDITION_KEYS[Math.floor(Math.random() * EDITION_KEYS.length)];
+
     let balance;
     try {
-      balance = await spendPoints(req.userId, PACK_PRICE, "cards", { set: CURRENT_SET });
+      balance = await spendPoints(req.userId, PACK_PRICE, "cards", { set: CURRENT_SET, edition });
     } catch (e) {
       if (e.code === "INSUFFICIENT_POINTS")
         return res.status(402).json({ error: "Pas assez de points." });
@@ -100,7 +125,7 @@ router.post("/open", requireAuth, async (req, res) => {
 
     let ids, golden, counts;
     try {
-      ({ ids, golden } = drawPack(cat));
+      ({ ids, golden } = drawPack(cat, edition));
       counts = await storeCards(req.userId, ids);
     } catch (e) {
       // Payé mais rien rangé : on rend les points.
@@ -117,12 +142,14 @@ router.post("/open", requireAuth, async (req, res) => {
         cards: ids,
         news: ids.filter((id) => counts.get(id) === 1),
         golden,
+        edition,
       },
     });
 
     res.json({
       points: balance,
       golden,
+      edition,
       cards: ids.map((id) => ({
         ...cat.byId.get(id),
         count: counts.get(id),

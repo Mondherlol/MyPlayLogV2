@@ -156,11 +156,31 @@ export function cardStats(card) {
 }
 
 // --- Les éditions de boosters ------------------------------------------------
-// Même contenu, même taux : c'est l'habillage qu'on choisit (pour l'instant).
+// Chaque édition ne tire que dans ses familles (miroir de PACK_EDITIONS côté
+// serveur, lib/cards.js) : c'est ce qui fait choisir un booster plutôt qu'un
+// autre. `types` = les pastilles affichées pour le dire sans une phrase.
 export const EDITIONS = [
-  { key: "origines", name: "Origines", no: "01" },
-  { key: "neon", name: "Néon", no: "02" },
-  { key: "braise", name: "Braise", no: "03" },
+  {
+    key: "origines",
+    name: "Origines",
+    no: "01",
+    label: "Aventure & RPG",
+    types: ["rpg", "aventure", "strategie", "simulation", "recit"],
+  },
+  {
+    key: "neon",
+    name: "Néon",
+    no: "02",
+    label: "Arcade & indé",
+    types: ["arcade", "inde", "rythme", "reflexion", "plateforme"],
+  },
+  {
+    key: "braise",
+    name: "Braise",
+    no: "03",
+    label: "Action",
+    types: ["combat", "tir", "course", "sport"],
+  },
 ];
 
 // --- Images -------------------------------------------------------------------

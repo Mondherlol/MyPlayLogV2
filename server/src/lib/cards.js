@@ -48,6 +48,21 @@ const SET_VERSION = 2;
 const SET_VERSION_KEY = "cards.setVersion";
 export const RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
 
+// Les trois boosters : chacun ne tire QUE dans ses familles de jeux (ids de
+// genres IGDB, les mêmes familles que les types des cartes côté client). Un
+// jeu de deux familles est dans les deux ; un jeu sans genre, dans les trois.
+export const PACK_EDITIONS = {
+  braise: { label: "Action", genres: [4, 25, 5, 10, 14] }, // combat, tir, course, sport
+  neon: { label: "Arcade & indé", genres: [33, 30, 32, 7, 9, 26, 35, 8] }, // arcade, indé, rythme, réflexion, plateforme
+  origines: { label: "Aventure & RPG", genres: [12, 31, 2, 11, 15, 16, 24, 36, 13, 34] }, // rpg, aventure, stratégie, simulation, récit
+};
+export const EDITION_KEYS = Object.keys(PACK_EDITIONS);
+
+// Les jeux « à l'affiche » de chaque booster : tirés au sort chaque semaine
+// (le même tirage pour tout le monde), leurs chances sont multipliées par 3.
+export const FEATURE_BOOST = 3;
+const FEATURE_SLOTS = [["mythic", "legendary"], ["epic"], ["rare"], ["uncommon"], ["common"]];
+
 // Les chances de chaque emplacement du booster (en %), façon Pokémon : trois
 // cartes « de base », une un cran au-dessus, et la dernière — celle qu'on
 // retourne en dernier — garantie rare ou mieux.
@@ -285,6 +300,9 @@ async function loadCatalog() {
 
   const byId = new Map();
   const byRarity = Object.fromEntries(RARITY_ORDER.map((r) => [r, []]));
+  const editions = Object.fromEntries(
+    EDITION_KEYS.map((k) => [k, { byRarity: Object.fromEntries(RARITY_ORDER.map((r) => [r, []])), size: 0 }])
+  );
   for (const c of cards) {
     const g = gById.get(c._id);
     if (!g?.cover) continue; // jeu disparu du catalogue : la carte dort
@@ -314,8 +332,21 @@ async function loadCatalog() {
     };
     byId.set(c._id, card);
     byRarity[c.rarity]?.push(c._id);
+    const gs = g.genres || [];
+    let placed = false;
+    for (const k of EDITION_KEYS) {
+      if (!PACK_EDITIONS[k].genres.some((id) => gs.includes(id))) continue;
+      editions[k].byRarity[c.rarity]?.push(c._id);
+      editions[k].size++;
+      placed = true;
+    }
+    if (!placed)
+      for (const k of EDITION_KEYS) {
+        editions[k].byRarity[c.rarity]?.push(c._id);
+        editions[k].size++;
+      }
   }
-  return { byId, byRarity, size: byId.size };
+  return { byId, byRarity, editions, size: byId.size, featured: new Map() };
 }
 
 export async function getCatalog() {
@@ -357,17 +388,68 @@ function rollRarity(odds, available) {
   return entries[entries.length - 1][0];
 }
 
-/** Tire un booster : 5 ids de cartes distinctes, de la moins rare à la plus rare. */
-export function drawPack(cat) {
+// ----------------------------------------------------------------------
+//  Les jeux à l'affiche de la semaine
+// ----------------------------------------------------------------------
+// La semaine commence le lundi à 0 h (UTC). Le tirage est SEMÉ par la semaine
+// et l'édition : le même pour tout le monde, sans rien stocker.
+export function currentWeek(now = new Date()) {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  const start = d.getTime();
+  return { key: new Date(start).toISOString().slice(0, 10), endsAt: new Date(start + 7 * 86400000) };
+}
+
+function seeded(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+/** Les ids des jeux à l'affiche d'une édition, cette semaine. */
+export function featuredIds(cat, edition, week = currentWeek().key) {
+  const k = `${edition}:${week}`;
+  if (cat.featured.has(k)) return cat.featured.get(k);
+  const ed = cat.editions?.[edition];
+  const out = [];
+  if (ed) {
+    const rnd = seeded(k);
+    for (const rarities of FEATURE_SLOTS) {
+      const pool = rarities.flatMap((r) => ed.byRarity[r] || []);
+      if (pool.length) out.push(pool[Math.floor(rnd() * pool.length)]);
+    }
+  }
+  cat.featured.set(k, out);
+  return out;
+}
+
+/**
+ * Tire un booster d'une édition : 5 ids de cartes distinctes, de la moins
+ * rare à la plus rare. Dans chaque rareté, les jeux à l'affiche pèsent triple.
+ */
+export function drawPack(cat, edition) {
   const golden = Math.random() < GOLDEN_CHANCE;
+  const pools = cat.editions?.[edition]?.byRarity || cat.byRarity;
+  const feat = new Set(cat.editions?.[edition] ? featuredIds(cat, edition) : []);
   const picked = new Set();
   const out = [];
   for (const slot of SLOTS) {
-    const rarity = rollRarity(golden ? SLOT_ODDS.gold : SLOT_ODDS[slot], cat.byRarity);
-    const pool = cat.byRarity[rarity];
+    const rarity = rollRarity(golden ? SLOT_ODDS.gold : SLOT_ODDS[slot], pools);
+    const pool = pools[rarity];
+    const stars = pool.filter((id) => feat.has(id));
+    const boost = stars.length * (FEATURE_BOOST - 1);
     let id;
     for (let tries = 0; tries < 20; tries++) {
-      id = pool[Math.floor(Math.random() * pool.length)];
+      // La vedette compte pour trois tickets au lieu d'un.
+      const x = Math.random() * (pool.length + boost);
+      id = x < pool.length ? pool[Math.floor(x)] : stars[Math.floor((x - pool.length) / (FEATURE_BOOST - 1))];
       if (!picked.has(id)) break;
     }
     picked.add(id);

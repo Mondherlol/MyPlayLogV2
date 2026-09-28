@@ -240,10 +240,14 @@ function TcgCard({
               <i className="tcg-glare" />
             </div>
           )}
-          <div className="tcg-face tcg-back">
-            <CardBack />
-            <i className="tcg-glare" />
-          </div>
+          {/* Le dos n'existe pas dans le classeur (`lite`) : ses quatre icônes
+              coûtaient autant que la face, pour une carte jamais retournée. */}
+          {!lite && (
+            <div className="tcg-face tcg-back">
+              <CardBack />
+              <i className="tcg-glare" />
+            </div>
+          )}
         </div>
       </div>
       {children}
