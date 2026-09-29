@@ -6,16 +6,17 @@
    combats. */
 
 /* ---------------------------------------------------------------------
-   La scène : deux capsules qui se croisent
+   La scène : mes cartes partent chez lui, les siennes viennent chez moi
    --------------------------------------------------------------------- */
 .tr {
   --me: #f2b70b;
   --them: #ff5470;
+  --ease: cubic-bezier(0.65, 0, 0.3, 1);
   position: fixed;
   inset: 0;
   z-index: 470;
   overflow: hidden;
-  background: rgba(10, 10, 12, 0.96);
+  background: radial-gradient(120% 90% at 50% 40%, #1a1a1f, #0b0b0d 70%);
   color: #fff;
   user-select: none;
   -webkit-user-select: none;
@@ -26,317 +27,239 @@
     opacity: 0;
   }
 }
+
+/* Les deux joueurs, sous leur paquet */
 .tr-who {
   position: absolute;
-  top: 22px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
-  animation: trWhoIn 0.5s cubic-bezier(0.2, 1.2, 0.4, 1) both;
-}
-.tr-who.me {
-  left: 22px;
-}
-.tr-who.them {
-  right: 22px;
-  flex-direction: row-reverse;
-  text-align: right;
-  animation-name: trWhoInR;
-}
-@keyframes trWhoIn {
-  from {
-    transform: translateX(-40px);
-    opacity: 0;
-  }
-}
-@keyframes trWhoInR {
-  from {
-    transform: translateX(40px);
-    opacity: 0;
-  }
+  gap: 8px;
+  transform: translate(-50%, -50%);
+  animation: trFade 0.4s 0.1s ease both;
 }
 .tr-ava {
-  width: 46px;
-  height: 46px;
+  position: relative;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
   background: #26262c;
-  box-shadow: 0 0 0 3px var(--me);
-}
-.tr-who.them .tr-ava {
-  box-shadow: 0 0 0 3px var(--them);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
+  transition: box-shadow 0.4s ease;
 }
 .tr-ava img {
   width: 100%;
-  height: 100%;
+  aspect-ratio: 1;
   object-fit: cover;
 }
 .tr-ava b {
-  font: 400 1.3rem/1 "Lilita One", var(--font-display);
+  font: 800 1.2rem/1 var(--font-display);
   text-transform: uppercase;
 }
-.tr-who {
-  max-width: calc(50% - 30px);
-}
-.tr-ava {
-  flex: none;
-}
-.tr-who-txt {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-.tr-who-txt b {
+.tr-name {
+  max-width: 34vw;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 400 1.1rem/1.1 "Lilita One", var(--font-display);
+  font: 800 0.95rem/1.1 var(--font-display);
+  color: #d8d8de;
 }
-.tr-who-txt small {
-  color: #9d9da5;
-  font: 700 0.75rem/1 var(--font-display);
+/* À l'arrivée, chaque photo s'allume de la couleur de celui qui reçoit. */
+.tr.ph-land .tr-who.them .tr-ava,
+.tr.ph-done .tr-who.them .tr-ava {
+  box-shadow:
+    0 0 0 2px var(--them),
+    0 0 26px rgba(255, 84, 112, 0.45);
 }
-
-/* Les tubes : deux arcs pointillés qui se dessinent. */
-.tr-tubes {
-  position: absolute;
-  left: 0;
-  top: 0;
-  pointer-events: none;
+.tr.ph-land .tr-who.me .tr-ava,
+.tr.ph-done .tr-who.me .tr-ava {
+  box-shadow:
+    0 0 0 2px var(--me),
+    0 0 26px rgba(242, 183, 11, 0.45);
 }
-.tr-tube {
-  fill: none;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-dasharray: 2 12;
-  opacity: 0;
-  transition: opacity 0.4s;
+.tr.ph-land .tr-who.them .tr-ava {
+  animation: trGulp 0.45s 0.15s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
-.tr-tube.up {
-  stroke: var(--me);
-}
-.tr-tube.down {
-  stroke: var(--them);
-}
-.tr.ph-pack .tr-tube,
-.tr.ph-travel .tr-tube,
-.tr.ph-cross .tr-tube {
-  opacity: 0.55;
-  animation: trDash 0.9s linear infinite;
-}
-@keyframes trDash {
-  to {
-    stroke-dashoffset: -28;
+@keyframes trGulp {
+  50% {
+    transform: scale(1.14);
   }
 }
 
-/* Les cartes. */
+/* Les paquets */
 .tr-stack {
   position: absolute;
   aspect-ratio: 63 / 88;
+  will-change: transform;
+  animation: trIn 0.55s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+.tr-stack.get {
+  animation-delay: 0.2s;
+}
+@keyframes trIn {
+  from {
+    transform: translateY(26px) scale(0.92);
+    opacity: 0;
+  }
 }
 .tr-card {
   position: absolute;
   inset: 0;
 }
-.tr-stack.give,
-.tr-stack.get {
-  animation: trStackIn 0.55s cubic-bezier(0.2, 1.3, 0.4, 1) both;
-}
-.tr-stack.get {
-  animation-delay: 0.15s;
-}
-@keyframes trStackIn {
-  from {
-    transform: translateY(40px) scale(0.8);
-    opacity: 0;
-  }
-}
-/* Elles se referment dans la capsule. */
-.tr.ph-pack .tr-stack.give,
-.tr.ph-pack .tr-stack.get {
-  animation: trPack 0.6s cubic-bezier(0.5, 0, 0.8, 0.4) forwards;
-}
-@keyframes trPack {
-  to {
-    transform: scale(0.12) rotate(24deg);
-    opacity: 0;
-  }
-}
-.tr-stack.got {
-  animation: trGot 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) both;
-}
-@keyframes trGot {
-  from {
-    transform: scale(0.15) rotate(-20deg);
-    opacity: 0;
-  }
-  60% {
-    transform: scale(1.08);
-  }
-}
-.tr-stack.gone {
-  opacity: 0.35;
-  filter: grayscale(0.6);
-  animation: trGone 0.5s ease both;
-}
-@keyframes trGone {
-  from {
-    transform: scale(0.15);
-    opacity: 0;
-  }
+.tr-card .tcg-face {
+  box-shadow: 0 1.2rem 2.4rem rgba(0, 0, 0, 0.55);
 }
 
-/* La capsule : une gélule à deux tons (comme celles de la machine à capsules
-   de l'Arcade) — couleur du joueur en haut, blanc en bas, une couture fine. */
-.tr-orb {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 42px;
-  height: 62px;
-  offset-rotate: 0deg;
-  offset-anchor: 50% 50%;
-  offset-distance: 0%;
-  border-radius: 21px;
-  background: var(--me);
-  box-shadow:
-    inset 0 -31px 0 #f4f4f6,
-    inset 0 0 0 2px rgba(0, 0, 0, 0.12),
-    0 10px 24px rgba(0, 0, 0, 0.5);
-  animation: trOrbIn 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+/* Le croisement : les miens passent par-dessus, les siens par-dessous. */
+.tr.ph-go .tr-stack.give {
+  z-index: 3;
+  animation: trOver 1.15s var(--ease) forwards;
 }
-.tr-orb.them {
-  background: var(--them);
+.tr.ph-go .tr-stack.get {
+  z-index: 2;
+  animation: trUnder 1.15s var(--ease) forwards;
 }
-.tr-orb::before {
-  content: "";
-  position: absolute;
-  left: 3px;
-  right: 3px;
-  top: 50%;
-  height: 2px;
-  border-radius: 1px;
-  background: rgba(0, 0, 0, 0.18);
-  transform: translateY(-50%);
-}
-.tr-orb::after {
-  content: "";
-  position: absolute;
-  left: 9px;
-  top: 7px;
-  width: 7px;
-  height: 18px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.45);
-}
-@keyframes trOrbIn {
-  from {
-    transform: scale(0);
-  }
-}
-.tr.ph-travel .tr-orb,
-.tr.ph-cross .tr-orb {
-  animation: trTravel 1.6s cubic-bezier(0.55, 0, 0.35, 1) forwards;
-}
-@keyframes trTravel {
+@keyframes trOver {
   0% {
-    offset-distance: 0%;
-    transform: rotate(0deg);
+    transform: none;
   }
-  100% {
-    offset-distance: 100%;
-    transform: rotate(720deg);
-  }
-}
-.tr.ph-land .tr-orb {
-  offset-distance: 100%;
-  animation: trLand 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) forwards;
-}
-@keyframes trLand {
   50% {
-    transform: scale(1.35);
+    transform: translate(calc(var(--dx) * 0.5), -46px) rotate(5deg) scale(1.06);
   }
   100% {
-    transform: scale(0.2);
+    transform: translate(var(--dx), 0) rotate(0deg);
+  }
+}
+@keyframes trUnder {
+  0% {
+    transform: none;
+  }
+  50% {
+    transform: translate(calc(var(--dx) * 0.5), 46px) rotate(-5deg) scale(0.94);
+  }
+  100% {
+    transform: translate(var(--dx), 0) rotate(0deg);
+  }
+}
+
+/* Arrivés : les miens se fondent dans sa photo… */
+.tr.ph-land .tr-stack.give,
+.tr.ph-done .tr-stack.give {
+  animation: trAbsorb 0.5s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+}
+@keyframes trAbsorb {
+  from {
+    transform: translate(var(--dx), 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--dx), var(--drop)) scale(0.18);
     opacity: 0;
   }
 }
-.tr-cross,
-.tr-pop {
+/* …les siens se posent devant moi, et un reflet passe dessus. */
+.tr.ph-land .tr-stack.get,
+.tr.ph-done .tr-stack.get {
+  animation: trSettle 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) forwards;
+}
+@keyframes trSettle {
+  0% {
+    transform: translate(var(--dx), 0);
+  }
+  45% {
+    transform: translate(var(--dx), 6px) scale(0.97);
+  }
+  100% {
+    transform: translate(var(--dx), 0) scale(1.04);
+  }
+}
+.tr.ph-land .tr-stack.get .tr-card .tcg-face::after,
+.tr.ph-done .tr-stack.get .tr-card .tcg-face::after {
+  content: "";
   position: absolute;
-  width: 0;
-  height: 0;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%);
+  background-size: 250% 100%;
+  animation: trShine 0.9s 0.1s ease-out both;
+}
+@keyframes trShine {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -40% 0;
+  }
+}
+/* Un clic pour passer : tout est déjà à sa place. */
+.tr.ph-done .tr-stack.give {
+  opacity: 0;
 }
 
-/* Le titre et les boutons. */
+/* Le titre et les boutons */
 .tr-title {
   position: absolute;
   left: 50%;
-  bottom: 16%;
+  top: 9%;
   transform: translateX(-50%);
-  text-align: center;
-}
-.tr-kicker {
-  display: grid;
-  place-items: center;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
-  animation: trSpin 2.4s linear infinite;
-}
-.tr-kicker svg {
-  width: 24px;
-  height: 24px;
-}
-@keyframes trSpin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 .tr-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   margin: 0;
-  font: 400 clamp(2.2rem, 7vw, 3.6rem)/1 "Lilita One", var(--font-display);
-  color: var(--me);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font: 400 clamp(1.6rem, 5vw, 2.3rem)/1 "Lilita One", var(--font-display);
+  color: #fff;
   white-space: nowrap;
-  animation: trTitle 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  animation: trTitle 0.45s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.tr-check {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--me);
+  color: #161618;
+}
+.tr-check svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 3;
 }
 @keyframes trTitle {
   from {
-    transform: scale(2.2);
+    transform: translateY(10px);
     opacity: 0;
   }
 }
 .tr-actions {
   position: absolute;
   left: 50%;
-  bottom: 7%;
+  bottom: max(7%, calc(24px + env(safe-area-inset-bottom)));
   display: flex;
   gap: 0.6rem;
   transform: translateX(-50%);
-  animation: trFade 0.4s 0.2s both;
+  animation: trFade 0.4s 0.15s both;
 }
 .tr-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.8rem 1.3rem;
+  height: 46px;
+  padding: 0 1.2rem;
   border: 0;
-  border-radius: 14px;
-  font: 400 1.1rem/1 "Lilita One", var(--font-display);
-  text-transform: uppercase;
+  border-radius: 999px;
+  font: 800 0.95rem/1 var(--font-display);
   white-space: nowrap;
 }
 .tr-btn svg {
-  width: 19px;
-  height: 19px;
+  width: 18px;
+  height: 18px;
 }
 .tr-btn.gold {
   background: var(--me);
@@ -348,8 +271,8 @@
 }
 .tr-close {
   position: absolute;
-  top: 22px;
-  left: 50%;
+  top: 18px;
+  right: 18px;
   width: 40px;
   height: 40px;
   display: grid;
@@ -358,19 +281,23 @@
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
-  transform: translateX(-50%);
 }
 .tr-close svg {
   width: 20px;
   height: 20px;
 }
 @media (max-width: 620px) {
-  .tr-who-txt small {
-    display: none;
+  .tr-ava {
+    width: 44px;
+    height: 44px;
   }
-  .tr-btn {
-    font-size: 0.95rem;
-    padding: 0.75rem 1rem;
+  .tr-title {
+    top: 12%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tr-stack {
+    animation-duration: 0.01s !important;
   }
 }
 

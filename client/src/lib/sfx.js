@@ -1133,9 +1133,23 @@ export function playBattleChips() {
   sample("chips", { gain: 0.8 });
 }
 
-// Les capsules d'un échange qui filent d'un joueur à l'autre.
-export function playTradeWhoosh() {
-  sample("swoosh", { gain: 0.8 });
+// L'échange de cartes : que des bruits de cartes, bas et courts.
+// On présente ses cartes (distribuées)…
+export function playTradeDeal(i = 0) {
+  sample("deal", { gain: 0.45, rate: 1 + i * 0.04 });
+}
+// …elles glissent vers l'autre…
+export function playTradeSend() {
+  sample("shove", { gain: 0.45 });
+  sample("swoosh", { gain: 0.3, delay: 0.08 });
+}
+// …celles de l'autre se posent devant moi…
+export function playTradeLand(i = 0) {
+  sample("place", { gain: 0.55 - i * 0.12 });
+}
+// …et un jeton pour conclure.
+export function playTradeDone() {
+  sample("chip", { gain: 0.4 });
 }
 
 // Un palier de la passe franchi.
