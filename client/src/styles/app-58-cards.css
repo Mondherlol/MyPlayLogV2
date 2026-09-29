@@ -482,6 +482,165 @@
   opacity: 1;
 }
 
+/* --- Légendaire et mythique : un vrai foil -----------------------------
+   Le pastel ci-dessus reste pour rare et épique. Les deux plus hautes
+   raretés ont chacune LEUR foil, franc et reconnaissable :
+   • légendaire : un arc-en-ciel gravé (bandes fines, lignes d'acier en
+     biais) qui coule avec le pointeur — l'holo « à l'ancienne » ;
+   • mythique : un soleil d'or, des rayons qui partent du point visé, un
+     halo chaud, et l'éclat qui balaie plus fort.
+   Au repos (et au doigt, sans survol), le reflet DÉRIVE lentement : la
+   carte vit sans qu'on la touche. Les variables du pointeur sont déclarées
+   (@property) pour pouvoir être animées ; dès que le pointeur est là, il
+   reprend la main. */
+@property --hx {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 50%;
+}
+@property --hy {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 50%;
+}
+@property --mx {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 50%;
+}
+@property --my {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 50%;
+}
+
+.tcg:is(.r-legendary, .r-mythic):not(.live):not(.lite) {
+  animation: tcgDrift 7s ease-in-out infinite alternate;
+}
+@keyframes tcgDrift {
+  0% {
+    --hx: 22%;
+    --hy: 30%;
+    --mx: 18%;
+    --my: 24%;
+  }
+  50% {
+    --hx: 62%;
+    --hy: 46%;
+    --mx: 70%;
+    --my: 42%;
+  }
+  100% {
+    --hx: 78%;
+    --hy: 72%;
+    --mx: 84%;
+    --my: 78%;
+  }
+}
+
+.tcg.r-legendary .tcg-holo {
+  --sp: 5.5%;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      hsl(2, 100%, 73%) calc(var(--sp) * 1),
+      hsl(53, 100%, 69%) calc(var(--sp) * 2),
+      hsl(93, 100%, 69%) calc(var(--sp) * 3),
+      hsl(176, 100%, 76%) calc(var(--sp) * 4),
+      hsl(228, 100%, 74%) calc(var(--sp) * 5),
+      hsl(283, 100%, 73%) calc(var(--sp) * 6),
+      hsl(2, 100%, 73%) calc(var(--sp) * 7)
+    ),
+    repeating-linear-gradient(
+      133deg,
+      #0e152e 0%,
+      hsl(180, 10%, 60%) 3.8%,
+      hsl(180, 29%, 66%) 4.5%,
+      hsl(180, 10%, 60%) 5.2%,
+      #0e152e 10%,
+      #0e152e 12%
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(0, 0, 0, 0.1) 12%,
+      rgba(0, 0, 0, 0.15) 20%,
+      rgba(0, 0, 0, 0.25) 120%
+    );
+  background-size: 200% 700%, 300% 100%, 200% 100%;
+  background-position:
+    0% var(--hy),
+    var(--hx) var(--hy),
+    center;
+  background-blend-mode: screen, hue, hard-light;
+  mix-blend-mode: color-dodge;
+  filter: brightness(0.5) contrast(1.7);
+  opacity: 0.3;
+  transition: opacity 0.35s, filter 0.35s;
+}
+.tcg.r-legendary.live .tcg-holo {
+  opacity: 0.52;
+  filter: brightness(0.55) contrast(1.6) saturate(1.2);
+}
+
+.tcg.r-mythic .tcg-holo {
+  /* En `overlay` et non en color-dodge : l'or teinte et fait briller la
+     jaquette sans la délaver (en dodge, le survol la noyait sous le jaune). */
+  background-image:
+    repeating-conic-gradient(
+      from 0deg at var(--mx) var(--my),
+      hsl(46, 100%, 66%) 0deg 4deg,
+      hsl(34, 90%, 30%) 4deg 10deg,
+      hsl(52, 100%, 80%) 10deg 14deg,
+      hsl(40, 95%, 42%) 14deg 20deg
+    ),
+    linear-gradient(115deg, #5a3900, #fff0b3 45%, #8a5600 70%, #ffe27a);
+  background-size: 100% 100%, 300% 300%;
+  background-position:
+    center,
+    var(--hx) var(--hy);
+  background-blend-mode: soft-light, normal;
+  mix-blend-mode: overlay;
+  opacity: 0.42;
+  transition: opacity 0.35s;
+}
+.tcg.r-mythic.live .tcg-holo {
+  opacity: 0.62;
+}
+.tcg.r-mythic .tcg-shimmer {
+  background: linear-gradient(
+    110deg,
+    transparent 34%,
+    rgba(255, 226, 122, 0.7) 44%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(255, 226, 122, 0.7) 56%,
+    transparent 66%
+  );
+  background-size: 300% 100%;
+}
+/* Les paillettes : un peu plus présentes au survol seulement (au repos, leur
+   trame régulière faisait une grille de points). */
+.tcg:is(.r-legendary, .r-mythic).live .tcg-sparkle {
+  opacity: 0.6;
+}
+/* Le liseré brille : argent froid / or chaud. */
+.tcg.r-legendary:not(.lite) .tcg-front {
+  box-shadow:
+    0 0 0 calc(0.5 * var(--cq, 1cqw)) rgba(220, 228, 255, 0.55),
+    0 0 calc(5 * var(--cq, 1cqw)) rgba(170, 200, 255, 0.28),
+    0 calc(1.6 * var(--cq, 1cqw)) calc(5 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.42);
+}
+.tcg.r-mythic:not(.lite) .tcg-front {
+  box-shadow:
+    0 0 0 calc(0.5 * var(--cq, 1cqw)) rgba(255, 214, 102, 0.7),
+    0 0 calc(6 * var(--cq, 1cqw)) rgba(242, 183, 11, 0.4),
+    0 calc(1.6 * var(--cq, 1cqw)) calc(5 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.42);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tcg:is(.r-legendary, .r-mythic) {
+    animation: none !important;
+  }
+}
+
 /* --- Dos ---------------------------------------------------------------
    Des symboles de manette en filigrane (comme la coque d'une DualSense), une
    bande dorée, le rond du logo au milieu. */
@@ -2565,12 +2724,34 @@ button.cd-rar:hover {
   margin: 0 0 0.8rem;
   font: 800 1.15rem/1.2 var(--font-display);
 }
+/* La rangée est un `Rail` (components/home/Rail) : flèches + glissé. */
+.cd-friends {
+  --mh-gap: 0.75rem;
+  --bleed: 0px;
+}
 .cd-friends-row {
-  display: flex;
-  gap: 0.75rem;
-  overflow-x: auto;
-  padding-bottom: 4px;
   scrollbar-width: none;
+}
+.cd-friends-row .cd-friend {
+  -webkit-user-drag: none;
+}
+/* Les flèches se voient dès qu'il reste des amis de ce côté (pas seulement
+   au survol), un peu en dehors de la rangée pour ne pas cacher une carte. */
+.cd-friends .mh-rail-arrow {
+  opacity: 1;
+  width: 36px;
+  height: 36px;
+}
+.cd-friends .mh-rail-arrow.left {
+  left: -14px;
+}
+.cd-friends .mh-rail-arrow.right {
+  right: -14px;
+}
+@media (hover: none) {
+  .cd-friends .mh-rail-arrow {
+    display: none;
+  }
 }
 .cd-friend {
   flex: 0 0 auto;
@@ -2786,6 +2967,14 @@ button.cd-rar:hover {
 }
 .tcg.lite:not(.live) :is(.tcg-holo, .tcg-art-holo, .tcg-sparkle, .tcg-glare) {
   display: none;
+}
+/* …sauf le foil des légendaires et mythiques, sur ordinateur : figé (pas de
+   dérive, pas de paillettes), il suffit à les repérer dans la grille. Au
+   doigt, la grille reste légère. */
+@media (hover: hover) {
+  .tcg.lite:is(.r-legendary, .r-mythic):not(.live) .tcg-holo {
+    display: block;
+  }
 }
 
 .cd-grid-v {

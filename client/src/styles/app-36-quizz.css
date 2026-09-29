@@ -2751,7 +2751,12 @@
   position: absolute;
   inset: 0;
   display: flex;
+  /* « 4/8 » sur une même ligne de base, et cette ligne AU CENTRE du rond :
+     seul un conteneur à retour à la ligne centre sa ligne (align-content) —
+     avec `align-items: baseline` seul, le texte collait en haut. */
+  flex-wrap: wrap;
   align-items: baseline;
+  align-content: center;
   justify-content: center;
   gap: 1px;
 }

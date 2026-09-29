@@ -557,80 +557,249 @@
 /* ---------------------------------------------------------------------
    Les échanges en cours (page Cartes)
    --------------------------------------------------------------------- */
-.tx {
+/* --- La pastille, dans l'en-tête de la page Cartes --- */
+.cd-head-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.tx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 42px;
+  padding: 0 0.45rem 0 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: 800 0.9rem/1 var(--font-display);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.tx-pill:hover {
+  border-color: var(--border-strong, #3a3a42);
+}
+.tx-pill:active {
+  transform: scale(0.97);
+}
+.tx-pill-faces {
+  display: flex;
+}
+.tx-pill-faces .tx-ava {
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.tx-pill-faces .tx-ava + .tx-ava {
+  margin-left: -9px;
+}
+.tx-pill-ic {
+  width: 16px;
+  height: 16px;
+  color: #f2b70b;
+}
+.tx-pill-n {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.78rem;
+}
+/* Une proposition attend MA réponse : le compteur passe au rose et respire. */
+.tx-pill.has-in {
+  border-color: color-mix(in srgb, #ff5470 55%, var(--border));
+}
+.tx-pill.has-in .tx-pill-n {
+  background: #ff5470;
+  color: #fff;
+  animation: txPing 2.4s ease-out infinite;
+}
+@keyframes txPing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 84, 112, 0.55);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 8px rgba(255, 84, 112, 0);
+  }
+}
+@media (max-width: 560px) {
+  .tx-pill-lbl,
+  .tx-pill-ic {
+    display: none;
+  }
+}
+
+/* Un avatar rond, jamais ovale (cf. le correctif des photos). */
+.tx-ava {
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+.tx-ava img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.tx-ava b {
+  font: 800 0.85rem/1 var(--font-display);
+  text-transform: uppercase;
+}
+
+/* --- Le panneau --- */
+.tx-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 455; /* sous la carte en grand (460) et la scène d'échange (470) */
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(8, 8, 10, 0.6);
+  animation: bdFade 0.2s ease both;
+}
+.tx-panel {
+  position: relative;
+  width: min(440px, 100%);
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.45);
+  animation: txSlide 0.32s cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
-.tx-h {
+@keyframes txSlide {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+}
+.tx-grip {
+  display: none;
+}
+.tx-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 10px;
+}
+.tx-panel-head h3 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   margin: 0;
-  font: 800 1.15rem/1 var(--font-display);
+  font: 400 1.45rem/1.1 "Lilita One", var(--font-display);
 }
-.tx-h svg {
-  width: 19px;
-  height: 19px;
+.tx-panel-head h3 svg {
+  width: 20px;
+  height: 20px;
   color: #f2b70b;
 }
-.tx-h b {
-  min-width: 22px;
-  height: 22px;
+.tx-x {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.tx-x svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Onglets : un rail segmenté */
+.tx-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 18px 12px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.tx-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-soft);
+  font: 800 0.88rem/1 var(--font-display);
+  transition: background 0.15s, color 0.15s;
+}
+.tx-tab.on {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.tx-tab b {
+  min-width: 20px;
+  height: 20px;
   padding: 0 6px;
   display: grid;
   place-items: center;
   border-radius: 999px;
+  background: var(--bg);
+  font-size: 0.72rem;
+}
+.tx-tab b.hot {
   background: #ff5470;
   color: #fff;
-  font-size: 0.78rem;
 }
-.tx-list {
+
+.tx-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 12px;
+  padding: 2px 18px calc(18px + env(safe-area-inset-bottom));
 }
-.tx-row {
+.tx-empty {
+  margin: 2rem 0;
+  text-align: center;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+/* Un échange */
+.tx-card {
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius);
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 18px;
   background: var(--surface);
   border: 1px solid var(--border);
+  animation: bdFade 0.25s ease both;
 }
-.tx-row.in {
-  box-shadow: inset 4px 0 0 #ff5470;
+.tx-card.in {
+  border-color: color-mix(in srgb, #ff5470 35%, var(--border));
 }
 .tx-who {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   min-width: 0;
-  width: 170px;
   color: var(--text);
   text-decoration: none;
 }
-.tx-ava {
-  width: 38px;
-  height: 38px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 50%;
-  background: var(--bg);
-}
-.tx-ava img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.tx-ava b {
-  font: 800 1rem/1 var(--font-display);
-  text-transform: uppercase;
-}
 .tx-who-txt {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -644,95 +813,177 @@
 }
 .tx-who-txt small {
   color: var(--text-soft);
-  font: 700 0.76rem/1 var(--font-display);
+  font: 700 0.76rem/1.1 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.tx-card.in .tx-who-txt small {
+  color: #ff5470;
+}
+.tx-who-go {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--text-soft);
+}
+
+/* Le deal : deux plateaux, l'échange au milieu */
 .tx-deal {
-  flex: 1;
-  min-width: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  gap: 1rem;
+  gap: 8px;
 }
 .tx-side {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+  padding: 10px 6px 12px;
+  border-radius: 14px;
+  background: var(--bg);
 }
 .tx-side small {
   color: var(--text-soft);
-  font: 800 0.66rem/1 var(--font-display);
-  letter-spacing: 0.04em;
+  font: 800 0.64rem/1 var(--font-display);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.tx-cards {
+.tx-side.get small {
+  color: #f2b70b;
+}
+.tx-swap {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f2b70b;
+  color: #161618;
+}
+.tx-swap svg {
+  width: 17px;
+  height: 17px;
+}
+/* L'éventail : les cartes se chevauchent et pivotent autour du centre */
+.tx-fan {
   display: flex;
-  gap: 6px;
+  justify-content: center;
+  padding-top: 4px;
 }
 .tx-mini {
-  width: 54px;
+  --i: 0;
+  width: 58px;
   padding: 0;
   border: 0;
   background: none;
   cursor: zoom-in;
-  transition: transform 0.15s;
+  transform: rotate(calc(var(--i) * 7deg)) translateY(calc(var(--i) * var(--i) * 3px));
+  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.tx-mini + .tx-mini {
+  margin-left: -22px;
+}
+.tx-fan.n1 .tx-mini {
+  width: 66px;
 }
 .tx-mini:hover {
-  transform: translateY(-3px);
+  z-index: 2;
+  transform: translateY(-6px) scale(1.08);
 }
-.tx-arrow {
-  width: 20px;
-  height: 20px;
-  color: var(--text-soft);
-}
+
 .tx-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+}
+.tx-busy {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  height: 42px;
 }
 .tx-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  height: 38px;
-  padding: 0 0.95rem;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 42px;
+  padding: 0 1rem;
   border-radius: 999px;
   border: 0;
   font: 800 0.88rem/1 var(--font-display);
+  white-space: nowrap;
 }
 .tx-btn svg {
   width: 16px;
   height: 16px;
+  flex: none;
+}
+.tx-btn.grow {
+  flex: 1;
 }
 .tx-btn.gold {
   background: #f2b70b;
   color: #161618;
 }
-.tx-btn.ghost {
+.tx-btn.ghost,
+.tx-btn.icon {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
 }
-@media (max-width: 700px) {
-  .tx-row {
-    flex-wrap: wrap;
+.tx-btn.icon {
+  width: 42px;
+  padding: 0;
+  flex: none;
+}
+.tx-btn.icon:hover {
+  color: #ff5470;
+  border-color: #ff5470;
+}
+
+/* Téléphone : une feuille qui monte du bas */
+@media (max-width: 620px) {
+  .tx-veil {
+    align-items: flex-end;
   }
-  .tx-who {
-    width: auto;
-    flex: 1;
+  .tx-panel {
+    width: 100%;
+    height: auto;
+    max-height: 88dvh;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.45);
+    animation-name: txRise;
   }
-  .tx-deal {
-    order: 3;
-    flex-basis: 100%;
+  @keyframes txRise {
+    from {
+      transform: translateY(60px);
+      opacity: 0;
+    }
   }
-  .tx-btn span {
-    display: none;
+  .tx-grip {
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: 999px;
+    background: var(--border-strong, #3a3a42);
   }
-  .tx-btn {
-    width: 38px;
-    padding: 0;
-    justify-content: center;
+  .tx-panel-head {
+    padding: 8px 14px 8px;
+  }
+  .tx-tabs {
+    margin: 0 14px 10px;
+  }
+  .tx-scroll {
+    padding: 2px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+  .tx-mini {
+    width: 52px;
   }
 }
 

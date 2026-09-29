@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../../lib/api";
 import TcgCard from "./TcgCard";
+import { Rail } from "../home/Rail";
 
 // ======================================================================
 //  Les classeurs des amis : qui collectionne, combien, et sa plus belle carte
 // ======================================================================
-// Une rangée qui défile. Un clic ouvre le classeur de l'ami (en lecture). La
+// Une rangée qui défile (flèches, glissé à la souris, doigt : le `Rail` de
+// l'accueil). Un clic ouvre le classeur de l'ami (en lecture). La
 // rangée n'existe pas tant qu'aucun des gens que je suis n'a de carte.
 
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
@@ -28,7 +30,7 @@ export default function FriendsBinders({ token }) {
   return (
     <section className="cd-friends">
       <h2 className="cd-h2">Amis</h2>
-      <div className="cd-friends-row">
+      <Rail className="cd-friends-row" snap>
         {friends.map((f) => (
           <Link key={f.user.id} to={`/cartes/u/${f.user.username}`} className="cd-friend clickable">
             <span className="cd-friend-card">
@@ -49,7 +51,7 @@ export default function FriendsBinders({ token }) {
             </span>
           </Link>
         ))}
-      </div>
+      </Rail>
     </section>
   );
 }

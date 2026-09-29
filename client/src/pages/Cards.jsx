@@ -145,16 +145,18 @@ export default function Cards() {
     <div className="cd-page">
       <header className="cd-head">
         <h1 className="cd-title">Cartes</h1>
-        <Link to="/arcade" className="cd-wallet clickable" title="Points d'arcade">
-          <Coins size={18} />
-          <b>{fmt(points)}</b>
-        </Link>
+        <div className="cd-head-right">
+          {/* Les échanges en attente : une pastille, le détail dans un panneau. */}
+          <TradeInbox token={token} me={user} onChanged={refresh} onBinder={() => setFocusRecent((n) => n + 1)} />
+          <Link to="/arcade" className="cd-wallet clickable" title="Points d'arcade">
+            <Coins size={18} />
+            <b>{fmt(points)}</b>
+          </Link>
+        </div>
       </header>
 
 
       {err && <p className="cd-err">{err}</p>}
-
-      <TradeInbox token={token} me={user} onChanged={refresh} onBinder={() => setFocusRecent((n) => n + 1)} />
 
       {/* ---------- Les boosters ---------- */}
       <PackShop
