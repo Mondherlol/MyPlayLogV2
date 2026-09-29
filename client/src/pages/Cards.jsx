@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Coins } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -10,6 +10,7 @@ import CardCollection from "../components/cards/CardCollection";
 import FriendsBinders from "../components/cards/FriendsBinders";
 import PackShop from "../components/cards/PackShop";
 import TradeInbox from "../components/cards/TradeInbox";
+import Workshop, { Shards } from "../components/cards/Workshop";
 
 // ======================================================================
 //  Cartes — les boosters à ouvrir et le classeur
@@ -98,6 +99,92 @@ export default function Cards() {
     [commit]
   );
 
+  // --- l'atelier : recycler, forger (toujours avec « Annuler ») -------------------
+  const [workshop, setWorkshop] = useState(null); // { forgeCard }
+  const withShards = useCallback((shards) => commit((d) => (d ? { ...d, shards } : d)), [commit]);
+  // Des cartes partent (recyclées) : les compteurs baissent, une carte à zéro
+  // quitte le classeur.
+  const dropCards = useCallback(
+    (left) =>
+      commit((d) => {
+        if (!d) return d;
+        const m = new Map(left.map((x) => [x.id, x.left]));
+        const cards = d.cards
+          .map((c) => (m.has(c.id) ? { ...c, count: m.get(c.id) } : c))
+          .filter((c) => c.count > 0);
+        return { ...d, cards };
+      }),
+    [commit]
+  );
+  // L'annulation : les cartes reviennent (celles sorties du classeur aussi).
+  const restoreCards = useCallback(
+    (counts, originals) =>
+      commit((d) => {
+        if (!d) return d;
+        const byId = new Map(d.cards.map((c) => [c.id, c]));
+        for (const { id, count } of counts) {
+          const had = byId.get(id) || originals.get(id);
+          if (had) byId.set(id, { ...had, count });
+        }
+        return { ...d, cards: [...byId.values()] };
+      }),
+    [commit]
+  );
+  const recycled = useCallback(
+    (res, picked) => {
+      dropCards(res.cards);
+      withShards(res.shards);
+      const n = picked.reduce((a, x) => a + x.n, 0);
+      const originals = new Map(picked.map((x) => [x.card.id, x.card]));
+      toast.show({
+        title: n > 1 ? `${n} cartes recyclées` : `${picked[0]?.card.name} recyclée`,
+        cover: picked[0] ? cardCover(picked[0].card.cover, "t_cover_small") : undefined,
+        text: `+${fmt(res.gained)} éclats`,
+        undo: async () => {
+          const back = await apiFetch(`/cards/recycle/${res.id}/undo`, { method: "POST", token });
+          restoreCards(back.cards, originals);
+          withShards(back.shards);
+        },
+      });
+    },
+    [dropCards, withShards, restoreCards, toast, token]
+  );
+  const forged = useCallback(
+    (res) => {
+      setWorkshop(null);
+      withShards(res.shards);
+      commit((d) => (d ? { ...d, cards: [...d.cards.filter((c) => c.id !== res.card.id), res.card] } : d));
+      toast.show({
+        title: res.card.name,
+        cover: cardCover(res.card.cover, "t_cover_small"),
+        text: `Forgée · −${fmt(res.cost)} éclats`,
+        undo: async () => {
+          const back = await apiFetch(`/cards/forge/${res.id}/undo`, { method: "POST", token });
+          dropCards([{ id: back.card, left: back.left }]);
+          withShards(back.shards);
+        },
+      });
+    },
+    [commit, withShards, dropCards, toast, token]
+  );
+  // Depuis la carte en grand : un exemplaire, sans scène (le toast suffit).
+  const recycleOneRef = useRef(null);
+  const recycleOne = useCallback(
+    async (card) => {
+      if (recycleOneRef.current) return;
+      recycleOneRef.current = apiFetch("/cards/recycle", { method: "POST", token, body: { items: [{ card: card.id, n: 1 }] } });
+      try {
+        const res = await recycleOneRef.current;
+        recycled(res, [{ card, n: 1 }]);
+      } catch (e) {
+        toast.show({ title: card.name, text: e.message, error: true });
+      } finally {
+        recycleOneRef.current = null;
+      }
+    },
+    [token, recycled, toast]
+  );
+
   const points = data?.points ?? user?.points ?? 0;
   const price = data?.price ?? 500;
   const canBuy = points >= price;
@@ -148,6 +235,13 @@ export default function Cards() {
         <div className="cd-head-right">
           {/* Les échanges en attente : une pastille, le détail dans un panneau. */}
           <TradeInbox token={token} me={user} onChanged={refresh} onBinder={() => setFocusRecent((n) => n + 1)} />
+          <button
+            className="cd-wallet ws-wallet clickable"
+            onClick={() => setWorkshop({ forgeCard: null })}
+            title="Atelier : recycler des cartes, en forger une"
+          >
+            <Shards n={data?.shards ?? 0} />
+          </button>
           <Link to="/arcade" className="cd-wallet clickable" title="Points d'arcade">
             <Coins size={18} />
             <b>{fmt(points)}</b>
@@ -182,7 +276,25 @@ export default function Cards() {
         goldenChance={data?.goldenChance}
         focusRecent={focusRecent}
         between={<FriendsBinders token={token} />}
+        onForge={(card) => setWorkshop({ forgeCard: card })}
+        onRecycle={recycleOne}
+        rates={data?.shardRates?.recycle || null}
       />
+
+      {workshop && (
+        <Workshop
+          token={token}
+          cards={data?.cards || []}
+          shards={data?.shards ?? 0}
+          forgeCard={workshop.forgeCard}
+          onClose={() => setWorkshop(null)}
+          onRecycled={(res, picked) => {
+            setWorkshop(null);
+            recycled(res, picked);
+          }}
+          onForged={forged}
+        />
+      )}
 
       {opening && (
         <PackOpening

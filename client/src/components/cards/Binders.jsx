@@ -72,10 +72,15 @@ export function BinderShelf({ view, onView, total, favs, binders, onCreate }) {
 }
 
 /** Une carte du classeur qu'on n'a pas encore : en creux. */
-export const MissingCell = memo(function MissingCell({ card }) {
+// `onForge` (chez soi) : toucher la carte ouvre l'atelier pour la forger.
+export const MissingCell = memo(function MissingCell({ card, onForge = null }) {
   const meta = CARD_RARITIES[card.rarity] || CARD_RARITIES.common;
   return (
-    <div className="cd-cell bd-missing" title={`${card.name} — à trouver`}>
+    <div
+      className={`cd-cell bd-missing ${onForge ? "forgeable clickable" : ""}`}
+      title={onForge ? `${card.name} — forger` : `${card.name} — à trouver`}
+      onClick={onForge ? () => onForge(card) : undefined}
+    >
       <span className="bd-miss-art" aria-hidden="true">
         <img src={cardCover(card.cover, "t_cover_big")} alt="" loading="lazy" draggable="false" />
       </span>

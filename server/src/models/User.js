@@ -351,6 +351,11 @@ const userSchema = new mongoose.Schema(
     // cumulé du classement blind test, qui lui ne bouge jamais. L'historique
     // détaillé vit dans le modèle PointEntry (voir lib/points.js).
     points: { type: Number, default: 0, min: 0 },
+    // Les Éclats des cartes (lib/cardShards.js) : une monnaie À PART, gagnée en
+    // recyclant des cartes et dépensée pour en forger une précise. Elle ne
+    // redevient jamais des points (sinon ouvrir des boosters pour les recycler
+    // deviendrait une machine à points).
+    shards: { type: Number, default: 0, min: 0 },
     // Lots gagnés. On stocke le SLUG du lot (Reward.key) et non son id : un lot
     // recréé sous le même slug reste possédé, et la lecture ne demande aucun
     // populate. `count` compte les doublons (gagnés puis reconvertis en points).

@@ -78,6 +78,7 @@ import {
   cancelTrade,
   markTradeSeen,
 } from "../lib/cardTrades.js";
+import { ShardError, shardsHome, recycleCards, undoRecycle, forgeCard, undoForge, RECYCLE, FORGE } from "../lib/cardShards.js";
 
 // ======================================================================
 //  /api/cards — le classeur et les boosters
@@ -107,7 +108,7 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const [cat, user, owned] = await Promise.all([
       getCatalog(),
-      User.findById(req.userId).select("points").lean(),
+      User.findById(req.userId).select("points shards").lean(),
       CardOwn.find({ user: req.userId }).lean(),
     ]);
     if (!user) return res.status(404).json({ error: "Compte introuvable." });
@@ -125,6 +126,8 @@ router.get("/", requireAuth, async (req, res) => {
 
     res.json({
       points: user.points || 0,
+      shards: user.shards || 0,
+      shardRates: { recycle: RECYCLE, forge: FORGE },
       binders,
       price: PACK_PRICE,
       packSize: PACK_SIZE,
@@ -357,6 +360,29 @@ router.post(
   trade((req) => cancelTrade(req.userId, req.params.id, { restore: !!req.body?.restore }))
 );
 router.post("/trades/:id/seen", trade((req) => markTradeSeen(req.userId, req.params.id)));
+
+// ----------------------------------------------------------------------
+//  Recycler et forger (lib/cardShards.js)
+// ----------------------------------------------------------------------
+const shard = (fn) => async (req, res) => {
+  try {
+    res.json(await fn(req));
+  } catch (err) {
+    if (err instanceof ShardError) return res.status(err.status).json({ error: err.message });
+    console.error("cards shards error:", err.message);
+    res.status(500).json({ error: "L'atelier a planté, réessaie." });
+  }
+};
+// GET /api/cards/shards — mon solde, les barèmes, les cartes verrouillées.
+router.get("/shards", shard((req) => shardsHome(req.userId)));
+// POST /api/cards/recycle { items: [{ card, n }] } — recycler.
+router.post("/recycle", shard((req) => recycleCards(req.userId, req.body?.items)));
+// POST /api/cards/recycle/:id/undo — l'« Annuler » du toast.
+router.post("/recycle/:id/undo", shard((req) => undoRecycle(req.userId, req.params.id)));
+// POST /api/cards/forge { card } — forger une carte que je n'ai pas.
+router.post("/forge", shard((req) => forgeCard(req.userId, req.body?.card)));
+// POST /api/cards/forge/:id/undo — l'« Annuler » du toast.
+router.post("/forge/:id/undo", shard((req) => undoForge(req.userId, req.params.id)));
 
 // ----------------------------------------------------------------------
 //  Les combats contre le bot (tout se décide dans lib/cardBattle.js)

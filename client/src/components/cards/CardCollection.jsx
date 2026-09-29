@@ -57,6 +57,10 @@ export default function CardCollection({
   // Chez un ami : les cartes que je cherche, et proposer un échange.
   wants = null,
   onRequest = null,
+  // Chez soi : l'atelier (forger une carte en creux, recycler).
+  onForge = null,
+  onRecycle = null,
+  rates = null,
 }) {
   const [inspect, setInspect] = useState(null);
   const [q, setQ] = useState("");
@@ -439,7 +443,7 @@ export default function CardCollection({
             items={shown}
             renderItem={(c, w) =>
               c.owned === false ? (
-                <MissingCell key={c.id} card={c} />
+                <MissingCell key={c.id} card={c} onForge={onForge} />
               ) : (
                 <BinderCell
                   key={c.id}
@@ -466,6 +470,8 @@ export default function CardCollection({
           binders={editable ? binders : null}
           onToggleBinder={editable ? setMembership : null}
           onRequest={onRequest}
+          onRecycle={onRecycle}
+          rates={rates}
         />
       )}
 

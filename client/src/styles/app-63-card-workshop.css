@@ -1,0 +1,731 @@
+/* ======================================================================
+   L'atelier des cartes : recycler en Éclats, forger (Workshop.jsx)
+   ======================================================================
+   Les Éclats ont leur couleur (un bleu glacé) : ce ne sont pas des points
+   d'arcade (l'or), et ils ne le redeviennent jamais. */
+:root {
+  --shard: #8fd3ff;
+}
+
+.ws-shards {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-variant-numeric: tabular-nums;
+}
+.ws-shards svg {
+  width: 16px;
+  height: 16px;
+  color: var(--shard);
+  fill: var(--shard);
+}
+.ws-shards b {
+  font: 800 1rem/1 var(--font-display);
+}
+.cd-wallet.ws-wallet {
+  cursor: pointer;
+  font: inherit;
+}
+.cd-wallet.ws-wallet svg {
+  color: var(--shard);
+}
+.cd-wallet.ws-wallet:hover {
+  border-color: var(--shard);
+}
+
+/* --- la fenêtre --- */
+.bd-sheet.ws {
+  width: min(860px, 100%);
+  height: min(760px, calc(100dvh - 32px));
+  overflow: hidden;
+}
+.ws .bd-sheet-head {
+  gap: 10px;
+}
+.ws-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.ws-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-soft);
+  font: 800 0.92rem/1 var(--font-display);
+}
+.ws-tab svg {
+  width: 17px;
+  height: 17px;
+}
+.ws-tab.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.ws-balance {
+  margin-left: auto;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.ws-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ws-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 38px;
+  padding: 0 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: 800 0.88rem/1 var(--font-display);
+}
+.ws-chip svg {
+  width: 16px;
+  height: 16px;
+}
+.ws-chip b {
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+.ws-chip.on {
+  border-color: var(--shard);
+  color: var(--shard);
+}
+.ws-chip:disabled {
+  opacity: 0.45;
+}
+.ws-rars {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.ws-rar {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--rc);
+  font-size: 0.62rem;
+  letter-spacing: -1px;
+}
+.ws-rar.on {
+  border-color: var(--rc);
+  background: color-mix(in srgb, var(--rc) 14%, var(--bg));
+}
+
+/* La grille : des jaquettes (pas des cartes entières : il peut y en avoir
+   des centaines). */
+.ws-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  align-content: start;
+  gap: 14px 12px;
+  padding: 6px 4px 10px;
+}
+.ws-grid .bd-none {
+  grid-column: 1 / -1;
+}
+.ws-cell {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ws-cell-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--rc) 55%, transparent);
+  transition:
+    transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1),
+    box-shadow 0.18s;
+}
+.ws-cell-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ws-cell-art:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.ws-cell.on .ws-cell-art {
+  box-shadow: 0 0 0 3px var(--shard);
+}
+.ws-cell.on .ws-cell-art img {
+  filter: saturate(0.4) brightness(0.55);
+}
+.ws-cell.last .ws-cell-art {
+  box-shadow: 0 0 0 3px #ff5470;
+}
+.ws-cell.locked .ws-cell-art img {
+  filter: grayscale(1) brightness(0.45);
+}
+.ws-cell-val {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  padding: 0.18rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(12, 12, 14, 0.82);
+  color: var(--shard);
+  font: 800 0.7rem/1 var(--font-display);
+}
+.ws-cell-count {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  padding: 0.18rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(12, 12, 14, 0.82);
+  color: #fff;
+  font: 800 0.72rem/1 var(--font-display);
+}
+.ws-cell-lock {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.ws-cell-lock svg {
+  width: 22px;
+  height: 22px;
+}
+.ws-cell-n {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font: 400 1.3rem/1 "Lilita One", var(--font-display);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  animation: wsPop 0.25s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.ws-cell.last .ws-cell-n {
+  color: #ff5470;
+  font-size: 1.05rem;
+  text-transform: uppercase;
+}
+@keyframes wsPop {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+}
+.ws-cell-minus {
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 0 0 2px var(--border);
+}
+.ws-cell-minus svg {
+  width: 14px;
+  height: 14px;
+}
+.ws-cell-name {
+  font: 700 0.74rem/1.15 var(--font-display);
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ws-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.ws-warn {
+  color: #ff5470;
+  font: 700 0.85rem/1.2 var(--font-display);
+}
+.ws-foot .bd-btn {
+  height: 46px;
+}
+.ws-foot-n {
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.14);
+}
+.ws-gain {
+  margin-left: 0.3rem;
+}
+.bd-btn.gold .ws-gain svg {
+  color: #161618;
+  fill: #161618;
+}
+
+/* --- forger --- */
+.ws-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ws-costs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  padding: 6px 2px;
+}
+.ws-cost-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.ws-cost-row > i {
+  color: var(--rc);
+  font-style: normal;
+  font-size: 0.7rem;
+  letter-spacing: -1px;
+}
+.ws-no {
+  width: 16px;
+  height: 16px;
+  color: var(--text-soft);
+}
+.ws-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+.ws-row:hover:not(:disabled) {
+  background: var(--bg);
+}
+.ws-row:disabled {
+  opacity: 0.55;
+}
+.ws-row img {
+  width: 38px;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.ws-row-name {
+  flex: 1;
+  min-width: 0;
+  font: 700 0.95rem/1.2 var(--font-display);
+}
+.ws-row-rar {
+  font-style: normal;
+  font-size: 0.65rem;
+  letter-spacing: -1px;
+}
+.ws-shards.short b {
+  color: var(--text-soft);
+}
+.ws-confirm {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 10px;
+}
+.ws-confirm-card {
+  width: min(240px, 44vw);
+  flex: none;
+}
+.ws-confirm-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.ws-confirm-name {
+  font: 400 1.7rem/1.05 "Lilita One", var(--font-display);
+}
+.ws-confirm-rar {
+  font: 800 0.9rem/1 var(--font-display);
+}
+.ws-confirm-cost {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.ws-confirm-cost .ws-shards b {
+  font-size: 1.6rem;
+}
+.ws-confirm-cost .ws-shards svg {
+  width: 22px;
+  height: 22px;
+}
+.ws-confirm-after {
+  color: var(--text-soft);
+  font: 700 0.85rem/1 var(--font-display);
+}
+.ws-confirm-after.short {
+  color: #ff5470;
+}
+.ws-confirm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.ws-confirm-actions .bd-btn {
+  height: 46px;
+}
+
+/* Les cartes en creux d'un classeur se forgent d'un clic. */
+.bd-missing.forgeable {
+  cursor: pointer;
+}
+.bd-missing.forgeable:hover .bd-miss-lock {
+  color: var(--shard);
+}
+/* La carte en grand : « Recycler +20 ». */
+.cd-insp-shards {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 0.2rem;
+  color: var(--shard);
+  font-weight: 800;
+}
+.cd-insp-shards svg {
+  fill: var(--shard);
+}
+
+/* --- les scènes --- */
+.ws-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  overflow: hidden;
+  background: rgba(10, 10, 13, 0.94);
+  color: #fff;
+  animation: bdFade 0.25s ease both;
+}
+.ws-scene.done {
+  cursor: pointer;
+}
+.ws-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1.3rem;
+  border-radius: 999px;
+  background: #16161b;
+  box-shadow: 0 0 0 2px rgba(143, 211, 255, 0.35);
+}
+.ws-counter svg {
+  width: 30px;
+  height: 30px;
+  color: var(--shard);
+  fill: var(--shard);
+}
+.ws-counter b {
+  min-width: 3ch;
+  font: 400 2.6rem/1 "Lilita One", var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.ws-scene.done .ws-counter {
+  animation: wsCounter 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
+  box-shadow: 0 0 0 3px var(--shard);
+}
+@keyframes wsCounter {
+  40% {
+    transform: scale(1.15);
+  }
+}
+.ws-pile {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 0 20px;
+}
+.ws-piece {
+  width: clamp(64px, 11vw, 120px);
+  aspect-ratio: 3 / 4;
+  margin: 0 calc(clamp(64px, 11vw, 120px) * -0.28);
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 3px var(--rc),
+    0 12px 30px rgba(0, 0, 0, 0.5);
+  transform: rotate(calc((var(--i) - (var(--n) - 1) / 2) * 5deg))
+    translateY(calc(max(var(--i) - (var(--n) - 1) / 2, (var(--n) - 1) / 2 - var(--i)) * 5px));
+  animation: wsIn 0.4s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+  animation-delay: calc(var(--i) * 30ms);
+}
+.ws-piece img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+@keyframes wsIn {
+  from {
+    transform: translateY(40px) scale(0.8);
+    opacity: 0;
+  }
+}
+.ws-piece.broken {
+  animation: wsBreak 0.55s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+@keyframes wsBreak {
+  0% {
+    filter: brightness(2.4);
+  }
+  25% {
+    transform: scale(1.08) rotate(4deg);
+    filter: brightness(1.6) saturate(0.3);
+  }
+  100% {
+    transform: scale(0.4) rotate(-14deg) translateY(20px);
+    opacity: 0;
+    filter: brightness(0.8) blur(4px);
+  }
+}
+.ws-more {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  margin-left: 22px;
+  transform: translateY(-50%);
+  color: var(--text-soft, #9d9da5);
+  font: 400 1.4rem/1 "Lilita One", var(--font-display);
+}
+.ws-flight {
+  position: fixed;
+  z-index: 2;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  background: var(--shard);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  pointer-events: none;
+  animation: wsFly 0.75s cubic-bezier(0.55, 0, 0.35, 1) both;
+}
+@keyframes wsFly {
+  0% {
+    transform: translate(0, 0) scale(0.4);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(calc(var(--tx) * -0.06), -26px) scale(1.3);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx), var(--ty)) scale(0.5);
+    opacity: 0.2;
+  }
+}
+.ws-scene-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  animation: bdFade 0.3s ease both;
+}
+.ws-scene-foot .ws-shards b {
+  font-size: 1.2rem;
+}
+
+/* Forger : les éclats convergent vers le centre, puis la carte. */
+.ws-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: var(--shard);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  opacity: 0;
+  animation: wsGather 0.8s cubic-bezier(0.6, 0, 0.4, 1) forwards;
+}
+@keyframes wsGather {
+  0% {
+    transform: translate(var(--x), var(--y)) scale(var(--s)) rotate(0);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, 0) scale(0.3) rotate(220deg);
+    opacity: 0;
+  }
+}
+.ws-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff, var(--shard) 45%, transparent 70%);
+  animation: wsCore 1.25s ease-in forwards;
+}
+@keyframes wsCore {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  80% {
+    transform: scale(2.4);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(14);
+    opacity: 0;
+  }
+}
+.ws-forged {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.ws-forged-card {
+  width: min(280px, 62vw);
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 0.35s,
+    transform 0.6s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.st-reveal .ws-forged-card {
+  opacity: 1;
+  transform: none;
+  filter: drop-shadow(0 0 30px color-mix(in srgb, var(--rc) 60%, transparent));
+}
+.ws-forged-burst {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 0;
+  height: 0;
+}
+.ws-forged-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  animation: bdFade 0.4s 0.2s ease both;
+}
+.ws-forged-foot b {
+  font: 400 1.6rem/1.1 "Lilita One", var(--font-display);
+}
+.ws-forged-foot span {
+  font: 800 0.9rem/1 var(--font-display);
+}
+.ws-forged-foot .bd-btn {
+  margin-top: 8px;
+}
+
+@media (max-width: 620px) {
+  .bd-sheet.ws {
+    height: 92dvh;
+  }
+  .ws-tab {
+    padding: 0.5rem 0.7rem;
+  }
+  .ws-rars {
+    margin-left: 0;
+  }
+  .ws-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px 8px;
+  }
+  .ws-cell-name {
+    display: none;
+  }
+  .ws-confirm {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .ws-confirm-side {
+    align-items: center;
+    text-align: center;
+  }
+  .ws-foot {
+    justify-content: space-between;
+  }
+}
+@media (max-width: 620px) {
+  .ws-more {
+    left: 50%;
+    top: 100%;
+    margin: 18px 0 0;
+    transform: translateX(-50%);
+  }
+}
+.ws-scene.done .ws-more {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+/* Recycler détruit une carte : un bouton discret, pas l'or des actions. */
+.cd-insp-game.cd-insp-recycle {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.cd-insp-game.cd-insp-recycle:hover {
+  background: rgba(255, 255, 255, 0.18);
+}

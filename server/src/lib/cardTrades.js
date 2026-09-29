@@ -4,6 +4,7 @@ import User from "../models/User.js";
 import { getCatalog } from "./cards.js";
 import { viewContext } from "./privacy.js";
 import { notify } from "./notify.js";
+import { recentlyForged } from "./cardShards.js";
 
 // ======================================================================
 //  Les échanges de cartes entre joueurs
@@ -100,6 +101,9 @@ export async function proposeTrade(userId, body = {}) {
     throw new TradeError(400, `${MAX_SIDE} cartes au plus de chaque côté.`);
   if (!(await owns(userId, give))) throw new TradeError(409, "Tu n'as plus une des cartes proposées.");
   if (!(await owns(target._id, want))) throw new TradeError(409, "Il n'a plus une des cartes demandées.");
+  // Une carte forgée ne s'échange pas pendant 7 jours (lib/cardShards.js).
+  if ((await recentlyForged(userId, give)).length)
+    throw new TradeError(409, "Une carte forgée ne s'échange qu'au bout de 7 jours.");
 
   // Remplacer une proposition : celle qu'il m'a faite (contre-proposition), ou
   // la mienne (retouchée). Elle sort du jeu AVANT que la nouvelle n'entre —
@@ -188,6 +192,8 @@ export async function acceptTrade(userId, id) {
   };
   if (!(await owns(t.from, t.give))) await fail("Il n'a plus une des cartes qu'il proposait.");
   if (!(await owns(t.to, t.want))) await fail("Tu n'as plus une des cartes demandées.");
+  if ((await recentlyForged(t.to, t.want)).length)
+    await fail("Une carte forgée ne s'échange qu'au bout de 7 jours.");
 
   // Le transfert : on retire d'abord (ce qui peut échouer), on donne ensuite.
   const taken = [];

@@ -74,4 +74,6 @@
 @import "./styles/app-61-card-trades.css";
 /* Le 2 contre 2 aux cartes. */
 @import "./styles/app-62-card-team.css";
+/* L'atelier des cartes : recycler, forger. */
+@import "./styles/app-63-card-workshop.css";
 @import "./styles/app-99-mobile-perf.css";
