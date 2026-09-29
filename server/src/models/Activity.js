@@ -80,6 +80,10 @@ const activitySchema = new mongoose.Schema(
         "card_pack", // a ouvert un booster de cartes (meta = { cards: [ids des
         // 5 cartes], news: [ids nouvelles], golden } — le fil relit les cartes
         // dans le catalogue, qui fait foi pour le nom et la rareté)
+        "card_battle", // a fini un combat de cartes (meta = { mode: bot|duel,
+        // result: win|loss|draw, score: [moi, lui], level (bot), duelId
+        // (duel : une ligne par joueur, le fil n'en garde qu'une), cards: ids
+        // des plus belles cartes gagnantes }, target = l'adversaire en duel)
         "collection_drop", // a sorti un boîtier de la machine à capsules
         // (meta = { slug, title } — le titre n'est là que comme repli si le
         // boîtier quitte le catalogue ; le fil relit la fiche par son slug)

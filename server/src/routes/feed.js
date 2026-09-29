@@ -505,6 +505,7 @@ async function buildTimeline(
   const perroquets = []; // idem pour Le Perroquet
   const caseopens = []; // idem : ouvrir plusieurs caisses d'affilée est la norme
   const cardpacks = []; // boosters de cartes (idem, en rafale)
+  const cardbattles = []; // combats de cartes (bot : en rafale ; duel : un par duel)
   const drops = []; // boîtiers sortis de la machine à capsules (idem, en rafale)
   // Victoires collectives au Mot du jour déjà sorties : chaque membre de
   // l'équipe a SA ligne d'activité (c'est son résultat, il a ses points), mais
@@ -977,6 +978,25 @@ async function buildTimeline(
         cards: a.meta.cards,
         news: a.meta.news || [],
         golden: !!a.meta.golden,
+      });
+      continue;
+    }
+
+    if (a.type === "card_battle") {
+      if (!a.meta?.result) continue;
+      cardbattles.push({
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        foe: person(a.target),
+        mode: a.meta.mode === "duel" ? "duel" : "bot",
+        duelId: a.meta.duelId || null,
+        result: a.meta.result,
+        score: Array.isArray(a.meta.score) ? a.meta.score : [0, 0],
+        level: a.meta.level || null,
+        perfect: !!a.meta.perfect,
+        forfeit: !!a.meta.forfeit,
+        cards: Array.isArray(a.meta.cards) ? a.meta.cards : [],
       });
       continue;
     }
@@ -1495,6 +1515,78 @@ async function buildTimeline(
           cards: cards.slice(0, 5),
         });
       }
+    }
+  }
+
+  // --- Combats de cartes. Contre le bot, les parties rapprochées d'un même
+  //     joueur font UNE carte (bilan + ses plus belles cartes gagnantes). Un
+  //     duel entre amis a une ligne par joueur : on les fusionne en UNE carte
+  //     par duel, signée par le vainqueur (comme les versus). ---
+  if (cardbattles.length) {
+    const cat = await getCatalog().catch(() => null);
+    const rank = (c) => CARD_RARITIES.indexOf(c.rarity) * 1e6 - c.no;
+    const cardsOf = (ids) => {
+      if (!cat) return [];
+      const out = [];
+      for (const id of new Set(ids)) {
+        const c = cat.byId.get(id);
+        if (c) out.push(c);
+      }
+      return out.sort((a, b) => rank(b) - rank(a)).slice(0, 3);
+    };
+
+    for (const c of burstsByUser(cardbattles.filter((b) => b.mode === "bot"))) {
+      const m = c.members;
+      const wins = m.filter((b) => b.result === "win").length;
+      // La partie phare : la meilleure victoire (niveau, puis écart), à défaut
+      // la plus récente.
+      const top =
+        [...m].sort(
+          (a, b) =>
+            (b.result === "win") - (a.result === "win") ||
+            (b.level || 0) - (a.level || 0) ||
+            b.score[0] - b.score[1] - (a.score[0] - a.score[1])
+        )[0] || m[0];
+      events.push({
+        type: "cardbattle",
+        id: `cb-${m[0].id}`,
+        date: c.date,
+        user: c.user,
+        mode: "bot",
+        games: m.length,
+        wins,
+        losses: m.filter((b) => b.result === "loss").length,
+        result: top.result,
+        score: top.score,
+        level: Math.max(...m.map((b) => b.level || 0)) || null,
+        perfect: m.some((b) => b.perfect),
+        cards: cardsOf(m.flatMap((b) => b.cards)),
+      });
+    }
+
+    const duels = new Map();
+    for (const b of cardbattles) {
+      if (b.mode !== "duel" || !b.duelId) continue;
+      if (!duels.has(b.duelId)) duels.set(b.duelId, []);
+      duels.get(b.duelId).push(b);
+    }
+    for (const rows of duels.values()) {
+      // Le point de vue du vainqueur (ou de n'importe qui en cas de nul).
+      const main = rows.find((b) => b.result === "win") || rows[0];
+      const other = rows.find((b) => b !== main);
+      events.push({
+        type: "cardbattle",
+        id: `cd-${main.duelId}`,
+        date: rows.reduce((d, b) => (new Date(b.date) > new Date(d) ? b.date : d), main.date),
+        user: main.user,
+        foe: main.foe || other?.user || null,
+        mode: "duel",
+        games: 1,
+        result: main.result,
+        score: main.score,
+        forfeit: main.forfeit,
+        cards: cardsOf(main.cards),
+      });
     }
   }
 

@@ -645,6 +645,12 @@ const FEED_GROUPS = [
         desc: "Les cartes tirées par les autres.",
       },
       {
+        key: "cardbattles",
+        Icon: Swords,
+        title: "Combats de cartes",
+        desc: "Les parties contre le bot et les duels entre amis.",
+      },
+      {
         key: "drops",
         Icon: Boxes,
         title: "Machine à capsules",

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Send,
   Loader2,
@@ -946,22 +946,53 @@ function Countdown({ ms, tz }) {
 }
 
 // ---------- Une pastille de joueur ----------
-function Face({ user, size = 26, title }) {
+// Un clic ouvre son profil. La pastille reste un <img>/<span> (pas un lien
+// qui l'enveloppe) : les rangées de têtes qui se chevauchent reposent sur
+// `.mdj-face:first-child`. `link={false}` quand elle est déjà dans un lien ou
+// un bouton.
+function Face({ user, size = 26, title, link = true }) {
+  const navigate = useNavigate();
+  const to = `/u/${user.username}`;
+  const nav = link
+    ? {
+        role: "link",
+        tabIndex: 0,
+        onClick: (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          if (e.ctrlKey || e.metaKey) window.open(to, "_blank", "noopener");
+          else navigate(to);
+        },
+        onAuxClick: (e) => {
+          if (e.button !== 1) return;
+          e.stopPropagation();
+          window.open(to, "_blank", "noopener");
+        },
+        onKeyDown: (e) => {
+          if (e.key !== "Enter") return;
+          e.stopPropagation();
+          navigate(to);
+        },
+      }
+    : {};
+  const cls = link ? " clickable" : "";
   return user.avatar ? (
     <img
-      className="mdj-face"
+      className={`mdj-face${cls}`}
       src={user.avatar}
       alt={user.username}
       title={title || user.username}
       style={{ width: size, height: size }}
       loading="lazy"
       draggable="false"
+      {...nav}
     />
   ) : (
     <span
-      className="mdj-face letters"
+      className={`mdj-face letters${cls}`}
       title={title || user.username}
       style={{ width: size, height: size, fontSize: size * 0.4 }}
+      {...nav}
     >
       {user.username[0].toUpperCase()}
     </span>
@@ -1677,7 +1708,7 @@ function BoardRow({ entry, rank }) {
       <span className={`mdj-rank r${rank}`}>{rank}</span>
       {solo ? (
         <Link to={`/u/${entry.user.username}`} className="mdj-board-user clickable">
-          <Face user={entry.user} size={25} />
+          <Face user={entry.user} size={25} link={false} />
           <span className="mdj-board-who">{entry.user.username}</span>
         </Link>
       ) : (
@@ -1710,7 +1741,7 @@ function TeamFaces({ team, size, max, className, whoClass = "" }) {
       <span className="mdj-sess-faces">
         {team.slice(0, max).map((u) => (
           <Link key={u.id} to={`/u/${u.username}`} className="mdj-team-face clickable" title={u.username}>
-            <Face user={u} size={size} />
+            <Face user={u} size={size} link={false} />
           </Link>
         ))}
       </span>
@@ -1739,7 +1770,7 @@ function TeamFaces({ team, size, max, className, whoClass = "" }) {
               role="menuitem"
               onClick={close}
             >
-              <Face user={u} size={26} />
+              <Face user={u} size={26} link={false} />
               <span>{u.username}</span>
               <ArrowRight size={13} />
             </Link>
@@ -1772,7 +1803,7 @@ function Searching({ rows }) {
             >
               {solo ? (
                 <Link to={`/u/${r.user.username}`} className="mdj-live-who clickable">
-                  <Face user={r.user} size={22} />
+                  <Face user={r.user} size={22} link={false} />
                   <span>{r.user.username}</span>
                 </Link>
               ) : (
@@ -1982,7 +2013,7 @@ function InviteModal({ token, meId, session, onClose }) {
                         className={`mdj-inv-row clickable ${picked.has(key) ? "on" : ""}`}
                         onClick={() => toggle(key)}
                       >
-                        <Face user={p} size={30} />
+                        <Face user={p} size={30} link={false} />
                         <span className="mdj-inv-name">{p.username}</span>
                         {picked.has(key) && <Check size={16} />}
                       </button>

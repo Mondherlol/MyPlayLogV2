@@ -124,6 +124,12 @@ export const FEED_CATEGORIES = [
     activity: ["card_pack"],
     cards: ["cardpack"],
   },
+  // Les combats de cartes (contre le bot, ou en duel entre amis).
+  {
+    key: "cardbattles",
+    activity: ["card_battle"],
+    cards: ["cardbattle"],
+  },
   // La machine à capsules est à l'arcade, même si le boîtier gagné atterrit
   // dans la collection : la carte raconte le TIRAGE, elle est rangée avec le
   // reste de l'arcade.

@@ -784,8 +784,8 @@
 }
 .cd-cell.wanted .tcg-face {
   box-shadow:
-    0 0 0 1.4cqw #f2b70b,
-    0 1.6cqw 5cqw rgba(0, 0, 0, 0.42);
+    0 0 0 calc(1.4 * var(--cq, 1cqw)) #f2b70b,
+    0 calc(1.6 * var(--cq, 1cqw)) calc(5 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.42);
 }
 .cd-want-filter {
   display: inline-flex;

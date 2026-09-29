@@ -988,8 +988,8 @@
 .wide .ba-card.zoomed.kf .tcg-face,
 .narrow .ba-card.zoomed.focused .tcg-face {
   box-shadow:
-    0 0 0 1.1cqw var(--acc),
-    0 5cqw 14cqw rgba(0, 0, 0, 0.6);
+    0 0 0 calc(1.1 * var(--cq, 1cqw)) var(--acc),
+    0 calc(5 * var(--cq, 1cqw)) calc(14 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.6);
 }
 /* Téléphone : la main en grille, la carte touchée par-dessus en grand. */
 .narrow .ba-card.zoomed.under .ba-fx {
@@ -1033,13 +1033,13 @@
 }
 .fx-win .tcg-face {
   box-shadow:
-    0 0 0 1.2cqw var(--acc),
-    0 5cqw 14cqw rgba(0, 0, 0, 0.55);
+    0 0 0 calc(1.2 * var(--cq, 1cqw)) var(--acc),
+    0 calc(5 * var(--cq, 1cqw)) calc(14 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.55);
 }
 .bot.fx-win .tcg-face {
   box-shadow:
-    0 0 0 1.2cqw var(--foe),
-    0 5cqw 14cqw rgba(0, 0, 0, 0.55);
+    0 0 0 calc(1.2 * var(--cq, 1cqw)) var(--foe),
+    0 calc(5 * var(--cq, 1cqw)) calc(14 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.55);
 }
 .fx-lunge {
   z-index: 35 !important;
@@ -1147,8 +1147,8 @@
 }
 .fx-danger .tcg-face {
   box-shadow:
-    0 0 0 1.3cqw var(--foe),
-    0 5cqw 14cqw rgba(0, 0, 0, 0.55);
+    0 0 0 calc(1.3 * var(--cq, 1cqw)) var(--foe),
+    0 calc(5 * var(--cq, 1cqw)) calc(14 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.55);
 }
 .fx-shield .ba-fx {
   animation: baShield 0.7s cubic-bezier(0.2, 1.4, 0.4, 1);
@@ -1162,8 +1162,8 @@
 .fx-good .tcg-face,
 .fx-answer .tcg-face {
   box-shadow:
-    0 0 0 1.4cqw var(--ok),
-    0 5cqw 14cqw rgba(0, 0, 0, 0.55);
+    0 0 0 calc(1.4 * var(--cq, 1cqw)) var(--ok),
+    0 calc(5 * var(--cq, 1cqw)) calc(14 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.55);
 }
 .fx-probe .ba-lift,
 .fx-good .ba-lift {
@@ -1180,8 +1180,8 @@
 }
 .fx-bad .tcg-face {
   box-shadow:
-    0 0 0 1.4cqw var(--foe),
-    0 5cqw 14cqw rgba(0, 0, 0, 0.55);
+    0 0 0 calc(1.4 * var(--cq, 1cqw)) var(--foe),
+    0 calc(5 * var(--cq, 1cqw)) calc(14 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.55);
 }
 @keyframes baNo {
   20% {
@@ -2798,4 +2798,34 @@
     left: 8px;
     width: auto;
   }
+}
+
+/* ---------------------------------------------------------------------
+   Les photos de profil restent dans leur rond
+   ---------------------------------------------------------------------
+   Ces ronds sont des grilles : un `height: 100%` n'y trouve pas de hauteur
+   de référence et l'image reprenait sa hauteur naturelle — une photo en
+   portrait débordait en ovale. Carrée par construction (`aspect-ratio`),
+   elle ne dépend plus de la hauteur du rond. */
+:is(
+    .ba-ava,
+    .ba-vs-ava,
+    .ba-slot-mark,
+    .ba-think-ava,
+    .ba-end-rematch-ava,
+    .bl-ava,
+    .bl-duel-ava,
+    .df-face,
+    .tr-ava,
+    .tx-ava
+  )
+  > img,
+.ba-focus-bot.opp > img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 50%;
+  object-fit: cover;
 }

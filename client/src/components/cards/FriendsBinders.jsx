@@ -32,7 +32,7 @@ export default function FriendsBinders({ token }) {
         {friends.map((f) => (
           <Link key={f.user.id} to={`/cartes/u/${f.user.username}`} className="cd-friend clickable">
             <span className="cd-friend-card">
-              {f.best && <TcgCard card={f.best} tilt={false} />}
+              {f.best && <TcgCard card={f.best} tilt={false} lite />}
             </span>
             <span className="cd-friend-info">
               <span className="cd-friend-who">

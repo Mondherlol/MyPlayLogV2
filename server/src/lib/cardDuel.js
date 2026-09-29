@@ -4,8 +4,9 @@ import CardOwn from "../models/CardOwn.js";
 import User from "../models/User.js";
 import { emitTo, onlineAmong } from "./realtime.js";
 import { grantPoints } from "./points.js";
+import { recordActivity } from "./activity.js";
 import { makeCode, makeRoomQueue, makeClock } from "./versusRoom.js";
-import { engine as E, DECK_SIZE, MIN_CARDS, TO_WIN, PICK_MS, RESCUE_MS, BattleError } from "./cardBattle.js";
+import { engine as E, bestCards, DECK_SIZE, MIN_CARDS, TO_WIN, PICK_MS, RESCUE_MS, BattleError } from "./cardBattle.js";
 
 // ======================================================================
 //  Les duels de cartes : 1 contre 1, en temps réel
@@ -271,7 +272,10 @@ function resolve(st, cat) {
     const ask = E.rescueAsk(cat, st[loser].hand);
     if (ask) pending = { side: loser, card: ids[loser], ask, at: Date.now(), n: st.n };
   }
-  if (winner) st.score[winner]++;
+  if (winner) {
+    st.score[winner]++;
+    (st.won ||= { you: [], bot: [] })[winner].push(ids[winner]);
+  }
   for (const side of ["you", "bot"]) {
     if (winner === side) st[side].hand.push(ids[side]);
     else if (pending?.side !== side) st[side].out.push(ids[side]);
@@ -374,6 +378,26 @@ async function closeGame(room, st) {
     st.end.pay = {};
     for (const [side, id] of members(room)) st.end.pay[side] = await payOne(id, st, side);
     await CardDuel.updateOne({ _id: room._id }, { $set: { "state.end": st.end } }).catch(() => {});
+    // Le fil : une ligne par joueur (chacun son résultat), que routes/feed.js
+    // fusionne en UNE carte par duel (meta.duelId), comme les versus.
+    const cat = await E.catalogReady().catch(() => null);
+    const ms = members(room);
+    for (const [side, id] of ms) {
+      const foe = ms.find(([s2]) => s2 !== side);
+      recordActivity({
+        actor: id,
+        type: "card_battle",
+        target: foe?.[1] || null,
+        meta: {
+          mode: "duel",
+          duelId: String(room._id),
+          result: st.end.winner === "draw" ? "draw" : st.end.winner === side ? "win" : "loss",
+          score: [st.score[side], st.score[sw(side)]],
+          forfeit: !!st.end.forfeit,
+          cards: cat ? bestCards(cat, st.won?.[side]) : [],
+        },
+      });
+    }
   }
 }
 

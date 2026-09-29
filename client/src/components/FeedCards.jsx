@@ -68,6 +68,7 @@ import {
   Sparkles as SparklesIc,
   Copy as CopyIc,
   Library,
+  Bot as BotIc,
 } from "lucide-react";
 import { Globe2, MapPin, Thermometer, Target, Crown, Users, Zap } from "lucide-react";
 import { rarityColor, rarityLabel } from "../lib/rarity";
@@ -202,6 +203,7 @@ export function FeedCard(props) {
     return <PerroquetEvent {...props} />;
   if (item.type === "mot") return <MotEvent {...props} />;
   if (item.type === "cardpack") return <CardPackEvent {...props} />;
+  if (item.type === "cardbattle") return <CardBattleEvent {...props} />;
   if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
   if (item.type === "caseopengroup") return <CaseOpenGroupEvent {...props} />;
   if (item.type === "collectiondrop") return <CollectionDropEvent {...props} />;
@@ -2328,6 +2330,132 @@ function CardPackEvent({ item }) {
         )}
         <Link to={`/cartes/u/${item.user.username}`} className="hf-cp-link clickable" onClick={stop}>
           Classeur
+        </Link>
+      </div>
+
+      {inspect != null && (
+        <div onClick={stop} onTouchStart={stop} onTouchEnd={stop}>
+          <Suspense fallback={null}>
+            <CardInspector
+              list={item.cards}
+              index={inspect}
+              onIndex={setInspect}
+              onClose={() => setInspect(null)}
+            />
+          </Suspense>
+        </div>
+      )}
+    </article>
+  );
+}
+
+// ============================================================
+//  Combat de cartes — le score, l'adversaire, les cartes qui ont gagné
+// ============================================================
+// Contre le bot, une série de parties fait une seule carte (le bilan, la
+// meilleure partie en vedette). En duel, une carte par duel, au nom du
+// vainqueur. Les cartes gagnantes s'ouvrent en grand, comme celles des
+// boosters.
+function CardBattleEvent({ item }) {
+  const [inspect, setInspect] = useState(null);
+  const stop = (e) => e.stopPropagation();
+  const duel = item.mode === "duel";
+  const [me, him] = item.score || [0, 0];
+  const foe = item.foe;
+  const series = !duel && item.games > 1;
+  const action = duel ? (
+    item.result === "draw" ? (
+      <>
+        a fait match nul en duel de cartes{foe ? ` contre ${foe.username}` : ""}
+      </>
+    ) : (
+      <>
+        a battu {foe ? <b>{foe.username}</b> : "un ami"} en duel de cartes{item.forfeit ? " (abandon)" : ""}
+      </>
+    )
+  ) : series ? (
+    <>a enchaîné {item.games} combats de cartes</>
+  ) : item.result === "win" ? (
+    <>a gagné un combat de cartes</>
+  ) : item.result === "draw" ? (
+    <>a fait match nul au combat de cartes</>
+  ) : (
+    <>a perdu un combat de cartes</>
+  );
+  const badge = series ? (
+    <span className="hf-cb-tally">
+      <b>{item.wins}</b> V · <b>{item.losses}</b> D
+    </span>
+  ) : item.perfect && item.result === "win" ? (
+    <span className="hf-cb-tally gold">Sans faute</span>
+  ) : null;
+
+  // Le score côté centre : « [moi] 3 – 2 [lui] ».
+  const side = (u, n, win, right = false) => {
+    const face = (
+      <span className="hf-cb-face">
+        {u?.avatar ? (
+          <img src={u.avatar} alt="" loading="lazy" draggable="false" />
+        ) : (
+          <span className="hf-cb-fb">{u?.username?.[0]?.toUpperCase() || "?"}</span>
+        )}
+      </span>
+    );
+    const num = <b className="hf-cb-num">{n}</b>;
+    return (
+      <span className={`hf-cb-side ${win ? "win" : ""}`}>
+        {right ? num : face}
+        {right ? face : num}
+      </span>
+    );
+  };
+
+  return (
+    <article className="hf-card hf-cardbattle">
+      <EventHead user={item.user} date={item.date} badge={badge}>
+        <Swords size={13} className="hf-inline-ic" /> {action}
+      </EventHead>
+
+      <div className="hf-cb-body">
+        <div className="hf-cb-score">
+          {side(item.user, me, me > him)}
+          <span className="hf-cb-dash">–</span>
+          {duel ? (
+            side(foe, him, him > me, true)
+          ) : (
+            <span className={`hf-cb-side ${him > me ? "win" : ""}`}>
+              <b className="hf-cb-num">{him}</b>
+              <span className="hf-cb-face bot" title="Le bot">
+                <BotIc size={18} />
+              </span>
+            </span>
+          )}
+          {!duel && item.level && <span className="hf-cb-level">Niv. {item.level}</span>}
+        </div>
+
+        {item.cards?.length > 0 && (
+          <div className="hf-cb-cards">
+            {item.cards.map((c, i) => (
+              <button
+                key={c.id}
+                type="button"
+                className="hf-cp-card clickable"
+                onClick={(e) => {
+                  stop(e);
+                  setInspect(i);
+                }}
+                title={c.name}
+              >
+                <TcgCard card={c} tilt={false} lite />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="hf-cp-foot">
+        <Link to="/cartes/combat" className="hf-cp-link clickable" onClick={stop}>
+          Jouer
         </Link>
       </div>
 

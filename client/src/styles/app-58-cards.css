@@ -32,6 +32,12 @@
 .tcg.clickable {
   cursor: pointer;
 }
+/* Largeur connue d'avance (la grille du classeur la calcule) : l'unité est
+   posée en px (`--cq`) et la carte n'est plus un conteneur. Les requêtes de
+   conteneur doublaient le coût de chaque carte qui entre à l'écran. */
+.tcg.sized {
+  container-type: normal;
+}
 .tcg-tilt,
 .tcg-flip {
   position: absolute;
@@ -54,14 +60,14 @@
 .tcg-face {
   position: absolute;
   inset: 0;
-  border-radius: 4.8cqw;
+  border-radius: calc(4.8 * var(--cq, 1cqw));
   overflow: hidden;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  box-shadow: 0 1.6cqw 5cqw rgba(0, 0, 0, 0.42);
+  box-shadow: 0 calc(1.6 * var(--cq, 1cqw)) calc(5 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.42);
 }
 .tcg.live .tcg-face {
-  box-shadow: 0 5cqw 12cqw rgba(0, 0, 0, 0.5);
+  box-shadow: 0 calc(5 * var(--cq, 1cqw)) calc(12 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.5);
 }
 .tcg-back {
   transform: rotateY(180deg);
@@ -70,7 +76,7 @@
 /* --- Face ------------------------------------------------------------ */
 .tcg-front {
   background: var(--edge);
-  padding: 3cqw;
+  padding: calc(3 * var(--cq, 1cqw));
   color: var(--ink);
 }
 .tcg-body {
@@ -78,45 +84,45 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1.6cqw;
-  padding: 2.4cqw 2.8cqw 2cqw;
-  border-radius: 2.4cqw;
+  gap: calc(1.6 * var(--cq, 1cqw));
+  padding: calc(2.4 * var(--cq, 1cqw)) calc(2.8 * var(--cq, 1cqw)) calc(2 * var(--cq, 1cqw));
+  border-radius: calc(2.4 * var(--cq, 1cqw));
   overflow: hidden;
   background:
     radial-gradient(130% 60% at 50% 0%, rgba(255, 255, 255, 0.4), transparent 62%),
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 0.8cqw, transparent 0.8cqw 2.4cqw),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 calc(0.8 * var(--cq, 1cqw)), transparent calc(0.8 * var(--cq, 1cqw)) calc(2.4 * var(--cq, 1cqw))),
     linear-gradient(172deg, var(--t1), color-mix(in srgb, var(--t1) 72%, #000));
 }
 .tcg-head {
   order: 0;
   display: flex;
   align-items: center;
-  gap: 1.2cqw;
-  min-height: 8cqw;
+  gap: calc(1.2 * var(--cq, 1cqw));
+  min-height: calc(8 * var(--cq, 1cqw));
 }
 .tcg-name {
   flex: 1;
   min-width: 0;
-  font: 800 6.2cqw/1.1 var(--font-display);
+  font: 800 calc(6.2 * var(--cq, 1cqw))/1.1 var(--font-display);
   letter-spacing: -0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .tcg-name.sm {
-  font-size: 5.2cqw;
+  font-size: calc(5.2 * var(--cq, 1cqw));
 }
 .tcg-name.xs {
-  font-size: 4.3cqw;
+  font-size: calc(4.3 * var(--cq, 1cqw));
 }
 .tcg-var {
   flex: none;
-  font: italic 900 6.6cqw/1 var(--font-display);
+  font: italic 900 calc(6.6 * var(--cq, 1cqw))/1 var(--font-display);
   letter-spacing: -0.04em;
   color: #fff;
-  -webkit-text-stroke: 0.9cqw #d7262c;
+  -webkit-text-stroke: calc(0.9 * var(--cq, 1cqw)) #d7262c;
   paint-order: stroke fill;
-  margin-right: 0.4cqw;
+  margin-right: calc(0.4 * var(--cq, 1cqw));
 }
 .tcg-var.v-hd {
   -webkit-text-stroke-color: #2563d6;
@@ -125,12 +131,12 @@
   flex: none;
   display: inline-flex;
   align-items: baseline;
-  gap: 0.5cqw;
-  font: 800 6.6cqw/1 var(--font-display);
+  gap: calc(0.5 * var(--cq, 1cqw));
+  font: 800 calc(6.6 * var(--cq, 1cqw))/1 var(--font-display);
   font-variant-numeric: tabular-nums;
 }
 .tcg-hp small {
-  font-size: 3.2cqw;
+  font-size: calc(3.2 * var(--cq, 1cqw));
   font-weight: 800;
 }
 
@@ -139,38 +145,38 @@
   flex: none;
   display: inline-grid;
   place-items: center;
-  width: 7.4cqw;
-  height: 7.4cqw;
+  width: calc(7.4 * var(--cq, 1cqw));
+  height: calc(7.4 * var(--cq, 1cqw));
   border-radius: 50%;
   color: #fff;
   /* Aplat : la couleur du type, un anneau blanc, rien d'autre. */
   background: var(--tc);
   box-shadow:
-    0 0 0 0.5cqw rgba(255, 255, 255, 0.92),
-    0 0.4cqw 0.8cqw rgba(0, 0, 0, 0.25);
+    0 0 0 calc(0.5 * var(--cq, 1cqw)) rgba(255, 255, 255, 0.92),
+    0 calc(0.4 * var(--cq, 1cqw)) calc(0.8 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.25);
 }
 .tcg-type svg {
   width: 64%;
   height: 64%;
 }
 .tcg-type.mini {
-  width: 4.8cqw;
-  height: 4.8cqw;
-  box-shadow: 0 0 0 0.35cqw rgba(255, 255, 255, 0.85);
+  width: calc(4.8 * var(--cq, 1cqw));
+  height: calc(4.8 * var(--cq, 1cqw));
+  box-shadow: 0 0 0 calc(0.35 * var(--cq, 1cqw)) rgba(255, 255, 255, 0.85);
 }
 
 .tcg-art {
   order: 1;
   position: relative;
   flex: none;
-  height: 76cqw;
-  border-radius: 1.2cqw;
+  height: calc(76 * var(--cq, 1cqw));
+  border-radius: calc(1.2 * var(--cq, 1cqw));
   overflow: hidden;
   background: #222;
-  border: 0.9cqw solid rgba(255, 255, 255, 0.8);
+  border: calc(0.9 * var(--cq, 1cqw)) solid rgba(255, 255, 255, 0.8);
   box-shadow:
-    inset 0 0 0 0.3cqw rgba(0, 0, 0, 0.25),
-    0 0.8cqw 1.6cqw rgba(0, 0, 0, 0.3);
+    inset 0 0 0 calc(0.3 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.25),
+    0 calc(0.8 * var(--cq, 1cqw)) calc(1.6 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.3);
 }
 .tcg-art img {
   display: block;
@@ -199,7 +205,7 @@
   width: 130%;
   height: 130%;
   object-fit: cover;
-  filter: blur(2.6cqw) brightness(0.72) saturate(1.35);
+  filter: blur(calc(2.6 * var(--cq, 1cqw))) brightness(0.72) saturate(1.35);
 }
 .tcg-art.fit::before {
   /* Un voile sur les bords : le flou s'efface, la jaquette ressort. */
@@ -214,17 +220,17 @@
   position: relative;
   z-index: 1;
   object-fit: contain;
-  padding: 2.2cqw 0;
-  filter: drop-shadow(0 1.2cqw 2.4cqw rgba(0, 0, 0, 0.55));
+  padding: calc(2.2 * var(--cq, 1cqw)) 0;
+  filter: drop-shadow(0 calc(1.2 * var(--cq, 1cqw)) calc(2.4 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.55));
 }
 .tcg-art .tcg-art-holo {
   z-index: 2;
 }
 .tcg-strip {
   order: 2;
-  margin: -0.4cqw 4cqw 0;
-  padding: 0.5cqw 2cqw;
-  font: italic 600 3.3cqw/1.3 var(--font-body);
+  margin: calc(-0.4 * var(--cq, 1cqw)) calc(4 * var(--cq, 1cqw)) 0;
+  padding: calc(0.5 * var(--cq, 1cqw)) calc(2 * var(--cq, 1cqw));
+  font: italic 600 calc(3.3 * var(--cq, 1cqw))/1.3 var(--font-body);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -240,60 +246,60 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 0.6cqw;
+  gap: calc(0.6 * var(--cq, 1cqw));
 }
 .tcg-move {
   display: grid;
-  grid-template-columns: minmax(11cqw, auto) 1fr auto;
+  grid-template-columns: minmax(calc(11 * var(--cq, 1cqw)), auto) 1fr auto;
   align-items: center;
-  gap: 2.6cqw;
-  padding: 1.3cqw 0;
-  border-bottom: 0.3cqw solid rgba(0, 0, 0, 0.14);
+  gap: calc(2.6 * var(--cq, 1cqw));
+  padding: calc(1.3 * var(--cq, 1cqw)) 0;
+  border-bottom: calc(0.3 * var(--cq, 1cqw)) solid rgba(0, 0, 0, 0.14);
 }
 .tcg-move:last-child {
   border-bottom: 0;
 }
 .tcg-cost {
   display: flex;
-  gap: 0.7cqw;
+  gap: calc(0.7 * var(--cq, 1cqw));
 }
 .tcg-mname {
-  font: 800 4.8cqw/1.1 var(--font-display);
+  font: 800 calc(4.8 * var(--cq, 1cqw))/1.1 var(--font-display);
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .tcg-mname.sm {
-  font-size: 4cqw;
+  font-size: calc(4 * var(--cq, 1cqw));
 }
 .tcg-dmg {
-  font: 800 6.6cqw/1 var(--font-display);
+  font: 800 calc(6.6 * var(--cq, 1cqw))/1 var(--font-display);
   font-variant-numeric: tabular-nums;
 }
 .tcg-foot {
   order: 4;
   display: flex;
   align-items: center;
-  gap: 2.2cqw;
-  padding-top: 1cqw;
-  border-top: 0.3cqw solid rgba(0, 0, 0, 0.14);
-  font: 700 3.5cqw/1 var(--font-display);
+  gap: calc(2.2 * var(--cq, 1cqw));
+  padding-top: calc(1 * var(--cq, 1cqw));
+  border-top: calc(0.3 * var(--cq, 1cqw)) solid rgba(0, 0, 0, 0.14);
+  font: 700 calc(3.5 * var(--cq, 1cqw))/1 var(--font-display);
   font-variant-numeric: tabular-nums;
 }
 .tcg-stat {
   display: inline-flex;
   align-items: center;
-  gap: 0.8cqw;
+  gap: calc(0.8 * var(--cq, 1cqw));
 }
 .tcg-stat svg {
-  width: 3.4cqw;
-  height: 3.4cqw;
+  width: calc(3.4 * var(--cq, 1cqw));
+  height: calc(3.4 * var(--cq, 1cqw));
 }
 .tcg-rar {
   margin-left: auto;
-  font-size: 3.2cqw;
-  letter-spacing: -0.1cqw;
+  font-size: calc(3.2 * var(--cq, 1cqw));
+  letter-spacing: calc(-0.1 * var(--cq, 1cqw));
   white-space: nowrap;
 }
 .tcg-no {
@@ -351,7 +357,7 @@
 .tcg.full :is(.tcg-head, .tcg-strip, .tcg-moves, .tcg-foot) {
   position: relative;
   z-index: 2;
-  text-shadow: 0 0.3cqw 1cqw rgba(0, 0, 0, 0.6);
+  text-shadow: 0 calc(0.3 * var(--cq, 1cqw)) calc(1 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.6);
 }
 .tcg.full .tcg-strip {
   margin-top: auto;
@@ -424,10 +430,10 @@
 .tcg-sparkle {
   z-index: 3;
   background-image:
-    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 0.35cqw, transparent 0.65cqw),
-    radial-gradient(circle, rgba(255, 255, 255, 0.75) 0 0.25cqw, transparent 0.5cqw);
-  background-size: 7cqw 7cqw, 11cqw 11cqw;
-  background-position: 0 0, 3cqw 5cqw;
+    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 calc(0.35 * var(--cq, 1cqw)), transparent calc(0.65 * var(--cq, 1cqw))),
+    radial-gradient(circle, rgba(255, 255, 255, 0.75) 0 calc(0.25 * var(--cq, 1cqw)), transparent calc(0.5 * var(--cq, 1cqw)));
+  background-size: calc(7 * var(--cq, 1cqw)) calc(7 * var(--cq, 1cqw)), calc(11 * var(--cq, 1cqw)) calc(11 * var(--cq, 1cqw));
+  background-position: 0 0, calc(3 * var(--cq, 1cqw)) calc(5 * var(--cq, 1cqw));
   mix-blend-mode: color-dodge;
   opacity: 0.3;
   -webkit-mask-image: radial-gradient(circle at var(--mx) var(--my), #000 0 14%, rgba(0, 0, 0, 0.3) 45%, transparent 72%);
@@ -481,18 +487,18 @@
    bande dorée, le rond du logo au milieu. */
 .tcg-back {
   background: #15151a;
-  padding: 3cqw;
+  padding: calc(3 * var(--cq, 1cqw));
 }
 .tcg-back-in {
   position: relative;
   height: 100%;
   display: grid;
   place-items: center;
-  border-radius: 2.6cqw;
-  border: 0.8cqw solid #f2b70b;
+  border-radius: calc(2.6 * var(--cq, 1cqw));
+  border: calc(0.8 * var(--cq, 1cqw)) solid #f2b70b;
   background-color: #1d1d23;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' fill='none' stroke='%23f2b70b' stroke-width='1.6' stroke-opacity='.16'%3E%3Cpath d='M8 4l5 8H3z'/%3E%3Ccircle cx='36' cy='9' r='4.5'/%3E%3Cpath d='M5 32l8 8M13 32l-8 8'/%3E%3Crect x='31' y='31' width='9' height='9'/%3E%3C/svg%3E");
-  background-size: 16cqw 16cqw;
+  background-size: calc(16 * var(--cq, 1cqw)) calc(16 * var(--cq, 1cqw));
   overflow: hidden;
 }
 .tcg-back-in::before {
@@ -501,7 +507,7 @@
   left: 0;
   right: 0;
   top: 50%;
-  height: 1.4cqw;
+  height: calc(1.4 * var(--cq, 1cqw));
   transform: translateY(-50%);
   background: #f2b70b;
 }
@@ -509,19 +515,19 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 32cqw;
-  height: 32cqw;
+  width: calc(32 * var(--cq, 1cqw));
+  height: calc(32 * var(--cq, 1cqw));
   border-radius: 50%;
   background: #f2b70b;
   color: #15151a;
   box-shadow:
-    0 0 0 2cqw #1d1d23,
-    0 0 0 2.8cqw #f2b70b;
+    0 0 0 calc(2 * var(--cq, 1cqw)) #1d1d23,
+    0 0 0 calc(2.8 * var(--cq, 1cqw)) #f2b70b;
 }
 .tcg-back-glyphs {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.6cqw;
+  gap: calc(0.6 * var(--cq, 1cqw));
   width: 62%;
 }
 .tcg-back-glyphs svg {
@@ -530,11 +536,11 @@
 }
 .tcg-back-word {
   position: absolute;
-  bottom: 9cqw;
+  bottom: calc(9 * var(--cq, 1cqw));
   left: 0;
   right: 0;
   text-align: center;
-  font: 800 6.6cqw/1 var(--font-display);
+  font: 800 calc(6.6 * var(--cq, 1cqw))/1 var(--font-display);
   letter-spacing: -0.02em;
   color: #fff;
 }
@@ -628,7 +634,7 @@
 }
 
 .bst-foil {
-  --tooth: 2.6cqw;
+  --tooth: calc(2.6 * var(--cq, 1cqw));
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -656,26 +662,28 @@
   bottom: -20%;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 2.2cqw;
+  gap: calc(2.2 * var(--cq, 1cqw));
   align-content: center;
   transform: rotate(-16deg);
   mix-blend-mode: luminosity;
   opacity: var(--mosaic-o);
   pointer-events: none;
+  /* Un filtre pour tout le bloc, pas trente (un par jaquette). La fusion en
+     luminosité enlève déjà la couleur : reste le contraste. */
+  filter: contrast(1.15);
 }
 .bst-mosaic img {
   display: block;
   width: 100%;
   aspect-ratio: 3 / 4;
   object-fit: cover;
-  border-radius: 1.2cqw;
-  filter: grayscale(1) contrast(1.15);
+  border-radius: calc(1.2 * var(--cq, 1cqw));
 }
 .bst-burst {
   position: absolute;
   left: 50%;
   top: 60%;
-  width: 190cqw;
+  width: calc(190 * var(--cq, 1cqw));
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   background: repeating-conic-gradient(from 0deg, var(--burst) 0deg 6deg, transparent 6deg 18deg);
@@ -688,23 +696,23 @@
 .bst-fan {
   position: absolute;
   left: 50%;
-  top: 60cqw;
+  top: calc(60 * var(--cq, 1cqw));
   width: 0;
   height: 0;
 }
 .bst-fan-card {
   position: absolute;
-  left: -16cqw;
+  left: calc(-16 * var(--cq, 1cqw));
   top: 0;
-  width: 32cqw;
+  width: calc(32 * var(--cq, 1cqw));
   aspect-ratio: 3 / 4;
-  border-radius: 2.2cqw;
+  border-radius: calc(2.2 * var(--cq, 1cqw));
   overflow: hidden;
   background: #fff;
-  border: 1.1cqw solid #fff;
+  border: calc(1.1 * var(--cq, 1cqw)) solid #fff;
   box-shadow:
-    0 1.2cqw 3cqw rgba(0, 0, 0, 0.45),
-    0 0 0 0.3cqw rgba(0, 0, 0, 0.12);
+    0 calc(1.2 * var(--cq, 1cqw)) calc(3 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.45),
+    0 0 0 calc(0.3 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.12);
   transform-origin: 50% 210%;
   transform: rotate(var(--r)) translateY(var(--y));
   transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.35);
@@ -712,21 +720,21 @@
 /* Au survol, l'éventail s'ouvre un peu plus. */
 .cd-pack:not(:disabled):hover .bst-fan-card,
 .ph-ready .po-pack:hover .bst-fan-card {
-  transform: rotate(calc(var(--r) * 1.3)) translateY(calc(var(--y) - 2.5cqw));
+  transform: rotate(calc(var(--r) * 1.3)) translateY(calc(var(--y) - calc(2.5 * var(--cq, 1cqw))));
 }
 .bst-fan-card img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 1.2cqw;
+  border-radius: calc(1.2 * var(--cq, 1cqw));
 }
 .bst-fan-card:not(:has(img))::after {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: 1.2cqw;
-  background: repeating-linear-gradient(135deg, var(--tag-bg) 0 1.6cqw, var(--rib-bg) 1.6cqw 3.2cqw);
+  border-radius: calc(1.2 * var(--cq, 1cqw));
+  background: repeating-linear-gradient(135deg, var(--tag-bg) 0 calc(1.6 * var(--cq, 1cqw)), var(--rib-bg) calc(1.6 * var(--cq, 1cqw)) calc(3.2 * var(--cq, 1cqw)));
   opacity: 0.85;
 }
 
@@ -735,20 +743,20 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: 15cqw;
+  top: calc(15 * var(--cq, 1cqw));
   z-index: 4;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.8cqw;
+  gap: calc(1.8 * var(--cq, 1cqw));
 }
 .bst-word {
-  font: 400 18.5cqw/0.95 "Lilita One", var(--font-display);
+  font: 400 calc(18.5 * var(--cq, 1cqw))/0.95 "Lilita One", var(--font-display);
   letter-spacing: 0.01em;
   color: var(--word);
-  -webkit-text-stroke: 2.6cqw var(--stroke);
+  -webkit-text-stroke: calc(2.6 * var(--cq, 1cqw)) var(--stroke);
   paint-order: stroke fill;
-  text-shadow: 0 1.6cqw 0 var(--drop);
+  text-shadow: 0 calc(1.6 * var(--cq, 1cqw)) 0 var(--drop);
   white-space: nowrap;
 }
 .bst-word b {
@@ -756,11 +764,11 @@
   color: var(--word2);
 }
 .bst-tag {
-  padding: 1cqw 3.4cqw 1cqw calc(3.4cqw + 0.22em);
-  border-radius: 99cqw;
+  padding: calc(1 * var(--cq, 1cqw)) calc(3.4 * var(--cq, 1cqw)) calc(1 * var(--cq, 1cqw)) calc(calc(3.4 * var(--cq, 1cqw)) + 0.22em);
+  border-radius: calc(99 * var(--cq, 1cqw));
   background: var(--tag-bg);
   color: var(--tag-ink);
-  font: 800 4.3cqw/1 var(--font-display);
+  font: 800 calc(4.3 * var(--cq, 1cqw))/1 var(--font-display);
   letter-spacing: 0.22em;
   text-transform: uppercase;
 }
@@ -768,26 +776,26 @@
 /* Le ruban de l'édition, aux bouts entaillés */
 .bst-ribbon {
   position: absolute;
-  left: 7cqw;
-  right: 7cqw;
-  bottom: 27cqw;
+  left: calc(7 * var(--cq, 1cqw));
+  right: calc(7 * var(--cq, 1cqw));
+  bottom: calc(27 * var(--cq, 1cqw));
   z-index: 4;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.8cqw 0 2.2cqw;
+  padding: calc(1.8 * var(--cq, 1cqw)) 0 calc(2.2 * var(--cq, 1cqw));
   background: var(--rib-bg);
   color: var(--rib-ink);
   clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%, 6% 50%);
 }
 .bst-ribbon small {
-  font: 800 3.4cqw/1 var(--font-display);
+  font: 800 calc(3.4 * var(--cq, 1cqw))/1 var(--font-display);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   opacity: 0.8;
 }
 .bst-ribbon span {
-  font: 400 11cqw/1 "Lilita One", var(--font-display);
+  font: 400 calc(11 * var(--cq, 1cqw))/1 "Lilita One", var(--font-display);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -795,34 +803,34 @@
 .bst-set,
 .bst-count {
   position: absolute;
-  bottom: 13cqw;
+  bottom: calc(13 * var(--cq, 1cqw));
   z-index: 4;
 }
 .bst-set {
-  left: 6cqw;
-  padding: 1cqw 2.4cqw;
-  border-radius: 1.4cqw;
+  left: calc(6 * var(--cq, 1cqw));
+  padding: calc(1 * var(--cq, 1cqw)) calc(2.4 * var(--cq, 1cqw));
+  border-radius: calc(1.4 * var(--cq, 1cqw));
   background: var(--badge-bg);
   color: var(--badge-ink);
-  font: 800 3.4cqw/1 var(--font-display);
+  font: 800 calc(3.4 * var(--cq, 1cqw))/1 var(--font-display);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 .bst-count {
-  right: 6cqw;
+  right: calc(6 * var(--cq, 1cqw));
   display: flex;
   align-items: baseline;
-  gap: 0.8cqw;
-  padding: 0.6cqw 2.4cqw;
-  border-radius: 1.4cqw;
+  gap: calc(0.8 * var(--cq, 1cqw));
+  padding: calc(0.6 * var(--cq, 1cqw)) calc(2.4 * var(--cq, 1cqw));
+  border-radius: calc(1.4 * var(--cq, 1cqw));
   background: var(--badge-bg);
   color: var(--badge-ink);
 }
 .bst-count b {
-  font: 400 6.6cqw/1 "Lilita One", var(--font-display);
+  font: 400 calc(6.6 * var(--cq, 1cqw))/1 "Lilita One", var(--font-display);
 }
 .bst-count small {
-  font: 800 3.2cqw/1 var(--font-display);
+  font: 800 calc(3.2 * var(--cq, 1cqw))/1 var(--font-display);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -833,23 +841,23 @@
   left: 0;
   right: 0;
   z-index: 5;
-  height: 10cqw;
+  height: calc(10 * var(--cq, 1cqw));
   background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.34) 0 0.45cqw, rgba(0, 0, 0, 0.3) 0.45cqw 1.3cqw),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.34) 0 calc(0.45 * var(--cq, 1cqw)), rgba(0, 0, 0, 0.3) calc(0.45 * var(--cq, 1cqw)) calc(1.3 * var(--cq, 1cqw))),
     linear-gradient(90deg, var(--crimp-a), var(--crimp-c) 18%, var(--crimp-b) 36%, var(--crimp-a) 55%, var(--crimp-c) 74%, var(--crimp-b) 90%, var(--crimp-a));
 }
 .bst-crimp.top {
   top: 0;
   box-shadow:
-    0 0.35cqw 0 rgba(255, 255, 255, 0.35),
-    0 1.2cqw 2cqw rgba(0, 0, 0, 0.4);
+    0 calc(0.35 * var(--cq, 1cqw)) 0 rgba(255, 255, 255, 0.35),
+    0 calc(1.2 * var(--cq, 1cqw)) calc(2 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.4);
 }
 .bst-crimp.bottom {
   bottom: 0;
-  height: 8cqw;
+  height: calc(8 * var(--cq, 1cqw));
   box-shadow:
-    0 -0.35cqw 0 rgba(255, 255, 255, 0.35),
-    0 -1.2cqw 2cqw rgba(0, 0, 0, 0.4);
+    0 calc(-0.35 * var(--cq, 1cqw)) 0 rgba(255, 255, 255, 0.35),
+    0 calc(-1.2 * var(--cq, 1cqw)) calc(2 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.4);
 }
 
 /* Le volume : bords qui fuient, pincement près des soudures, plis d'alu */
@@ -861,7 +869,7 @@
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0) 9%, rgba(0, 0, 0, 0) 91%, rgba(0, 0, 0, 0.5)),
     linear-gradient(180deg, rgba(0, 0, 0, 0) 5.5%, rgba(0, 0, 0, 0.32) 6.2%, rgba(0, 0, 0, 0) 12%, rgba(0, 0, 0, 0) 89%, rgba(0, 0, 0, 0.32) 95%, rgba(0, 0, 0, 0) 95.6%),
-    repeating-linear-gradient(98deg, transparent 0 7cqw, rgba(255, 255, 255, 0.08) 7cqw 7.8cqw, transparent 7.8cqw 15cqw),
+    repeating-linear-gradient(98deg, transparent 0 calc(7 * var(--cq, 1cqw)), rgba(255, 255, 255, 0.08) calc(7 * var(--cq, 1cqw)) calc(7.8 * var(--cq, 1cqw)), transparent calc(7.8 * var(--cq, 1cqw)) calc(15 * var(--cq, 1cqw))),
     radial-gradient(75% 42% at 50% 50%, rgba(255, 255, 255, 0.1), transparent 70%);
 }
 .bst-sheen {
@@ -2702,7 +2710,7 @@ button.cd-rar:hover {
 .hf-cp-card:first-child .tcg-face {
   box-shadow:
     0 0 0 2px var(--drop-rarity),
-    0 1.6cqw 5cqw rgba(0, 0, 0, 0.42);
+    0 calc(1.6 * var(--cq, 1cqw)) calc(5 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.42);
 }
 .hf-cp-new {
   position: absolute;
@@ -2782,6 +2790,52 @@ button.cd-rar:hover {
 
 .cd-grid-v {
   position: relative;
+  contain: layout style;
+}
+/* Une case posée à sa place, à sa taille : elle ne bouge plus quand ses
+   voisines entrent ou sortent, et une carte qui arrive ne fait recalculer
+   qu'elle-même (pas de `paint` : les pastilles ×2 et NEW débordent). */
+.cd-vcell {
+  position: absolute;
+  top: 0;
+  left: 0;
+  contain: size layout style;
+}
+.cd-vcell:hover {
+  z-index: 2;
+}
+
+/* L'éclat du mythique tourne en boucle : dans le classeur, seulement sur la
+   carte survolée (des dizaines d'animations en fusion saccadaient). */
+.tcg.lite:not(.live) .tcg-shimmer {
+  display: none;
+}
+
+/* Écran tactile / téléphone : le classeur sans les effets les plus chers.
+   Pas de flou par carte (un filtre par jaquette), une ombre courte, et les
+   sachets ne brillent plus en boucle (fusion de calques repeinte à chaque
+   image). Le dessin reste le même. */
+@media (hover: none), (max-width: 640px) {
+  .tcg.lite .tcg-art-blur {
+    display: none;
+  }
+  .tcg.lite .tcg-art-fit {
+    filter: none;
+  }
+  .tcg.lite .tcg-face {
+    box-shadow: 0 calc(1.6 * var(--cq, 1cqw)) calc(3 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.35);
+  }
+  .tcg.lite .tcg-tilt {
+    transform: none;
+    transition: none;
+  }
+  .cd-cell:hover .tcg {
+    transform: none;
+  }
+  .bst-sheen,
+  .cd-pack.p1 .bst {
+    animation: none;
+  }
 }
 
 /* ---------------------------------------------------------------------
@@ -2813,3 +2867,96 @@ button.cd-rar:hover {
   transition-duration: 0.12s;
 }
 
+
+/* ---------------------------------------------------------------------
+   Dans le fil : « a gagné un combat de cartes »
+   --------------------------------------------------------------------- */
+.hf-cb-tally {
+  margin-left: auto;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font: 700 0.72rem/1 var(--font-display);
+  white-space: nowrap;
+}
+.hf-cb-tally b {
+  color: var(--text);
+}
+.hf-cb-tally.gold {
+  background: #f2b70b;
+  color: #17171a;
+}
+.hf-cb-body {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.4rem;
+  margin: 0.8rem 0 0.7rem;
+}
+.hf-cb-score {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.hf-cb-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.6;
+}
+.hf-cb-side.win {
+  opacity: 1;
+}
+.hf-cb-face {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.hf-cb-side.win .hf-cb-face {
+  box-shadow: 0 0 0 2px #f2b70b;
+}
+.hf-cb-face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hf-cb-fb {
+  font: 800 0.95rem/1 var(--font-display);
+}
+.hf-cb-num {
+  font: 800 1.7rem/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.hf-cb-side.win .hf-cb-num {
+  color: #f2b70b;
+}
+.hf-cb-dash {
+  color: var(--text-soft);
+  font: 700 1.2rem/1 var(--font-display);
+}
+.hf-cb-level {
+  margin-left: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font: 700 0.72rem/1 var(--font-display);
+}
+.hf-cb-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  gap: 0.5rem;
+}
+@media (max-width: 480px) {
+  .hf-cb-cards {
+    grid-template-columns: repeat(3, 64px);
+  }
+}

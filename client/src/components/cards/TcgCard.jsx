@@ -18,7 +18,9 @@ import { TYPE_ICONS } from "./TypeIcons";
 // ======================================================================
 // Toutes les tailles internes sont en `cqw` (largeur de la carte) : la même
 // carte se dessine à 120 px dans le classeur et à 420 px en grand, sans une
-// ligne de CSS en plus. On lui donne une largeur, elle fait le reste.
+// ligne de CSS en plus. On lui donne une largeur, elle fait le reste. (Les
+// feuilles écrivent `var(--cq, 1cqw)` : une carte à `size` connu le remplace
+// par des px.)
 
 // L'inclinaison 3D et la position du reflet, pilotées par le pointeur. Écrit
 // directement dans le style (variables CSS), jamais dans l'état React : une
@@ -74,6 +76,10 @@ export function useCardTilt(enabled = true, strength = 1) {
   return ref;
 }
 
+// Écran sans survol (téléphone, tablette) : lu une fois.
+const NO_HOVER =
+  typeof window !== "undefined" && !!window.matchMedia?.("(hover: none)").matches;
+
 export function TypeBadge({ type, className = "" }) {
   const key = TYPES[type] ? type : "arcade";
   const t = TYPES[key];
@@ -114,11 +120,16 @@ function TcgCard({
   // l'écran : une carte qui arrive ne doit jamais montrer son fond vide.
   eager = false,
   lite = false,
+  // Largeur en px, quand on la connaît : la carte se passe alors des requêtes
+  // de conteneur (voir `.tcg.sized`).
+  size = 0,
   onClick,
   style,
   children,
 }) {
-  const ref = useCardTilt(tilt && !faceDown);
+  // Au doigt, une carte du classeur ne bascule pas : le toucher sert à faire
+  // défiler, et chaque contact allumait reflets et holo pour rien.
+  const ref = useCardTilt(tilt && !faceDown && !(lite && NO_HOVER));
   const back = !card;
   const stats = back ? null : cardStats(card);
   const r = card?.rarity || "common";
@@ -133,11 +144,12 @@ function TcgCard({
       ref={ref}
       className={`tcg r-${r} ${full ? "full" : ""} ${holo ? "holo" : ""} ${
         faceDown || back ? "down" : ""
-      } ${lite ? "lite" : ""} ${onClick ? "clickable" : ""} ${className}`}
+      } ${lite ? "lite" : ""} ${size ? "sized" : ""} ${onClick ? "clickable" : ""} ${className}`}
       style={{
         "--t1": t1?.color,
         "--t2": t2?.color,
         "--rc": CARD_RARITIES[r]?.color,
+        ...(size ? { "--cq": `${size / 100}px` } : null),
         ...style,
       }}
       onClick={onClick}

@@ -834,7 +834,11 @@ export async function playRound(userId, id, cardId) {
       if (ask) pending = { card: mine, ask, at: Date.now() };
     }
   }
-  if (winner) st.score[winner]++;
+  if (winner) {
+    st.score[winner]++;
+    // Les cartes qui ont gagné une manche : ce que le fil montre de la partie.
+    (st.won ||= { you: [], bot: [] })[winner].push(winner === "you" ? mine : his);
+  }
   if (back.you) st.you.hand.push(mine);
   else if (!pending) st.you.out.push(mine);
   if (back.bot) st.bot.hand.push(his);
@@ -912,8 +916,33 @@ async function finishTurn(userId, doc, st, cat, extra) {
     st.end.balance = balance;
     st.end.pass = pass;
     CardBattle.updateOne({ _id: doc._id }, { $set: { "state.end": st.end } }).catch(() => {});
+    // Le fil des abonnés : une partie menée à son terme (un abandon n'est pas
+    // une partie à raconter).
+    if (!st.end.quit)
+      recordActivity({
+        actor: userId,
+        type: "card_battle",
+        meta: {
+          mode: "bot",
+          battleId: String(doc._id),
+          result: st.end.winner === "you" ? "win" : st.end.winner === "bot" ? "loss" : "draw",
+          score: [st.score.you, st.score.bot],
+          level: st.level,
+          perfect: !!st.end.reward?.perfect,
+          cards: bestCards(cat, st.won?.you),
+        },
+      });
   }
   return { ...extra, state: view(doc._id, st, cat) };
+}
+
+// Les trois plus belles cartes gagnantes d'un joueur (la rareté d'abord),
+// sans doublon : une carte revenue en main a pu gagner deux manches.
+export function bestCards(cat, ids = []) {
+  return [...new Set(ids || [])]
+    .filter((id) => cat.byId.has(id))
+    .sort((a, b) => rank(cat.byId.get(b).rarity) - rank(cat.byId.get(a).rarity))
+    .slice(0, 3);
 }
 
 // ----------------------------------------------------------------------

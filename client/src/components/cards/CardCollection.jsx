@@ -437,7 +437,7 @@ export default function CardCollection({
         ) : (
           <VirtualGrid
             items={shown}
-            renderItem={(c) =>
+            renderItem={(c, w) =>
               c.owned === false ? (
                 <MissingCell key={c.id} card={c} />
               ) : (
@@ -448,6 +448,7 @@ export default function CardCollection({
                   onOpen={setInspect}
                   onFav={editable ? onFav : null}
                   wanted={!!wants?.has(c.id)}
+                  size={w}
                 />
               )
             }
@@ -486,11 +487,11 @@ export default function CardCollection({
 // Une case du classeur. MÉMORISÉE : quand une rangée entre à l'écran, seules
 // ses cartes se dessinent — celles déjà là ne bougent pas. (Une fonction de
 // clic recréée à chaque rendu faisait tout redessiner à chaque cran.)
-const BinderCell = memo(function BinderCell({ card, index, onOpen, onFav, wanted = false }) {
+const BinderCell = memo(function BinderCell({ card, index, onOpen, onFav, wanted = false, size = 0 }) {
   const open = useCallback(() => onOpen(index), [onOpen, index]);
   return (
     <div className={`cd-cell ${wanted ? "wanted" : ""}`}>
-      <TcgCard card={card} lite onClick={open} />
+      <TcgCard card={card} lite size={size} onClick={open} />
       {card.fresh && <span className="cd-new">NEW</span>}
       {wanted && <span className="cd-wanted">Je cherche</span>}
       {card.count > 1 && <span className="cd-count">×{card.count}</span>}
@@ -539,7 +540,8 @@ function VirtualGrid({ items, renderItem }) {
   const gapY = small ? 14 : 19;
   const cols = Math.max(1, Math.floor((width + gapX) / (minCol + gapX)));
   const cellW = width ? (width - gapX * (cols - 1)) / cols : minCol;
-  const rowH = (cellW * 88) / 63 + gapY;
+  const cellH = (cellW * 88) / 63;
+  const rowH = cellH + gapY;
   const rows = Math.ceil(items.length / cols);
 
   useEffect(() => {
@@ -568,21 +570,26 @@ function VirtualGrid({ items, renderItem }) {
     };
   }, [rowH, rows]);
 
+  // Chaque case à SA place (absolue) : quand une rangée entre ou sort, les
+  // cases déjà là ne bougent pas d'un pixel — rien à redessiner. (Avant, la
+  // grille entière glissait d'une rangée et toutes ses cartes se repeignaient,
+  // ce qui saccadait sur téléphone.)
   const start = win.first * cols;
   const end = Math.min(items.length, win.last * cols);
+  const out = [];
+  for (let i = start; i < end; i++) {
+    const it = items[i];
+    const x = (i % cols) * (cellW + gapX);
+    const y = Math.floor(i / cols) * rowH;
+    out.push(
+      <div key={it.id} className="cd-vcell" style={{ width: cellW, height: cellH, transform: `translate(${x}px, ${y}px)` }}>
+        {renderItem(it, cellW)}
+      </div>
+    );
+  }
   return (
     <div ref={ref} className="cd-grid-v" style={{ height: rows ? rows * rowH - gapY : 0 }}>
-      <div
-        className="cd-grid"
-        style={{
-          transform: `translateY(${win.first * rowH}px)`,
-          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-          columnGap: gapX,
-          rowGap: gapY,
-        }}
-      >
-        {items.slice(start, end).map((it, k) => renderItem(it, start + k))}
-      </div>
+      {out}
     </div>
   );
 }

@@ -709,8 +709,8 @@
 }
 .bd-found-cell.on .tcg-face {
   box-shadow:
-    0 0 0 1.6cqw #f2b70b,
-    0 3cqw 8cqw rgba(0, 0, 0, 0.45);
+    0 0 0 calc(1.6 * var(--cq, 1cqw)) #f2b70b,
+    0 calc(3 * var(--cq, 1cqw)) calc(8 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.45);
 }
 .bd-found-mark {
   position: absolute;
