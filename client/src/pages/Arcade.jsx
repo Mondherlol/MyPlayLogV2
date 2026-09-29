@@ -159,6 +159,7 @@ const SOURCE_LABELS = {
   cards: "Booster de cartes",
   cardbattle: "Combat de cartes",
   cardduel: "Duel de cartes",
+  cardteam: "Combat de cartes à 2 contre 2",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",
   backfill: "Parties d'avant l'arcade",

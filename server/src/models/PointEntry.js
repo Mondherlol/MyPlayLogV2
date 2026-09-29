@@ -26,6 +26,7 @@ export const POINT_SOURCES = {
   cards: "Booster de cartes",
   cardbattle: "Combat de cartes",
   cardduel: "Duel de cartes",
+  cardteam: "Combat de cartes à 2 contre 2",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",
   // Rattrapage des parties jouées AVANT l'arcade (scripts/backfillArcadePoints.js).

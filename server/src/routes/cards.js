@@ -43,6 +43,19 @@ import {
   challengeDuel,
   declineDuel,
 } from "../lib/cardDuel.js";
+import {
+  createTeam,
+  getTeam,
+  sitTeam,
+  inviteTeam,
+  startTeam,
+  readyTeam,
+  pickTeam,
+  quitTeam,
+  rematchTeam,
+  liveTeamOf,
+  teamStats,
+} from "../lib/cardTeam.js";
 import CardBattleStat from "../models/CardBattleStat.js";
 import { deliverCard, deliverCardToConversation } from "./chat.js";
 import {
@@ -366,6 +379,8 @@ router.get(
     ...(await battleHome(req.userId)),
     duel: await liveDuelOf(req.userId),
     duels: duelStats(await CardBattleStat.findOne({ user: req.userId }).select("pvpWins pvpLosses pvpDraws").lean()),
+    team: await liveTeamOf(req.userId),
+    teams: teamStats(await CardBattleStat.findOne({ user: req.userId }).select("teamWins teamLosses teamDraws").lean()),
     packCovers: packCovers(await getCatalog()),
   }))
 );
@@ -443,6 +458,34 @@ router.post(
 router.post("/duel/:code/decline", battle((req) => declineDuel(req.userId, req.params.code)));
 // POST /api/cards/duel/:code/rematch — la revanche.
 router.post("/duel/:code/rematch", battle((req) => rematchDuel(req.userId, req.params.code)));
+
+// ----------------------------------------------------------------------
+//  Le 2 contre 2, en temps réel (lib/cardTeam.js)
+// ----------------------------------------------------------------------
+// POST /api/cards/team — j'ouvre une table (et je m'y assois).
+router.post("/team", battle((req) => createTeam(req.userId)));
+// GET /api/cards/team/:code — la table (et ma partie si j'en suis).
+router.get("/team/:code", battle((req) => getTeam(req.userId, req.params.code)));
+// POST /api/cards/team/:code/sit { seat } — je m'assois (ou je change de place).
+router.post("/team/:code/sit", battle((req) => sitTeam(req.userId, req.params.code, req.body?.seat)));
+// POST /api/cards/team/:code/invite { user, seat } — j'invite un pote.
+router.post(
+  "/team/:code/invite",
+  battle((req) => inviteTeam(req.userId, req.params.code, req.body?.user, req.body?.seat))
+);
+// POST /api/cards/team/:code/start — l'hôte lance (des bots aux places vides).
+router.post("/team/:code/start", battle((req) => startTeam(req.userId, req.params.code)));
+// POST /api/cards/team/:code/ready { n } — mes animations sont finies.
+router.post("/team/:code/ready", battle((req) => readyTeam(req.userId, req.params.code, req.body?.n)));
+// POST /api/cards/team/:code/pick { n, card, lane } — je pose ma carte sur une voie.
+router.post(
+  "/team/:code/pick",
+  battle((req) => pickTeam(req.userId, req.params.code, req.body?.n, req.body?.card, req.body?.lane))
+);
+// POST /api/cards/team/:code/quit — me lever, fermer la table, ou abandonner.
+router.post("/team/:code/quit", battle((req) => quitTeam(req.userId, req.params.code)));
+// POST /api/cards/team/:code/rematch — la revanche.
+router.post("/team/:code/rematch", battle((req) => rematchTeam(req.userId, req.params.code)));
 
 // POST /api/cards/duel/:code/invite { userIds, conversationIds } — la carte
 // « viens m'affronter » dans la messagerie, comme les autres versus.

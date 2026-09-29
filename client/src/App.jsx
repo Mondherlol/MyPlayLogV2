@@ -45,6 +45,7 @@ const Cards = lazyPage(() => import("./pages/Cards"));
 const CardsUser = lazyPage(() => import("./pages/CardsUser"));
 const CardBattle = lazyPage(() => import("./pages/CardBattle"));
 const CardDuel = lazyPage(() => import("./pages/CardDuel"));
+const CardTeam = lazyPage(() => import("./pages/CardTeam"));
 const Playtopia = lazyPage(() => import("./pages/Playtopia"));
 const Explorer = lazyPage(() => import("./pages/Explorer"));
 const Releases = lazyPage(() => import("./pages/Releases"));
@@ -324,6 +325,7 @@ export default function App() {
         {/* Les combats de cartes, contre le bot. */}
         <Route path="/cartes/combat" element={<CardBattle />} />
         <Route path="/cartes/duel/:code" element={<CardDuel />} />
+        <Route path="/cartes/equipe/:code" element={<CardTeam />} />
         <Route path="/blindtest" element={<BlindTest />} />
         {/* Salon de versus musical : adresse des liens d'invitation. */}
         <Route path="/blindtest/versus/:code" element={<BlindTestVersus />} />

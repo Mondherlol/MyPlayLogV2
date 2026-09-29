@@ -950,6 +950,7 @@ export function bestCards(cat, ids = []) {
 // ----------------------------------------------------------------------
 // Les mêmes règles, à la lettre : objectifs, verdict, combat, sauvetage,
 // passe. Seuls changent le rythme (deux humains) et le palmarès.
+// Le 2 contre 2 (lib/cardTeam.js) s'en sert aussi, sans le sauvetage.
 export const engine = {
   MAX_ROUNDS,
   LATE_MS,
@@ -959,6 +960,7 @@ export const engine = {
   rnd,
   pick,
   shuffle,
+  gauss,
   rank,
   unit,
   check,

@@ -53,6 +53,8 @@ const VERSUS_EVENTS = [
   "cardduel", // Les duels de cartes (lib/cardDuel.js) : l'invité arrive, « go »,
   // la carte d'en face est posée, le verdict. Sans cette ligne, chacun attend
   // l'autre indéfiniment (seul le filet de 4 s ferait avancer la partie).
+  "cardteam", // Le 2 contre 2 aux cartes (lib/cardTeam.js) : la table qui se
+  // remplit, « go », les cartes posées sur chaque voie, le verdict.
 ];
 
 // Durée d'affichage d'une bulle « X t'a écrit » (ms).

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link2, Loader2, Search, Swords, X } from "lucide-react";
+import { Link2, Loader2, Search, Swords, UserPlus, X } from "lucide-react";
 import { apiFetch } from "../../../lib/api";
 import { useScrollLock } from "../../../hooks/useScrollLock";
 
@@ -24,7 +24,7 @@ export function FriendFace({ u, size = 40, dot = false }) {
   );
 }
 
-export default function DuelFriends({ token, title = "Défier un pote", onPick, onLink, onClose }) {
+export default function DuelFriends({ token, title = "Défier un pote", action = "Défier", onPick, onLink, onClose }) {
   useScrollLock(true);
   const [data, setData] = useState(null);
   const [q, setQ] = useState("");
@@ -111,8 +111,8 @@ export default function DuelFriends({ token, title = "Défier un pote", onPick, 
                     </small>
                   </span>
                   <button className="df-go clickable" disabled={off || !!busy} onClick={() => pick(f)}>
-                    {busy === f.id ? <Loader2 className="spin" /> : <Swords />}
-                    <span>Défier</span>
+                    {busy === f.id ? <Loader2 className="spin" /> : action === "Défier" ? <Swords /> : <UserPlus />}
+                    <span>{action}</span>
                   </button>
                 </div>
               );

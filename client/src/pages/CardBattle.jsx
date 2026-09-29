@@ -16,6 +16,7 @@ import {
   Swords,
   Trophy,
   Users,
+  UsersRound,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
@@ -129,6 +130,18 @@ export default function CardBattle() {
       toast.show({ title: "Duel", text: url });
     }
     navigate(`/cartes/duel/${d.room.code}`);
+  }
+
+  // Le 2 contre 2 : une table s'ouvre, j'y suis assis, j'invite qui je veux.
+  const teamRef = useRef(null);
+  function openTeam() {
+    if (teamRef.current) return;
+    teamRef.current = apiFetch("/cards/team", { method: "POST", token })
+      .then((d) => navigate(`/cartes/equipe/${d.room.code}`))
+      .catch((e) => toast.show({ title: "2 contre 2", text: e.message, error: true }))
+      .finally(() => {
+        teamRef.current = null;
+      });
   }
 
   function resume() {
@@ -260,6 +273,22 @@ export default function CardBattle() {
               </button>
             )
           )}
+          {!locked && home && (
+            home.team ? (
+              <Link to={`/cartes/equipe/${home.team.code}`} className="bl-duel team live clickable">
+                <UsersRound />
+                2 contre 2 en cours
+                <b>
+                  {home.team.score.you}–{home.team.score.bot}
+                </b>
+              </Link>
+            ) : (
+              <button className="bl-duel team clickable" onClick={openTeam}>
+                <UsersRound />
+                2 contre 2
+              </button>
+            )
+          )}
         </div>
 
         <div className="bl-stats">
@@ -279,6 +308,12 @@ export default function CardBattle() {
             <span title="Duels gagnés contre des potes" className="duel">
               <Users />
               <b>{fmt(home.duels.wins)}</b>
+            </span>
+          )}
+          {home?.teams?.wins + home?.teams?.losses + home?.teams?.draws > 0 && (
+            <span title="Victoires en 2 contre 2" className="duel team">
+              <UsersRound />
+              <b>{fmt(home.teams.wins)}</b>
             </span>
           )}
         </div>

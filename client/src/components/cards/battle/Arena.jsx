@@ -230,7 +230,7 @@ function place(p, lay, hands, zoom, focus, peek) {
 }
 
 // L'année qui défile jusqu'à la vraie.
-function YearRoll({ year, target }) {
+export function YearRoll({ year, target }) {
   const [v, setV] = useState(year - 18);
   const [done, setDone] = useState(false);
   useEffect(() => {
@@ -256,7 +256,7 @@ function YearRoll({ year, target }) {
   );
 }
 
-function ObjectiveFace({ o, big = false }) {
+export function ObjectiveFace({ o, big = false }) {
   if (!o) return null;
   const len = o.label?.length || 0;
   return (
@@ -273,7 +273,7 @@ function ObjectiveFace({ o, big = false }) {
   );
 }
 
-function Avatar({ me }) {
+export function Avatar({ me }) {
   return me?.avatar ? <img src={me.avatar} alt="" draggable="false" /> : <b>{(me?.username || "?")[0]}</b>;
 }
 

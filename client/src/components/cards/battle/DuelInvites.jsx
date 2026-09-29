@@ -16,6 +16,7 @@ import { FriendFace } from "./DuelFriends";
 // ne peut pas rater, et qui se répond en un clic. Accepter mène au salon et y
 // entre ; refuser prévient celui qui défie. Sans réponse, elle s'efface au bout
 // d'une minute (le défi reste dans le salon, et l'autre peut relancer).
+// Même fenêtre pour une invitation à une table de 2 contre 2 (« cardteam »).
 
 const TTL = 60000;
 
@@ -23,30 +24,33 @@ export default function DuelInvites() {
   const { token, user } = useAuth();
   const { subscribe } = useChat();
   const navigate = useNavigate();
-  const [list, setList] = useState([]); // [{ code, by, at }]
+  const [list, setList] = useState([]); // [{ id, code, team, seat, by, at }]
   const timers = useRef(new Map());
 
-  const drop = (code) => {
-    clearTimeout(timers.current.get(code));
-    timers.current.delete(code);
-    setList((l) => l.filter((x) => x.code !== code));
+  const drop = (id) => {
+    clearTimeout(timers.current.get(id));
+    timers.current.delete(id);
+    setList((l) => l.filter((x) => x.id !== id));
   };
 
   useEffect(() => {
     if (!subscribe || !user) return undefined;
     return subscribe((event, data) => {
-      if (event !== "cardduel" || !data?.code) return;
+      if ((event !== "cardduel" && event !== "cardteam") || !data?.code) return;
+      const team = event === "cardteam";
+      const id = `${team ? "t" : "d"}:${data.code}`;
       // Le défi ne tient plus (salon fermé, quelqu'un d'autre défié).
-      if (data.kind === "withdrawn") return drop(data.code);
+      if (data.kind === "withdrawn" || (team && data.kind === "closed")) return drop(id);
       if (data.kind !== "invite") return;
       // Déjà dans ce salon : rien à annoncer.
-      if (window.location.pathname === `/cartes/duel/${data.code}`) return;
-      setList((l) => [{ code: data.code, by: data.by, at: Date.now() }, ...l.filter((x) => x.code !== data.code)].slice(0, 3));
+      if (window.location.pathname === `/cartes/${team ? "equipe" : "duel"}/${data.code}`) return;
+      const item = { id, code: data.code, team, seat: data.seat ?? null, by: data.by, at: Date.now() };
+      setList((l) => [item, ...l.filter((x) => x.id !== id)].slice(0, 3));
       playMessageSound();
-      clearTimeout(timers.current.get(data.code));
+      clearTimeout(timers.current.get(id));
       timers.current.set(
-        data.code,
-        setTimeout(() => drop(data.code), TTL)
+        id,
+        setTimeout(() => drop(id), TTL)
       );
     });
   }, [subscribe, user]);
@@ -60,7 +64,7 @@ export default function DuelInvites() {
   return createPortal(
     <div className="dinv-stack">
       {list.map((x) => (
-        <div key={x.code} className="dinv" role="alertdialog" aria-label={`${x.by?.username} te défie en duel`}>
+        <div key={x.id} className="dinv" role="alertdialog" aria-label={`${x.by?.username} ${x.team ? "t'invite en 2 contre 2" : "te défie en duel"}`}>
           <span className="dinv-art">
             <FriendFace u={x.by} size={46} />
             <i className="dinv-badge">
@@ -69,14 +73,14 @@ export default function DuelInvites() {
           </span>
           <span className="dinv-txt">
             <b>{x.by?.username}</b>
-            <span>te défie en duel</span>
+            <span>{x.team ? "t'invite en 2 contre 2" : "te défie en duel"}</span>
           </span>
           <span className="dinv-actions">
             <button
               className="dinv-btn ghost clickable"
               onClick={() => {
-                drop(x.code);
-                apiFetch(`/cards/duel/${x.code}/decline`, { method: "POST", token }).catch(() => {});
+                drop(x.id);
+                if (!x.team) apiFetch(`/cards/duel/${x.code}/decline`, { method: "POST", token }).catch(() => {});
               }}
             >
               Refuser
@@ -84,8 +88,12 @@ export default function DuelInvites() {
             <button
               className="dinv-btn gold clickable"
               onClick={() => {
-                drop(x.code);
-                navigate(`/cartes/duel/${x.code}?rejoindre`);
+                drop(x.id);
+                navigate(
+                  x.team
+                    ? `/cartes/equipe/${x.code}${x.seat != null ? `?place=${x.seat}` : "?rejoindre"}`
+                    : `/cartes/duel/${x.code}?rejoindre`
+                );
               }}
             >
               Accepter

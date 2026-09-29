@@ -72,4 +72,6 @@
 @import "./styles/app-60-card-binders.css";
 /* Échanges de cartes entre joueurs. */
 @import "./styles/app-61-card-trades.css";
+/* Le 2 contre 2 aux cartes. */
+@import "./styles/app-62-card-team.css";
 @import "./styles/app-99-mobile-perf.css";

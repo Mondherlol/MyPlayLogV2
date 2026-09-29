@@ -26,6 +26,10 @@ const cardBattleStatSchema = new mongoose.Schema(
     pvpWins: { type: Number, default: 0 },
     pvpLosses: { type: Number, default: 0 },
     pvpDraws: { type: Number, default: 0 },
+    // Le 2 contre 2 : un palmarès à part, lui aussi.
+    teamWins: { type: Number, default: 0 },
+    teamLosses: { type: Number, default: 0 },
+    teamDraws: { type: Number, default: 0 },
   },
   { versionKey: false }
 );

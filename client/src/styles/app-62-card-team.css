@@ -1,0 +1,564 @@
+/* ======================================================================
+   Combats de cartes en 2 contre 2
+   ======================================================================
+   La table (pages/CardTeam.jsx) et l'arène à deux voies
+   (components/cards/battle/TeamArena.jsx). L'arène reprend tout le théâtre
+   du 1 contre 1 (classes .ba-*, app-59-card-battle.css) : ici, seulement ce
+   qui change à quatre. */
+
+/* ---------------------------------------------------------------------
+   La table
+   --------------------------------------------------------------------- */
+.tl-hero {
+  gap: 1.4rem;
+}
+.tl-table {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+}
+.tl-team {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.tl-vs {
+  font: 400 1.3rem/1 "Lilita One", var(--font-display);
+  color: var(--text-soft);
+}
+.tl-seat {
+  --tc: #f2b70b;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: inset 3px 0 0 var(--tc);
+}
+.tl-seat.bot {
+  --tc: #ff5470;
+}
+.tl-seat.mine {
+  border-color: var(--tc);
+}
+.tl-face {
+  flex: none;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.tl-seat.full .tl-face .df-face {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--tc);
+}
+.tl-seat.empty .tl-face {
+  border: 2px dashed color-mix(in srgb, var(--tc) 55%, transparent);
+  color: var(--text-soft);
+}
+.tl-seat.empty .tl-face svg {
+  width: 26px;
+  height: 26px;
+  opacity: 0.6;
+}
+.tl-name {
+  min-width: 0;
+  font: 700 0.98rem/1.1 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tl-seat.empty .tl-name {
+  color: var(--text-soft);
+}
+.tl-seat-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.35rem;
+  flex: none;
+}
+.tl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: 700 0.85rem/1 var(--font-display);
+}
+.tl-btn:hover {
+  border-color: var(--tc);
+}
+.tl-btn.icon {
+  padding: 0.45rem;
+}
+.tl-btn svg {
+  width: 17px;
+  height: 17px;
+}
+.tl-bots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: 0.2rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.12);
+  font-size: 1.1rem;
+}
+.bl-play .tl-bots svg {
+  width: 18px;
+  height: 18px;
+}
+.tl-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+@media (max-width: 620px) {
+  .tl-table {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+  .tl-vs {
+    justify-self: center;
+  }
+}
+
+/* Le hall : l'entrée du 2 contre 2, sobre (le rose reste au duel). */
+.bl-duel.team {
+  border-color: var(--border);
+  color: var(--text);
+}
+.bl-duel.team:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+.bl-duel.team.live {
+  border-color: #f2b70b;
+}
+.bl-duel.team.live > b {
+  margin-left: auto;
+  color: #f2b70b;
+  font-variant-numeric: tabular-nums;
+}
+.bl-stats span.team svg {
+  color: var(--text-soft);
+}
+
+/* ---------------------------------------------------------------------
+   L'arène
+   --------------------------------------------------------------------- */
+/* Le tapis : mon équipe en bas (or), l'autre en haut (rose), une ligne au
+   milieu, et la séparation des deux voies. */
+.tm .ba-board::before {
+  background: linear-gradient(0deg, rgba(242, 183, 11, 0.06), transparent 42%, transparent 58%, rgba(255, 84, 112, 0.06));
+}
+.tm .ba-board-line {
+  left: 22px;
+  right: 22px;
+  top: 50%;
+  bottom: auto;
+  border-left: 0;
+  border-top: 2px dashed rgba(255, 255, 255, 0.08);
+}
+.tm-split {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  bottom: 18px;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+}
+.tm-lane-mark {
+  box-shadow: none;
+  background: transparent;
+}
+.tm-lane-mark svg {
+  width: 70%;
+  height: 70%;
+}
+
+/* Les deux objectifs, plus petits qu'au 1 contre 1. */
+.tm-obj {
+  border-radius: 18px;
+  transition:
+    box-shadow 0.4s,
+    opacity 0.3s;
+}
+.tm-obj.dim {
+  opacity: 0.35;
+}
+.tm-obj .ba-obj-in {
+  padding: 0 12px;
+}
+.tm-obj .ba-objface {
+  gap: 10px;
+}
+.tm-obj .ba-obj-ico,
+.tm-obj .ba-objface .ba-obj-type.tcg-type {
+  width: 36px;
+  height: 36px;
+}
+.tm-obj .ba-obj-ico svg {
+  width: 20px;
+  height: 20px;
+}
+.tm-obj .ba-obj-label,
+.tm-obj .ba-objface.long .ba-obj-label {
+  font-size: 1.2rem;
+  white-space: normal;
+}
+.tm-obj .ba-objface.xlong .ba-obj-label {
+  font-size: 1rem;
+}
+.narrow .tm-obj .ba-obj-in {
+  padding: 0 8px;
+}
+.narrow .tm-obj .ba-objface {
+  gap: 7px;
+}
+.narrow .tm-obj .ba-obj-ico,
+.narrow .tm-obj .ba-objface .ba-obj-type.tcg-type {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+}
+.narrow .tm-obj .ba-obj-ico svg {
+  width: 16px;
+  height: 16px;
+}
+.narrow .tm-obj .ba-obj-label,
+.narrow .tm-obj .ba-objface.long .ba-obj-label {
+  font-size: 0.92rem;
+}
+.narrow .tm-obj .ba-objface.xlong .ba-obj-label {
+  font-size: 0.8rem;
+}
+
+/* La barre du haut : les deux visages de chaque équipe. */
+.tm-avas {
+  display: inline-flex;
+  flex: none;
+}
+.tm-avas .ba-ava + .ba-ava {
+  margin-left: -8px;
+}
+.ba-side.bot .tm-avas {
+  flex-direction: row-reverse;
+}
+.ba-side.bot .tm-avas .ba-ava + .ba-ava {
+  margin-left: 0;
+  margin-right: -8px;
+}
+.tm .ba-side .ba-ava {
+  box-shadow:
+    0 0 0 2px #0d0d10,
+    0 0 0 4px var(--acc);
+}
+.tm .ba-side.bot .ba-ava {
+  box-shadow:
+    0 0 0 2px #0d0d10,
+    0 0 0 4px var(--foe);
+}
+.tm .ba-side .ba-lvl {
+  display: none;
+}
+
+/* Les mains des autres : qui est qui. */
+.tm-seat {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 12;
+  width: 0;
+  height: 0;
+}
+.tm-seat .ba-ava {
+  position: absolute;
+  left: -15px;
+  top: -15px;
+  width: 30px;
+  height: 30px;
+}
+.tm-seat.bot .ba-ava,
+.tm-dot.bot .ba-ava {
+  background: #2a1a20;
+  color: var(--foe);
+  box-shadow: 0 0 0 2px var(--foe);
+}
+.tm-seat .ba-ava svg {
+  width: 17px;
+  height: 17px;
+}
+.tm-seat .ba-lvl,
+.tm-dot .ba-lvl,
+.tm-owner .ba-lvl {
+  display: none;
+}
+
+/* Sur la case posée : à qui est la carte. */
+.tm-owner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #26262c;
+  color: #fff;
+  box-shadow:
+    0 0 0 2px #0d0d10,
+    0 0 0 4px var(--acc);
+  animation: baPopIn 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.tm-owner.bot {
+  background: #2a1a20;
+  color: var(--foe);
+  box-shadow:
+    0 0 0 2px #0d0d10,
+    0 0 0 4px var(--foe);
+}
+.tm-owner img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.tm-owner b {
+  font: 400 0.85rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.tm-owner svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Le choix : les deux voies en bandeau, celle que je vise en or. */
+.tm-focus {
+  position: absolute;
+  left: 50%;
+  z-index: 75;
+  width: min(calc(100vw - 24px), 760px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  transform: translateX(-50%);
+  animation: baFocusIn 0.45s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.tm-focus .ba-timer {
+  bottom: -10px;
+  height: 4px;
+  border-radius: 2px;
+}
+.tm-lane {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 34px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 18px;
+  background: #1d1d23;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  transition:
+    box-shadow 0.2s,
+    background 0.2s,
+    opacity 0.2s;
+}
+.tm-lane:hover:not(:disabled) {
+  box-shadow: 0 0 0 2px rgba(242, 183, 11, 0.5);
+}
+.tm-lane.sel,
+.tm-lane.sel:hover {
+  background: #26221a;
+  box-shadow:
+    0 0 0 3px var(--acc),
+    0 16px 40px rgba(0, 0, 0, 0.55);
+}
+.tm-lane.taken {
+  opacity: 0.4;
+  cursor: default;
+}
+.tm-lane .ba-objface {
+  gap: 10px;
+}
+.tm-lane .ba-obj-ico,
+.tm-lane .ba-objface .ba-obj-type.tcg-type {
+  width: 38px;
+  height: 38px;
+}
+.tm-lane .ba-obj-label,
+.tm-lane .ba-objface.long .ba-obj-label {
+  font-size: 1.35rem;
+  white-space: normal;
+  text-align: left;
+}
+.tm-lane .ba-objface.xlong .ba-obj-label {
+  font-size: 1.1rem;
+}
+.tm-lane-side {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  display: grid;
+  color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-50%);
+}
+.tm-lane.sel .tm-lane-side {
+  color: var(--acc);
+}
+.tm-lane-side svg {
+  width: 22px;
+  height: 22px;
+}
+.tm-lane:last-of-type .tm-lane-side {
+  left: auto;
+  right: 6px;
+}
+.tm-lane-who {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+}
+.tm-lane:last-of-type .tm-lane-who {
+  right: auto;
+  left: 8px;
+}
+.tm-dot .ba-ava {
+  width: 22px;
+  height: 22px;
+  box-shadow: 0 0 0 2px var(--acc);
+}
+.tm-dot .ba-ava svg {
+  width: 13px;
+  height: 13px;
+}
+.tm-dot .ba-ava b {
+  font-size: 0.7rem;
+}
+.narrow .tm-lane {
+  padding: 0 22px;
+}
+.narrow .tm-lane .ba-objface {
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+}
+.narrow .tm-lane .ba-obj-ico,
+.narrow .tm-lane .ba-objface .ba-obj-type.tcg-type {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+.narrow .tm-lane .ba-obj-ico svg {
+  width: 17px;
+  height: 17px;
+}
+.narrow .tm-lane .ba-obj-label,
+.narrow .tm-lane .ba-objface.long .ba-obj-label {
+  font-size: 0.98rem;
+  text-align: center;
+}
+.narrow .tm-lane .ba-objface.xlong .ba-obj-label {
+  font-size: 0.82rem;
+}
+.narrow .tm-lane-side svg {
+  width: 16px;
+  height: 16px;
+}
+.tm-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.tm-go svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 3;
+}
+.tm-lane-flash span {
+  font-size: 2.6rem;
+  -webkit-text-stroke-width: 8px;
+}
+.narrow .tm-lane-flash span {
+  font-size: 1.8rem;
+}
+
+/* Le face-à-face : deux visages par camp. */
+.tm-vs-pair {
+  display: flex;
+  gap: 0.8rem;
+}
+.tm-vs .ba-vs-ava.tm-vs-ava {
+  width: clamp(64px, 11vw, 116px);
+}
+.tm-vs .ba-vs-side > b {
+  max-width: 42vw;
+}
+
+/* Téléphone : la barre du haut resserrée (deux visages et cinq points par
+   camp), et le face-à-face empilé (deux paires côte à côte ne tiennent pas). */
+.tm.narrow .ba-hud {
+  gap: 0.35rem;
+  padding: 0 0.45rem;
+}
+.tm.narrow .ba-icon {
+  width: 34px;
+  height: 34px;
+}
+.tm.narrow .ba-side {
+  gap: 0.35rem;
+}
+.tm.narrow .ba-side .ba-ava {
+  width: 28px;
+  height: 28px;
+}
+.tm.narrow .ba-side .ba-ava svg {
+  width: 16px;
+  height: 16px;
+}
+.tm.narrow .ba-pips {
+  gap: 3px;
+}
+.tm.narrow .ba-pips i {
+  width: 10px;
+  height: 10px;
+}
+.tm.narrow .ba-hud-vs {
+  font-size: 0.8rem;
+}
+.narrow .tm-vs {
+  flex-direction: column;
+  gap: 1.6rem;
+}
+.narrow .tm-vs .ba-vs-ava.tm-vs-ava {
+  width: clamp(64px, 20vw, 92px);
+}
+.narrow .tm-vs .ba-vs-side > b {
+  max-width: 86vw;
+}
+.narrow .tm-vs::before {
+  clip-path: polygon(0 0, 100% 0, 100% 44%, 0 53%);
+}
+.narrow .tm-vs::after {
+  clip-path: polygon(0 55%, 100% 46%, 100% 100%, 0 100%);
+}
