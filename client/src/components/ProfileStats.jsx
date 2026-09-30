@@ -27,7 +27,8 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
-import StatsCircle from "./StatsCircle";
+import StatsCircleButton from "./StatsCircle";
+import { useAuth } from "../context/AuthContext";
 
 // Cache stale-while-revalidate des stats (par pseudo) : réaffichage instantané,
 // revalidation en fond — même pattern que le profil.
@@ -518,6 +519,7 @@ function FacetGamesModal({ title, Icon, games, total, onClose }) {
 
 export default function ProfileStats({ username, token }) {
   const navigate = useNavigate();
+  const { user: me } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -593,6 +595,11 @@ export default function ProfileStats({ username, token }) {
             <span className="ps-hero-unit">h</span>
           </span>
           <span className="ps-hero-sub font-fun">{heroSub(t.hours)}</span>
+          <StatsCircleButton
+            username={username}
+            token={token}
+            isMe={me?.username === username}
+          />
         </div>
         <div className="ps-tiles">
           <StatTile Icon={Gamepad2} label="Jeux" value={t.games} />
@@ -614,13 +621,6 @@ export default function ProfileStats({ username, token }) {
       </section>
 
       <div className="ps-grid">
-        {/* ---------- Le cercle : sagas, studios… autour du profil ---------- */}
-        <StatsCircle
-          username={username}
-          token={token}
-          onPick={(it, Icon) => openFacet(it.name, Icon, it.list, it.games)}
-        />
-
         {/* ---------- Backlog : donut des statuts ---------- */}
         <Card Icon={Layers} title="État du backlog" sub={`${nf.format(t.games)} jeux`}>
           <StatusDonut

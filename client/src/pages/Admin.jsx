@@ -48,6 +48,7 @@ import {
   Bot,
   Bell,
   Terminal,
+  BarChart3,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import AdminRingtones from "../components/AdminRingtones";
@@ -58,6 +59,7 @@ import { PN_ICONS } from "../components/PatchnotePopup";
 import RewardsPanel from "../components/AdminRewards";
 import RewardArt from "../components/RewardArt";
 import SystemPanel from "../components/AdminSystem";
+import StatsPanel from "../components/AdminStats";
 import MissionsPanel from "../components/AdminMissions";
 import EventsPanel from "../components/AdminEvents";
 import CollectionPanel from "../components/AdminCollection";
@@ -85,6 +87,7 @@ const TAB_KEYS = [
   "events",
   "collection",
   "ringtones",
+  "stats",
   "system",
   "logs",
   "scripts",
@@ -122,6 +125,7 @@ export default function Admin() {
     { key: "events", label: "Événements", Icon: CalendarDays },
     { key: "collection", label: "Collection", Icon: Library },
     { key: "ringtones", label: "Sonneries", Icon: Bell },
+    { key: "stats", label: "Statistiques", Icon: BarChart3 },
     { key: "system", label: "Système", Icon: Activity },
     { key: "logs", label: "Logs", Icon: ScrollText },
     { key: "scripts", label: "Scripts", Icon: Terminal },
@@ -200,6 +204,7 @@ export default function Admin() {
           {safeTab === "events" && <EventsPanel token={token} />}
           {safeTab === "collection" && <CollectionPanel token={token} />}
           {safeTab === "ringtones" && <AdminRingtones token={token} />}
+          {safeTab === "stats" && <StatsPanel token={token} />}
           {safeTab === "system" && <SystemPanel token={token} />}
           {safeTab === "logs" && <LogsPanel token={token} isSuper={isSuper} />}
           {safeTab === "scripts" && <ScriptsPanel token={token} />}

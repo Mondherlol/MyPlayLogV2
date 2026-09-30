@@ -88,6 +88,7 @@ import { requireCollectionAccess } from "./middleware/auth.js";
 import { optionalAuth } from "./middleware/auth.js";
 import { avatarPrivacy } from "./middleware/avatarPrivacy.js";
 import { auditLog, logEvent } from "./lib/audit.js";
+import { statsMiddleware, startServerSampler } from "./lib/siteStats.js";
 import { authLimiter, gamesLimiter } from "./middleware/rateLimit.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -137,6 +138,8 @@ app.use(
 // réponse — moment où l'on connaît enfin l'auteur, le statut et la durée
 // (cf. lib/audit.js).
 app.use(auditLog);
+// Compteurs de l'onglet « Statistiques » (requêtes, temps, joueurs du jour).
+app.use(statsMiddleware);
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "myplaylog", time: new Date().toISOString() });
@@ -379,6 +382,8 @@ async function start() {
     // showcases : elles ne s'affichent qu'à ceux qui ont le jeu (cf.
     // lib/gameSeasons).
     startGameSeasonSync();
+    // Un relevé de la santé du serveur toutes les 5 minutes (panel admin).
+    startServerSampler();
     const server = app.listen(PORT, () => {
       console.log(`🚀 API MyPlayLog sur http://localhost:${PORT}`);
       // Une ligne dans le journal : un redémarrage explique souvent, à lui

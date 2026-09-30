@@ -248,7 +248,6 @@ function TcgCard({
               </div>
               {holo && <i className="tcg-holo" />}
               {full && <i className="tcg-sparkle" />}
-              {r === "mythic" && <i className="tcg-shimmer" />}
               <i className="tcg-glare" />
             </div>
           )}

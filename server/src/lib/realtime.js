@@ -72,6 +72,11 @@ export function emitTo(userIds, event, data) {
   }
 }
 
+/** Combien de joueurs sont connectés au temps réel, là, maintenant. */
+export function onlineCount() {
+  return clients.size;
+}
+
 export function isOnline(userId) {
   return clients.has(String(userId));
 }

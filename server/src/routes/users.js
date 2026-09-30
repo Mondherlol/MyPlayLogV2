@@ -20,6 +20,7 @@ import { ensureGameMeta, ensureGameKinds, franchiseRefs, unitOf } from "../lib/g
 import { createTtlCache } from "../lib/ttlCache.js";
 import { isLocalId } from "../lib/localGame.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
+import { brandOf } from "../lib/companyBrands.js";
 import { ensurePlatformImages } from "../lib/platformImages.js";
 import { setServiceNpsso, getServiceStatus, clearServiceTokens } from "../lib/psn.js";
 import { isUserAdmin, isUserStaff } from "../lib/admin.js";
@@ -2191,10 +2192,11 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
 });
 
 // --- Le cercle (onglet Stats) ----------------------------------------------
-// L'image « cercle » : le profil au centre, et autour ses sagas (ou studios,
-// éditeurs, genres, consoles) classées par temps de jeu, note ou nombre de
-// jeux. Le classement se fait côté client — la réponse porte les trois
-// mesures de chaque bulle, et l'union des 50 premières selon chacune.
+// L'image « cercle » : le profil au centre, et autour ses sagas (ou ses
+// studios, développeurs et éditeurs confondus), classées par UN score qui
+// mêle tout ce qui dit « j'aime cette saga » : le nombre de jeux joués, les
+// heures, les notes, les coups de cœur et le statut (finir un jeu pèse plus
+// que l'abandonner).
 //
 // ⚠️ UN ÉPISODE N'EST PAS UN JEU. Les cinq épisodes de The Walking Dead, les
 // DLC d'un jeu ou son édition GOTY comptent pour UN jeu de la saga (cf.
@@ -2202,16 +2204,19 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
 // entre elles.
 //
 // Une facette par requête (?kind=) : chaque bulle emporte un aperçu de ses
-// jeux pour le pop-up du clic, et tout envoyer d'un coup pèserait lourd. Le
-// calcul, lui, est fait une fois pour toutes les facettes et gardé une minute.
+// jeux. Le calcul, lui, est fait une fois pour les deux et gardé une minute.
 const circleCache = createTtlCache({ name: "users:circle", max: 200, ttl: 60 * 1000 });
-const CIRCLE_KINDS = ["franchises", "developers", "publishers", "genres", "platforms"];
+const CIRCLE_KINDS = ["franchises", "studios"];
 const CIRCLE_TOP = 50;
 const CIRCLE_GAMES = 24;
+// Ce que vaut un statut dans le score : finir > jeu sans fin > en cours…
+const CIRCLE_STATUS = { finished: 1, endless: 0.9, playing: 0.8, paused: 0.5, dropped: 0.2 };
+// Poids des composantes du score (somme = 1).
+const CIRCLE_WEIGHTS = { games: 0.25, hours: 0.25, rating: 0.2, favorites: 0.15, status: 0.15 };
 
 async function computeCircle(user) {
   const entries = await UserGame.find({ user: user._id, status: { $ne: "wishlist" } })
-    .select("gameId name cover platform playtimeHours favorite rating")
+    .select("gameId name cover status playtimeHours favorite rating")
     .lean();
   const meta = await ensureGameMeta(entries.map((e) => e.gameId));
   await ensureGameKinds(meta);
@@ -2224,16 +2229,17 @@ async function computeCircle(user) {
     Math.min(e.playtimeHours || 0, 200) / 10;
 
   const groups = Object.fromEntries(CIRCLE_KINDS.map((k) => [k, new Map()]));
-  const add = (kind, name, e, unit) => {
-    if (!name) return;
+  // `key` regroupe, `name` s'affiche (null : la variante la plus vue),
+  // `alias` est le nom d'origine (studios : « Ubisoft Montreal »…).
+  const add = (kind, key, e, unit, { name = key, logo = null, alias = null } = {}) => {
+    if (!key) return;
     const map = groups[kind];
-    let g = map.get(name);
-    if (!g) map.set(name, (g = { name, hours: 0, units: new Map(), best: null, bestW: -1 }));
-    g.hours += e.playtimeHours || 0;
-    if (!g.units.has(unit)) g.units.set(unit, { ratings: [], entries: [] });
-    const u = g.units.get(unit);
-    if (e.rating != null) u.ratings.push(e.rating);
-    u.entries.push(e);
+    let g = map.get(key);
+    if (!g)
+      map.set(key, (g = { name, logo, aliases: new Map(), units: new Map(), best: null, bestW: -1 }));
+    if (alias) g.aliases.set(alias, (g.aliases.get(alias) || 0) + 1);
+    if (!g.units.has(unit)) g.units.set(unit, []);
+    g.units.get(unit).push(e);
     const w = weight(e, unit === e.gameId);
     if (e.cover && w > g.bestW) {
       g.best = e;
@@ -2245,60 +2251,94 @@ async function computeCircle(user) {
     const m = meta.get(e.gameId) || {};
     const unit = unitOf(e.gameId, m);
     add("franchises", m.franchise, e, unit);
-    for (const d of new Set(m.developers || [])) add("developers", d, e, unit);
-    for (const p of new Set(m.publishers || [])) add("publishers", p, e, unit);
-    for (const g of new Set(m.genres || [])) add("genres", g, e, unit);
-    if (e.platform && e.platform !== "Vu en let's play") add("platforms", e.platform, e, unit);
+    // Studios = développeurs ET éditeurs, rangés par marque (cf.
+    // lib/companyBrands) : Nintendo qui développe et édite, ou Ubisoft
+    // Montréal édité par Ubisoft, ne comptent qu'une fois par jeu.
+    const brands = new Map();
+    for (const c of [...(m.developers || []), ...(m.publishers || [])]) {
+      const b = brandOf(c);
+      if (!brands.has(b.key)) brands.set(b.key, { ...b, alias: c });
+    }
+    for (const [key, b] of brands)
+      add("studios", key, e, unit, { name: b.name, logo: b.logo, alias: b.alias });
   }
+
+  const rated = entries.filter((e) => e.rating != null);
+  const userAvg = rated.length ? rated.reduce((s, e) => s + e.rating, 0) / rated.length : 60;
 
   const out = {};
   for (const kind of CIRCLE_KINDS) {
     const rows = [...groups[kind].values()].map((g) => {
-      const unitRatings = [...g.units.values()]
-        .filter((u) => u.ratings.length)
-        .map((u) => u.ratings.reduce((s, r) => s + r, 0) / u.ratings.length);
-      // Les jeux du pop-up : un par « jeu » (le plus représentatif), les
-      // plus joués d'abord.
-      const games = [...g.units.entries()]
-        .map(([unit, u]) =>
-          u.entries.reduce((a, b) =>
+      // Un « jeu » = ses fiches (épisodes, DLC…) mises ensemble.
+      const units = [...g.units.entries()].map(([unit, list]) => {
+        const ratings = list.filter((e) => e.rating != null).map((e) => e.rating);
+        return {
+          face: list.reduce((a, b) =>
             weight(b, unit === b.gameId) > weight(a, unit === a.gameId) ? b : a
-          )
-        )
-        .sort((a, b) => (b.playtimeHours || 0) - (a.playtimeHours || 0));
+          ),
+          hours: list.reduce((s, e) => s + (e.playtimeHours || 0), 0),
+          rating: ratings.length ? ratings.reduce((s, r) => s + r, 0) / ratings.length : null,
+          favorite: list.some((e) => e.favorite),
+          status: Math.max(...list.map((e) => CIRCLE_STATUS[e.status] ?? 0.5)),
+        };
+      });
+      const unitRatings = units.filter((u) => u.rating != null).map((u) => u.rating);
+      const hours = units.reduce((s, u) => s + u.hours, 0);
+      // Les noms d'origine, du plus vu au moins vu : le premier s'affiche
+      // quand ce n'est pas une grande marque, et tous servent à trouver un logo.
+      const aliases = [...g.aliases.entries()].sort((a, b) => b[1] - a[1]).map(([n]) => n);
       return {
-        name: g.name,
-        hours: Math.round(g.hours * 10) / 10,
-        games: g.units.size,
-        rated: unitRatings.length,
+        name: g.name || aliases[0] || "",
+        _logos: [g.logo, ...aliases.slice(0, 3)].filter(Boolean),
+        hours: Math.round(hours * 10) / 10,
+        games: units.length,
         rating: unitRatings.length
           ? Math.round(unitRatings.reduce((s, r) => s + r, 0) / unitRatings.length)
           : null,
+        // Moyenne « prudente » : une seule note de 95 ne vaut pas dix notes
+        // de 90 — la moyenne du joueur compte comme une note de plus.
+        _rating:
+          (unitRatings.reduce((s, r) => s + r, 0) + userAvg) / (unitRatings.length + 1),
+        favorites: units.filter((u) => u.favorite).length,
+        _status: units.reduce((s, u) => s + u.status, 0) / units.length,
         cover: g.best?.cover || null,
-        list: games
+        list: units
+          .map((u) => u.face)
+          .sort((a, b) => (b.playtimeHours || 0) - (a.playtimeHours || 0))
           .slice(0, CIRCLE_GAMES)
           .map((e) => ({ gameId: e.gameId, name: e.name, cover: e.cover })),
       };
     });
-    const top = (cmp, filter = () => true) => rows.filter(filter).sort(cmp).slice(0, CIRCLE_TOP);
-    const keep = new Set([
-      ...top((a, b) => b.hours - a.hours || b.games - a.games, (r) => r.hours > 0),
-      ...top((a, b) => b.games - a.games || b.hours - a.hours),
-      ...top((a, b) => b.rating - a.rating || b.rated - a.rated, (r) => r.rating != null),
-    ]);
-    out[kind] = [...keep];
+
+    // Chaque composante ramenée entre 0 et 1 par rapport aux autres bulles du
+    // joueur ; le log écrase les écarts énormes (5 000 h de Rayman ne doivent
+    // pas rendre muettes toutes les autres mesures).
+    const maxOf = (f) => Math.max(0, ...rows.map(f));
+    const maxGames = Math.log1p(maxOf((r) => r.games));
+    const maxHours = Math.log1p(maxOf((r) => r.hours));
+    const maxFavs = Math.log1p(maxOf((r) => r.favorites));
+    const ratings = rows.map((r) => r._rating);
+    const minR = Math.min(...ratings);
+    const spanR = Math.max(...ratings) - minR;
+    const W = CIRCLE_WEIGHTS;
+    for (const r of rows) {
+      r.score =
+        W.games * (maxGames ? Math.log1p(r.games) / maxGames : 0) +
+        W.hours * (maxHours ? Math.log1p(r.hours) / maxHours : 0) +
+        W.rating * (spanR ? (r._rating - minR) / spanR : 0.5) +
+        W.favorites * (maxFavs ? Math.log1p(r.favorites) / maxFavs : 0) +
+        W.status * r._status;
+      delete r._rating;
+      delete r._status;
+    }
+    out[kind] = rows.sort((a, b) => b.score - a.score).slice(0, CIRCLE_TOP);
   }
 
-  // Logos : studios et éditeurs (IGDB companies), consoles (IGDB platforms).
-  const [companyLogos, platformLogos] = await Promise.all([
-    ensureEntityLogos("company", [
-      ...out.developers.map((d) => d.name),
-      ...out.publishers.map((p) => p.name),
-    ]),
-    ensureEntityLogos("platform", out.platforms.map((p) => p.name)),
-  ]);
-  for (const r of [...out.developers, ...out.publishers]) r.logo = companyLogos.get(r.name) || null;
-  for (const r of out.platforms) r.logo = platformLogos.get(r.name) || null;
+  // Logos des studios (IGDB companies) : celui de la marque, sinon celui de
+  // la variante la plus vue qui en a un.
+  const logos = await ensureEntityLogos("company", out.studios.flatMap((d) => d._logos));
+  for (const r of out.studios) r.logo = r._logos.map((n) => logos.get(n)).find(Boolean) || null;
+  for (const kind of CIRCLE_KINDS) for (const r of out[kind]) delete r._logos;
 
   return { user: { username: user.username, avatar: user.avatar || null }, kinds: out };
 }

@@ -378,7 +378,6 @@
 .tcg-holo,
 .tcg-art-holo,
 .tcg-sparkle,
-.tcg-shimmer,
 .tcg-glare {
   position: absolute;
   inset: 0;
@@ -443,29 +442,6 @@
 .tcg.live .tcg-sparkle {
   opacity: 0.45;
 }
-.tcg-shimmer {
-  z-index: 4;
-  background: linear-gradient(
-    110deg,
-    transparent 38%,
-    rgba(255, 236, 160, 0.55) 46%,
-    rgba(255, 255, 255, 0.75) 50%,
-    rgba(255, 236, 160, 0.55) 54%,
-    transparent 62%
-  );
-  background-size: 300% 100%;
-  mix-blend-mode: overlay;
-  animation: tcgShimmer 3.8s ease-in-out infinite;
-}
-@keyframes tcgShimmer {
-  0% {
-    background-position: 150% 0;
-  }
-  55%,
-  100% {
-    background-position: -50% 0;
-  }
-}
 .tcg-glare {
   z-index: 5;
   background: radial-gradient(
@@ -487,8 +463,8 @@
    raretés ont chacune LEUR foil, franc et reconnaissable :
    • légendaire : un arc-en-ciel gravé (bandes fines, lignes d'acier en
      biais) qui coule avec le pointeur — l'holo « à l'ancienne » ;
-   • mythique : un soleil d'or, des rayons qui partent du point visé, un
-     halo chaud, et l'éclat qui balaie plus fort.
+   • mythique : l'holo arc-en-ciel lisse des cartes Pokémon, allumé là où
+     tombe la lumière.
    Au repos (et au doigt, sans survol), le reflet DÉRIVE lentement : la
    carte vit sans qu'on la touche. Les variables du pointeur sont déclarées
    (@property) pour pouvoir être animées ; dès que le pointeur est là, il
@@ -582,40 +558,40 @@
   filter: brightness(0.55) contrast(1.6) saturate(1.2);
 }
 
+/* Mythique : l'holo des cartes Pokémon — un arc-en-ciel lisse, en biais,
+   qui glisse avec l'angle et ne s'allume que là où tombe la lumière (le
+   reste de la jaquette garde ses couleurs). Plus de rayons de soleil ni de
+   balayage doré (« chelou », trop chargé). */
 .tcg.r-mythic .tcg-holo {
-  /* En `overlay` et non en color-dodge : l'or teinte et fait briller la
-     jaquette sans la délaver (en dodge, le survol la noyait sous le jaune). */
   background-image:
-    repeating-conic-gradient(
-      from 0deg at var(--mx) var(--my),
-      hsl(46, 100%, 66%) 0deg 4deg,
-      hsl(34, 90%, 30%) 4deg 10deg,
-      hsl(52, 100%, 80%) 10deg 14deg,
-      hsl(40, 95%, 42%) 14deg 20deg
+    repeating-linear-gradient(
+      115deg,
+      hsl(350, 90%, 68%) 0%,
+      hsl(40, 95%, 66%) 3%,
+      hsl(95, 80%, 64%) 6%,
+      hsl(175, 85%, 64%) 9%,
+      hsl(220, 95%, 70%) 12%,
+      hsl(285, 85%, 70%) 15%,
+      hsl(350, 90%, 68%) 18%
     ),
-    linear-gradient(115deg, #5a3900, #fff0b3 45%, #8a5600 70%, #ffe27a);
-  background-size: 100% 100%, 300% 300%;
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.9) 0%,
+      rgba(255, 255, 255, 0.5) 35%,
+      rgba(0, 0, 0, 0.6) 100%
+    );
+  background-size: 320% 320%, 100% 100%;
   background-position:
-    center,
-    var(--hx) var(--hy);
-  background-blend-mode: soft-light, normal;
-  mix-blend-mode: overlay;
-  opacity: 0.42;
+    var(--hx) var(--hy),
+    center;
+  background-blend-mode: multiply;
+  mix-blend-mode: color-dodge;
+  filter: brightness(0.7);
+  opacity: 0.34;
   transition: opacity 0.35s;
 }
 .tcg.r-mythic.live .tcg-holo {
-  opacity: 0.62;
-}
-.tcg.r-mythic .tcg-shimmer {
-  background: linear-gradient(
-    110deg,
-    transparent 34%,
-    rgba(255, 226, 122, 0.7) 44%,
-    rgba(255, 255, 255, 0.95) 50%,
-    rgba(255, 226, 122, 0.7) 56%,
-    transparent 66%
-  );
-  background-size: 300% 100%;
+  opacity: 0.55;
 }
 /* Les paillettes : un peu plus présentes au survol seulement (au repos, leur
    trame régulière faisait une grille de points). */
@@ -631,8 +607,8 @@
 }
 .tcg.r-mythic:not(.lite) .tcg-front {
   box-shadow:
-    0 0 0 calc(0.5 * var(--cq, 1cqw)) rgba(255, 214, 102, 0.7),
-    0 0 calc(6 * var(--cq, 1cqw)) rgba(242, 183, 11, 0.4),
+    0 0 0 calc(0.5 * var(--cq, 1cqw)) rgba(255, 214, 102, 0.55),
+    0 0 calc(4 * var(--cq, 1cqw)) rgba(242, 183, 11, 0.18),
     0 calc(1.6 * var(--cq, 1cqw)) calc(5 * var(--cq, 1cqw)) rgba(0, 0, 0, 0.42);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2202,7 +2178,6 @@ button.cd-rar:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tcg-shimmer,
   .bst-sheen,
   .cd-pack.p1 .bst,
   .po-rays i,
@@ -2992,12 +2967,6 @@ button.cd-rar:hover {
 }
 .cd-vcell:hover {
   z-index: 2;
-}
-
-/* L'éclat du mythique tourne en boucle : dans le classeur, seulement sur la
-   carte survolée (des dizaines d'animations en fusion saccadaient). */
-.tcg.lite:not(.live) .tcg-shimmer {
-  display: none;
 }
 
 /* Écran tactile / téléphone : le classeur sans les effets les plus chers.

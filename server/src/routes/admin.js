@@ -27,6 +27,7 @@ import Broadcast from "../models/Broadcast.js";
 import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
 import { logEvent, forgetAdmins } from "../lib/audit.js";
+import { siteStats, serverStats } from "../lib/siteStats.js";
 import { sendPush } from "../lib/push.js";
 import { canUserCollection, canUserDownload, isUserAdmin, isUserStaff } from "../lib/admin.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
@@ -768,6 +769,26 @@ async function readDbStats() {
     collections,
   };
 }
+
+// GET /api/admin/stats?days=7|30|90|365 — l'activité du site (onglet Statistiques).
+router.get("/stats", async (req, res) => {
+  try {
+    res.json(await siteStats(req.query.days));
+  } catch (err) {
+    console.error("admin stats error:", err.message);
+    res.status(500).json({ error: "Erreur lors du calcul des statistiques." });
+  }
+});
+
+// GET /api/admin/stats/server?hours=6|24|168|720 — l'histoire du serveur.
+router.get("/stats/server", async (req, res) => {
+  try {
+    res.json(await serverStats(req.query.hours));
+  } catch (err) {
+    console.error("admin server stats error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la lecture des relevés." });
+  }
+});
 
 router.get("/system", async (req, res) => {
   try {

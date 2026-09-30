@@ -27,15 +27,17 @@ export const PACK_PRICE = 500;
 export const PACK_SIZE = 5;
 export const CURRENT_SET = 1;
 
-// Jeu principal (0), extension autonome (4), remake (8), remaster (9).
+// Jeu principal (0), extension autonome (4), remake (8), remaster (9), et
+// « version enrichie » (10) quand elle a éclipsé l'originale (voir syncSet).
 const CARD_TYPES = [0, 4, 8, 9];
+const EXPANDED_TYPE = 10;
 
 // Combien de cartes par rareté, des plus populaires aux moins populaires. La
 // dernière ligne prend TOUT le reste : le set contient chaque jeu sorti qui a
 // été noté au moins une fois (~26 000 en septembre 2026). Les raretés hautes,
 // elles, restent une élite de taille fixe — un mythique doit rester un mythe.
 export const TIERS = [
-  { key: "mythic", count: 25 },
+  { key: "mythic", count: 50 },
   { key: "legendary", count: 125 },
   { key: "epic", count: 500 },
   { key: "rare", count: 1500 },
@@ -44,8 +46,10 @@ export const TIERS = [
 ];
 // À monter quand la composition du set change (TIERS, critères) : le serveur
 // recalcule alors numéros et raretés une fois, au chargement suivant.
-// v1 : 3 000 cartes. v2 : tous les jeux notés.
-const SET_VERSION = 2;
+// v1 : 3 000 cartes. v2 : tous les jeux notés. v3 : classement votes × note,
+// 50 mythiques, versions enrichies réintégrées (Final Fantasy VII, Pokémon
+// Émeraude, Kingdom Hearts…).
+const SET_VERSION = 3;
 const SET_VERSION_KEY = "cards.setVersion";
 export const RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
 
@@ -62,12 +66,19 @@ export const EDITION_KEYS = Object.keys(PACK_EDITIONS);
 // Les chances de chaque emplacement du booster (en %), façon Pokémon : trois
 // cartes « de base », une un cran au-dessus, et la dernière — celle qu'on
 // retourne en dernier — garantie rare ou mieux.
+// Une rareté se lit CARTE PAR CARTE : il n'y a que 50 mythiques pour 125
+// légendaires et 500 épiques, donc la part de chaque rareté doit fondre plus
+// vite que sa réserve. Les anciennes chances (mythique 1,3 % au dernier
+// emplacement, 25 mythiques) rendaient UNE mythique donnée (The Last of Us…)
+// aussi fréquente qu'une épique et cinq fois plus qu'une commune. Désormais,
+// carte par carte : rare > épique (≈ ½) > légendaire (≈ ½) > mythique (≈ ¼).
+// Une mythique, quelle qu'elle soit, sort environ une fois sur 300 boosters.
 const SLOT_ODDS = {
-  base: { common: 72, uncommon: 23.5, rare: 3.8, epic: 0.6, legendary: 0.09, mythic: 0.01 },
-  plus: { uncommon: 72, rare: 21, epic: 5.4, legendary: 1.3, mythic: 0.3 },
-  hit: { rare: 73, epic: 20, legendary: 5.7, mythic: 1.3 },
+  base: { common: 74, uncommon: 23, rare: 2.7, epic: 0.28, legendary: 0.02, mythic: 0.002 },
+  plus: { uncommon: 74, rare: 22, epic: 3.6, legendary: 0.4, mythic: 0.03 },
+  hit: { rare: 81, epic: 16.8, legendary: 2, mythic: 0.2 },
   // Le booster doré : chaque carte est tirée comme un « hit » gonflé.
-  gold: { epic: 60, legendary: 30, mythic: 10 },
+  gold: { epic: 72, legendary: 25, mythic: 3 },
 };
 const SLOTS = ["base", "base", "base", "plus", "hit"];
 // Un booster sur 250 est doré — le client le sait AVANT de déchirer.
@@ -81,18 +92,42 @@ export const GOLDEN_CHANCE = 0.004;
 // autre jeu a gagné des votes. Un recalcul garde le cadrage et l'illustration
 // déjà calculés (seuls `no` et `rarity` bougent) et ne touche jamais aux
 // cartes des joueurs (CardOwn), qui sont rangées par id de jeu.
+// Le rang d'un jeu : ses votes, pondérés par sa note. Les votes IGDB seuls
+// favorisaient les jeux PC/PlayStation récents (Tomb Raider 2013 mythique,
+// Super Mario Galaxy 94ᵉ) ; ×(note/100)^10, un jeu à 94 garde 54 % de ses
+// votes, un jeu à 83 n'en garde que 16 %.
+const renown = (g) => (g.ratingCount || 0) * Math.pow((g.rating || 70) / 100, 10);
+const normName = (n) => String(n || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
 async function syncSet(set) {
   const now = Math.floor(Date.now() / 1000);
-  const games = await GameFeatures.find({
+  const all = await GameFeatures.find({
     pool: true,
-    type: { $in: CARD_TYPES },
+    type: { $in: [...CARD_TYPES, EXPANDED_TYPE] },
     cover: { $ne: null },
     date: { $ne: null, $lte: now },
     ratingCount: { $gte: 1 },
   })
-    .select("_id")
-    .sort({ ratingCount: -1, hypes: -1, _id: 1 })
+    .select("_id type parent name rating ratingCount hypes")
     .lean();
+  // IGDB range certains classiques en « version enrichie » d'un autre jeu
+  // (Final Fantasy VII, Pokémon Émeraude, Kingdom Hearts, Metroid…). On la
+  // garde quand elle a plus de votes que son jeu d'origine (ou qu'il n'est pas
+  // au catalogue) — sinon c'est un doublon (Director's Cut, Enhanced Edition).
+  // Et un jeu d'origine qui porte le MÊME nom qu'elle, avec moins de votes, est
+  // le doublon, lui (le Final Fantasy VII à 9 votes).
+  const byId = new Map(all.map((g) => [g._id, g]));
+  const dropped = new Set();
+  const eligible = all.filter((g) => {
+    if (g.type !== EXPANDED_TYPE) return true;
+    const p = byId.get(g.parent);
+    if (p && (p.ratingCount || 0) >= (g.ratingCount || 0)) return false;
+    if (p && normName(p.name) === normName(g.name)) dropped.add(p._id);
+    return true;
+  });
+  const games = eligible
+    .filter((g) => !dropped.has(g._id))
+    .sort((a, b) => renown(b) - renown(a) || (b.hypes || 0) - (a.hypes || 0) || a._id - b._id);
   if (games.length < 500) return 0; // catalogue pas encore synchronisé
 
   const rows = [];
@@ -391,8 +426,13 @@ export async function getCatalog() {
 // ----------------------------------------------------------------------
 //  Le tirage
 // ----------------------------------------------------------------------
-function rollRarity(odds, available) {
-  const entries = Object.entries(odds).filter(([r]) => available[r]?.length);
+// Chances données pour le set entier ; une édition n'en a qu'une partie
+// (Néon : 8 mythiques sur 25), sa part de chaque rareté suit sa réserve —
+// sinon chacune de ses 8 mythiques sortirait trois fois plus souvent.
+function rollRarity(odds, available, all) {
+  const entries = Object.entries(odds)
+    .filter(([r]) => available[r]?.length)
+    .map(([r, w]) => [r, all?.[r]?.length ? (w * available[r].length) / all[r].length : w]);
   const total = entries.reduce((a, [, w]) => a + w, 0);
   let x = Math.random() * total;
   for (const [r, w] of entries) {
@@ -414,7 +454,7 @@ export function drawPack(cat, edition, forceGolden) {
   const picked = new Set();
   const out = [];
   for (const slot of SLOTS) {
-    const rarity = rollRarity(golden ? SLOT_ODDS.gold : SLOT_ODDS[slot], pools);
+    const rarity = rollRarity(golden ? SLOT_ODDS.gold : SLOT_ODDS[slot], pools, cat.byRarity);
     const pool = pools[rarity];
     let id;
     for (let tries = 0; tries < 20; tries++) {

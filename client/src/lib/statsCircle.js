@@ -19,60 +19,20 @@ const RING_R = [74, 58, 46, 38];
 const MAX_OUTER = 474;
 const CENTER_Y = CIRCLE_SIZE / 2 - 16;
 
-// Fonds proposés. Aplats, pas de dégradé : l'or et le rose du site, la nuit
-// du thème sombre, et un gris craie pour le clair.
-export const CIRCLE_THEMES = {
-  nuit: {
-    label: "Nuit",
-    bg: "#1b1b20",
-    ring: "#34343d",
-    pill: "#0e0e11",
-    pillInk: "#ffffff",
-    pillSoft: "#a3a3ad",
-    badge: "#f2b70b",
-    badgeInk: "#16161a",
-    tile: "#2a2a31",
-    tileInk: "#f2b70b",
-  },
-  or: {
-    label: "Or",
-    bg: "#f2b70b",
-    ring: "#ffffff",
-    pill: "#16161a",
-    pillInk: "#ffffff",
-    pillSoft: "#b5b5bd",
-    badge: "#ffffff",
-    badgeInk: "#16161a",
-    tile: "#16161a",
-    tileInk: "#f2b70b",
-  },
-  rose: {
-    label: "Rose",
-    bg: "#ff5470",
-    ring: "#ffffff",
-    pill: "#16161a",
-    pillInk: "#ffffff",
-    pillSoft: "#b5b5bd",
-    badge: "#f2b70b",
-    badgeInk: "#16161a",
-    tile: "#16161a",
-    tileInk: "#ff5470",
-  },
-  craie: {
-    label: "Craie",
-    bg: "#ecebe7",
-    // Contour sombre : sur ce fond clair, un liseré blanc laisserait les
-    // pastilles de logos (blanches) se fondre dans le décor.
-    ring: "#16161a",
-    pill: "#16161a",
-    pillInk: "#ffffff",
-    pillSoft: "#b5b5bd",
-    badge: "#f2b70b",
-    badgeInk: "#16161a",
-    tile: "#16161a",
-    tileInk: "#f2b70b",
-  },
+// Le fond de l'image : le rose des coups de cœur du site, en aplat, avec des
+// étiquettes sombres et des pastilles de rang dorées.
+const THEME = {
+  bg: "#ff5470",
+  ring: "#ffffff",
+  pill: "#16161a",
+  pillInk: "#ffffff",
+  pillSoft: "#b5b5bd",
+  badge: "#f2b70b",
+  badgeInk: "#16161a",
+  tile: "#16161a",
+  tileInk: "#ff5470",
 };
+export const CIRCLE_BG = THEME.bg;
 
 // ---------------------------------------------------------------------
 //  Disposition : anneaux concentriques
@@ -384,7 +344,8 @@ function drawFooter(ctx, { username, caption, site }, theme) {
  * - `images` : Map url → HTMLImageElement|null.
  * Rend la liste des bulles placées (pour le survol et le clic).
  */
-export function renderCircle(canvas, { items, avatar, username, caption, site, theme, images }) {
+export function renderCircle(canvas, { items, avatar, username, caption, site, images }) {
+  const theme = THEME;
   canvas.width = CIRCLE_SIZE * SCALE;
   canvas.height = CIRCLE_SIZE * SCALE;
   const ctx = canvas.getContext("2d");

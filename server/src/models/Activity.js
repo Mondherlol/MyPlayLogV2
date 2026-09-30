@@ -124,6 +124,8 @@ const activitySchema = new mongoose.Schema(
 
 // Fil d'accueil : activité émise par les joueurs suivis, du plus récent au plus ancien.
 activitySchema.index({ actor: 1, createdAt: -1 });
+// Les statistiques du panel admin lisent l'activité par période.
+activitySchema.index({ createdAt: -1 });
 // Fusion des actions rapprochées sur un même jeu / une même liste.
 activitySchema.index({ actor: 1, type: 1, game: 1, createdAt: -1 });
 
