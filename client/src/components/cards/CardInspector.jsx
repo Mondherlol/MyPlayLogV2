@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Info, X, Heart, Layers, Check, Loader2, ArrowLeftRight, Recycle, Diamond } from "lucide-react";
+import { ChevronLeft, ChevronRight, Info, X, Heart, Layers, Check, Loader2, ArrowLeftRight, Recycle, Coins } from "lucide-react";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { useBackClose } from "../../hooks/useBackClose";
 import { CARD_RARITIES, raritySymbol, cardCover } from "../../lib/cards";
@@ -73,7 +73,7 @@ export default function CardInspector({
   binders = null,
   onToggleBinder = null,
   onRequest = null,
-  // Chez soi : recycler un exemplaire (`rates` : les Éclats par rareté).
+  // Chez soi : recycler un exemplaire (`rates` : les points par rareté).
   onRecycle = null,
   rates = null,
 }) {
@@ -234,8 +234,8 @@ export default function CardInspector({
             >
               <Recycle size={16} /> Recycler
               {rates?.[card.rarity] != null && (
-                <b className="cd-insp-shards">
-                  <Diamond size={11} />+{rates[card.rarity]}
+                <b className="cd-insp-points">
+                  <Coins size={12} />+{rates[card.rarity]}
                 </b>
               )}
             </button>

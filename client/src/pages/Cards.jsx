@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Coins } from "lucide-react";
+import { Anvil, Coins } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import { EDITIONS, cardCover } from "../lib/cards";
@@ -10,7 +10,7 @@ import CardCollection from "../components/cards/CardCollection";
 import FriendsBinders from "../components/cards/FriendsBinders";
 import PackShop from "../components/cards/PackShop";
 import TradeInbox from "../components/cards/TradeInbox";
-import Workshop, { Shards } from "../components/cards/Workshop";
+import Workshop from "../components/cards/Workshop";
 
 // ======================================================================
 //  Cartes — les boosters à ouvrir et le classeur
@@ -101,7 +101,15 @@ export default function Cards() {
 
   // --- l'atelier : recycler, forger (toujours avec « Annuler ») -------------------
   const [workshop, setWorkshop] = useState(null); // { forgeCard }
-  const withShards = useCallback((shards) => commit((d) => (d ? { ...d, shards } : d)), [commit]);
+  // Le solde bouge (recyclage, forge, annulation) : la page ET le compte.
+  const withPoints = useCallback(
+    (points) => {
+      if (points == null) return;
+      commit((d) => (d ? { ...d, points } : d));
+      updateUser({ points });
+    },
+    [commit, updateUser]
+  );
   // Des cartes partent (recyclées) : les compteurs baissent, une carte à zéro
   // quitte le classeur.
   const dropCards = useCallback(
@@ -133,39 +141,39 @@ export default function Cards() {
   const recycled = useCallback(
     (res, picked) => {
       dropCards(res.cards);
-      withShards(res.shards);
+      withPoints(res.points);
       const n = picked.reduce((a, x) => a + x.n, 0);
       const originals = new Map(picked.map((x) => [x.card.id, x.card]));
       toast.show({
         title: n > 1 ? `${n} cartes recyclées` : `${picked[0]?.card.name} recyclée`,
         cover: picked[0] ? cardCover(picked[0].card.cover, "t_cover_small") : undefined,
-        text: `+${fmt(res.gained)} éclats`,
+        text: `+${fmt(res.gained)} points`,
         undo: async () => {
           const back = await apiFetch(`/cards/recycle/${res.id}/undo`, { method: "POST", token });
           restoreCards(back.cards, originals);
-          withShards(back.shards);
+          withPoints(back.points);
         },
       });
     },
-    [dropCards, withShards, restoreCards, toast, token]
+    [dropCards, withPoints, restoreCards, toast, token]
   );
   const forged = useCallback(
     (res) => {
       setWorkshop(null);
-      withShards(res.shards);
+      withPoints(res.points);
       commit((d) => (d ? { ...d, cards: [...d.cards.filter((c) => c.id !== res.card.id), res.card] } : d));
       toast.show({
         title: res.card.name,
         cover: cardCover(res.card.cover, "t_cover_small"),
-        text: `Forgée · −${fmt(res.cost)} éclats`,
+        text: `Forgée · −${fmt(res.cost)} points`,
         undo: async () => {
           const back = await apiFetch(`/cards/forge/${res.id}/undo`, { method: "POST", token });
           dropCards([{ id: back.card, left: back.left }]);
-          withShards(back.shards);
+          withPoints(back.points);
         },
       });
     },
-    [commit, withShards, dropCards, toast, token]
+    [commit, withPoints, dropCards, toast, token]
   );
   // Depuis la carte en grand : un exemplaire, sans scène (le toast suffit).
   const recycleOneRef = useRef(null);
@@ -238,9 +246,10 @@ export default function Cards() {
           <button
             className="cd-wallet ws-wallet clickable"
             onClick={() => setWorkshop({ forgeCard: null })}
-            title="Atelier : recycler des cartes, en forger une"
+            title="Atelier : recycler des cartes contre des points, en forger une"
           >
-            <Shards n={data?.shards ?? 0} />
+            <Anvil size={18} />
+            <b>Atelier</b>
           </button>
           <Link to="/arcade" className="cd-wallet clickable" title="Points d'arcade">
             <Coins size={18} />
@@ -278,14 +287,14 @@ export default function Cards() {
         between={<FriendsBinders token={token} />}
         onForge={(card) => setWorkshop({ forgeCard: card })}
         onRecycle={recycleOne}
-        rates={data?.shardRates?.recycle || null}
+        rates={data?.workshop?.recycle || null}
       />
 
       {workshop && (
         <Workshop
           token={token}
           cards={data?.cards || []}
-          shards={data?.shards ?? 0}
+          points={points}
           forgeCard={workshop.forgeCard}
           onClose={() => setWorkshop(null)}
           onRecycled={(res, picked) => {

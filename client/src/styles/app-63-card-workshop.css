@@ -1,25 +1,24 @@
 /* ======================================================================
-   L'atelier des cartes : recycler en Éclats, forger (Workshop.jsx)
+   L'atelier des cartes : recycler contre des points, forger (Workshop.jsx)
    ======================================================================
-   Les Éclats ont leur couleur (un bleu glacé) : ce ne sont pas des points
-   d'arcade (l'or), et ils ne le redeviennent jamais. */
+   Les points d'arcade ont l'or du site : ce sont les mêmes pièces que celles
+   qui achètent les boosters. */
 :root {
-  --shard: #8fd3ff;
+  --coin: #f2b70b;
 }
 
-.ws-shards {
+.ws-points {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   font-variant-numeric: tabular-nums;
 }
-.ws-shards svg {
+.ws-points svg {
   width: 16px;
   height: 16px;
-  color: var(--shard);
-  fill: var(--shard);
+  color: var(--coin);
 }
-.ws-shards b {
+.ws-points b {
   font: 800 1rem/1 var(--font-display);
 }
 .cd-wallet.ws-wallet {
@@ -27,10 +26,10 @@
   font: inherit;
 }
 .cd-wallet.ws-wallet svg {
-  color: var(--shard);
+  color: var(--coin);
 }
 .cd-wallet.ws-wallet:hover {
-  border-color: var(--shard);
+  border-color: var(--coin);
 }
 
 /* --- la fenêtre --- */
@@ -107,8 +106,8 @@
   font-variant-numeric: tabular-nums;
 }
 .ws-chip.on {
-  border-color: var(--shard);
-  color: var(--shard);
+  border-color: var(--coin);
+  color: var(--coin);
 }
 .ws-chip:disabled {
   opacity: 0.45;
@@ -180,7 +179,7 @@
   transform: translateY(-2px);
 }
 .ws-cell.on .ws-cell-art {
-  box-shadow: 0 0 0 3px var(--shard);
+  box-shadow: 0 0 0 3px var(--coin);
 }
 .ws-cell.on .ws-cell-art img {
   filter: saturate(0.4) brightness(0.55);
@@ -198,7 +197,7 @@
   padding: 0.18rem 0.4rem;
   border-radius: 6px;
   background: rgba(12, 12, 14, 0.82);
-  color: var(--shard);
+  color: var(--coin);
   font: 800 0.7rem/1 var(--font-display);
 }
 .ws-cell-count {
@@ -295,7 +294,6 @@
 }
 .bd-btn.gold .ws-gain svg {
   color: #161618;
-  fill: #161618;
 }
 
 /* --- forger --- */
@@ -367,7 +365,7 @@
   font-size: 0.65rem;
   letter-spacing: -1px;
 }
-.ws-shards.short b {
+.ws-points.short b {
   color: var(--text-soft);
 }
 .ws-confirm {
@@ -401,10 +399,10 @@
   align-items: baseline;
   gap: 10px;
 }
-.ws-confirm-cost .ws-shards b {
+.ws-confirm-cost .ws-points b {
   font-size: 1.6rem;
 }
-.ws-confirm-cost .ws-shards svg {
+.ws-confirm-cost .ws-points svg {
   width: 22px;
   height: 22px;
 }
@@ -429,20 +427,18 @@
   cursor: pointer;
 }
 .bd-missing.forgeable:hover .bd-miss-lock {
-  color: var(--shard);
+  color: var(--coin);
 }
 /* La carte en grand : « Recycler +20 ». */
-.cd-insp-shards {
+.cd-insp-points {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   margin-left: 0.2rem;
-  color: var(--shard);
+  color: var(--coin);
   font-weight: 800;
 }
-.cd-insp-shards svg {
-  fill: var(--shard);
-}
+
 
 /* --- les scènes --- */
 .ws-scene {
@@ -469,13 +465,12 @@
   padding: 0.7rem 1.3rem;
   border-radius: 999px;
   background: #16161b;
-  box-shadow: 0 0 0 2px rgba(143, 211, 255, 0.35);
+  box-shadow: 0 0 0 2px rgba(242, 183, 11, 0.35);
 }
 .ws-counter svg {
   width: 30px;
   height: 30px;
-  color: var(--shard);
-  fill: var(--shard);
+  color: var(--coin);
 }
 .ws-counter b {
   min-width: 3ch;
@@ -484,7 +479,7 @@
 }
 .ws-scene.done .ws-counter {
   animation: wsCounter 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
-  box-shadow: 0 0 0 3px var(--shard);
+  box-shadow: 0 0 0 3px var(--coin);
 }
 @keyframes wsCounter {
   40% {
@@ -555,8 +550,9 @@
   width: 9px;
   height: 9px;
   margin: -4.5px 0 0 -4.5px;
-  background: var(--shard);
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  border-radius: 50%;
+  background: var(--coin);
+  box-shadow: inset 0 0 0 2px #c98f00;
   pointer-events: none;
   animation: wsFly 0.75s cubic-bezier(0.55, 0, 0.35, 1) both;
 }
@@ -580,11 +576,11 @@
   gap: 14px;
   animation: bdFade 0.3s ease both;
 }
-.ws-scene-foot .ws-shards b {
+.ws-scene-foot .ws-points b {
   font-size: 1.2rem;
 }
 
-/* Forger : les éclats convergent vers le centre, puis la carte. */
+/* Forger : les pièces convergent vers le centre, puis la carte. */
 .ws-spark {
   position: absolute;
   left: 50%;
@@ -592,8 +588,9 @@
   width: 12px;
   height: 12px;
   margin: -6px 0 0 -6px;
-  background: var(--shard);
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  border-radius: 50%;
+  background: var(--coin);
+  box-shadow: inset 0 0 0 2px #c98f00;
   opacity: 0;
   animation: wsGather 0.8s cubic-bezier(0.6, 0, 0.4, 1) forwards;
 }
@@ -618,7 +615,7 @@
   height: 40px;
   margin: -20px 0 0 -20px;
   border-radius: 50%;
-  background: radial-gradient(circle, #fff, var(--shard) 45%, transparent 70%);
+  background: radial-gradient(circle, #fff, var(--coin) 45%, transparent 70%);
   animation: wsCore 1.25s ease-in forwards;
 }
 @keyframes wsCore {

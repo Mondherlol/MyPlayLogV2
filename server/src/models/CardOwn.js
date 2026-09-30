@@ -16,7 +16,7 @@ const cardOwnSchema = new mongoose.Schema(
     fresh: { type: Boolean, default: true },
     // Le cœur : une carte mise en favori.
     fav: { type: Boolean, default: false },
-    // Forgée avec des Éclats : pas d'échange pendant 7 jours (lib/cardShards.js).
+    // Forgée à l'atelier : pas d'échange pendant 7 jours (lib/cardRecycle.js).
     forgedAt: { type: Date, default: null },
   },
   { versionKey: false }

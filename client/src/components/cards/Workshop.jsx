@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Anvil, Check, Diamond, Loader2, Lock, Minus, Recycle, Search, X } from "lucide-react";
+import { Anvil, Check, Coins, Loader2, Lock, Minus, Recycle, Search, X } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { useBackClose } from "../../hooks/useBackClose";
@@ -10,22 +10,22 @@ import Burst from "../Burst";
 import TcgCard from "./TcgCard";
 
 // ======================================================================
-//  L'atelier : recycler des cartes en Éclats, forger celle qu'on veut
+//  L'atelier : recycler des cartes contre des points, forger celle qu'on veut
 // ======================================================================
 // Deux onglets. RECYCLER : on touche les cartes à fondre (une touche = un
 // exemplaire), « Doubles » les prend toutes d'un coup ; les favoris n'y
 // sont pas, les cartes en échange (ou reçues il y a peu) sont verrouillées.
 // FORGER : on cherche une carte qu'on n'a pas, et on la forge.
-// Chaque geste a sa scène : les cartes éclatent et leurs éclats filent au
-// compteur ; à la forge, les éclats convergent et la carte apparaît.
-// Les règles (barèmes, verrous) sont côté serveur (lib/cardShards.js).
+// Chaque geste a sa scène : les cartes éclatent en pièces qui filent au
+// compteur ; à la forge, les pièces convergent et la carte apparaît.
+// Les règles (barèmes, verrous) sont côté serveur (lib/cardRecycle.js).
 
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
 
-export function Shards({ n, className = "" }) {
+export function Points({ n, className = "" }) {
   return (
-    <span className={`ws-shards ${className}`}>
-      <Diamond />
+    <span className={`ws-points ${className}`}>
+      <Coins />
       <b>{fmt(n)}</b>
     </span>
   );
@@ -96,7 +96,7 @@ function RecycleTab({ cards, info, pick, setPick }) {
               className={`ws-rar clickable ${rarity === r ? "on" : ""}`}
               style={{ "--rc": CARD_RARITIES[r].color }}
               onClick={() => setRarity((v) => (v === r ? null : r))}
-              title={`${CARD_RARITIES[r].label} · ${rates[r] ?? "?"} éclats`}
+              title={`${CARD_RARITIES[r].label} · ${rates[r] ?? "?"} points`}
             >
               {raritySymbol(r)}
             </button>
@@ -144,7 +144,7 @@ function RecycleTab({ cards, info, pick, setPick }) {
 }
 
 // --- forger ------------------------------------------------------------------------
-function ForgeTab({ token, info, shards, onChoose }) {
+function ForgeTab({ token, info, points, onChoose }) {
   const [q, setQ] = useState("");
   const [found, setFound] = useState(null);
   const dq = useDebounced(q.trim());
@@ -174,7 +174,7 @@ function ForgeTab({ token, info, shards, onChoose }) {
             {CARD_RARITY_ORDER.map((r) => (
               <span key={r} className="ws-cost-row" style={{ "--rc": CARD_RARITIES[r].color }}>
                 <i>{raritySymbol(r)}</i>
-                {cost[r] ? <Shards n={cost[r]} className={shards >= cost[r] ? "ok" : ""} /> : <Lock className="ws-no" />}
+                {cost[r] ? <Points n={cost[r]} className={points >= cost[r] ? "ok" : ""} /> : <Lock className="ws-no" />}
               </span>
             ))}
           </div>
@@ -190,7 +190,7 @@ function ForgeTab({ token, info, shards, onChoose }) {
                 <i className="ws-row-rar" style={{ color: CARD_RARITIES[c.rarity]?.color }}>
                   {raritySymbol(c.rarity)}
                 </i>
-                {price ? <Shards n={price} className={shards >= price ? "ok" : "short"} /> : <Lock className="ws-no" />}
+                {price ? <Points n={price} className={points >= price ? "ok" : "short"} /> : <Lock className="ws-no" />}
               </button>
             );
           })
@@ -200,8 +200,8 @@ function ForgeTab({ token, info, shards, onChoose }) {
   );
 }
 
-function ForgeConfirm({ card, cost, loading, shards, busy, err, onForge, onBack }) {
-  const enough = cost != null && shards >= cost;
+function ForgeConfirm({ card, cost, loading, points, busy, err, onForge, onBack }) {
+  const enough = cost != null && points >= cost;
   return (
     <div className="ws-confirm">
       <div className="ws-confirm-card">
@@ -218,9 +218,9 @@ function ForgeConfirm({ card, cost, loading, shards, busy, err, onForge, onBack 
           <p className="bd-err">Les cartes mythiques ne se forgent pas.</p>
         ) : (
           <div className="ws-confirm-cost">
-            <Shards n={cost} />
+            <Points n={cost} />
             <span className={`ws-confirm-after ${enough ? "" : "short"}`}>
-              {enough ? <>reste {fmt(shards - cost)}</> : <>il en manque {fmt(cost - shards)}</>}
+              {enough ? <>reste {fmt(points - cost)}</> : <>il en manque {fmt(cost - points)}</>}
             </span>
           </div>
         )}
@@ -242,7 +242,7 @@ function ForgeConfirm({ card, cost, loading, shards, busy, err, onForge, onBack 
 }
 
 // --- les scènes ----------------------------------------------------------------------
-// Recycler : les cartes éclatent l'une après l'autre, leurs éclats filent au
+// Recycler : les cartes éclatent l'une après l'autre, leurs pièces filent au
 // compteur, qui monte.
 // Une scène ne se referme qu'une fois (le bouton ET le fond sont cliquables).
 function useOnce(fn) {
@@ -273,7 +273,7 @@ function RecycleScene({ cards, gained, total, onDone: done0 }) {
         setTimeout(() => {
           setBroken(i + 1);
           if (i < 4 || i % 3 === 0) playBattleShatter();
-          // Les éclats de cette carte partent vers le compteur.
+          // Les pièces de cette carte partent vers le compteur.
           const a = cellRefs.current[i]?.getBoundingClientRect();
           const b = counterRef.current?.getBoundingClientRect();
           if (a && b) {
@@ -312,7 +312,7 @@ function RecycleScene({ cards, gained, total, onDone: done0 }) {
   return createPortal(
     <div className={`ws-scene recycle ${done ? "done" : ""}`} onClick={done ? onDone : undefined}>
       <div className="ws-counter" ref={counterRef}>
-        <Diamond />
+        <Coins />
         <b>+{fmt(count)}</b>
       </div>
       <div className="ws-pile">
@@ -339,7 +339,7 @@ function RecycleScene({ cards, gained, total, onDone: done0 }) {
       ))}
       {done && (
         <div className="ws-scene-foot">
-          <Shards n={total} />
+          <Points n={total} />
           <button className="bd-btn gold clickable" onClick={onDone}>
             OK
           </button>
@@ -350,7 +350,7 @@ function RecycleScene({ cards, gained, total, onDone: done0 }) {
   );
 }
 
-// Forger : les éclats convergent, un éclair, la carte est là.
+// Forger : les pièces convergent, un éclair, la carte est là.
 function ForgeScene({ card, onDone: done0 }) {
   const onDone = useOnce(done0);
   const [stage, setStage] = useState("gather"); // gather → reveal
@@ -409,7 +409,7 @@ function ForgeScene({ card, onDone: done0 }) {
 }
 
 // --- la fenêtre -----------------------------------------------------------------------
-export default function Workshop({ token, cards, shards, forgeCard = null, onClose, onRecycled, onForged }) {
+export default function Workshop({ token, cards, points, forgeCard = null, onClose, onRecycled, onForged }) {
   useScrollLock(true);
   useBackClose(onClose, "workshop");
   const [tab, setTab] = useState(forgeCard ? "forge" : "recycle");
@@ -423,7 +423,7 @@ export default function Workshop({ token, cards, shards, forgeCard = null, onClo
 
   useEffect(() => {
     let alive = true;
-    apiFetch("/cards/shards", { token })
+    apiFetch("/cards/workshop", { token })
       .then((d) => alive && setInfo(d))
       .catch((e) => alive && setErr(e.message));
     return () => {
@@ -437,7 +437,7 @@ export default function Workshop({ token, cards, shards, forgeCard = null, onClo
   }, [onClose, scene]);
   useLayoutEffect(() => setErr(""), [tab]);
 
-  const balance = info?.shards ?? shards ?? 0;
+  const balance = info?.points ?? points ?? 0;
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const picked = [...pick].map(([id, n]) => ({ card: byId.get(id), n })).filter((x) => x.card);
   const nPicked = picked.reduce((a, x) => a + x.n, 0);
@@ -488,7 +488,7 @@ export default function Workshop({ token, cards, shards, forgeCard = null, onClo
       <RecycleScene
         cards={scene.cards}
         gained={scene.res.gained}
-        total={scene.res.shards}
+        total={scene.res.points}
         onDone={() => onRecycled(scene.res, scene.picked)}
       />
     );
@@ -508,7 +508,7 @@ export default function Workshop({ token, cards, shards, forgeCard = null, onClo
               Forger
             </button>
           </span>
-          <Shards n={balance} className="ws-balance" />
+          <Points n={balance} className="ws-balance" />
           <button className="bd-x clickable" onClick={onClose} aria-label="Fermer">
             <X />
           </button>
@@ -527,7 +527,7 @@ export default function Workshop({ token, cards, shards, forgeCard = null, onClo
               <button className="bd-btn gold clickable" onClick={recycle} disabled={!nPicked || busy || !info}>
                 {busy ? <Loader2 size={16} className="spin" /> : <Recycle size={17} />}
                 Recycler {nPicked > 0 && <b className="ws-foot-n">{nPicked}</b>}
-                {gain > 0 && <Shards n={gain} className="ws-gain" />}
+                {gain > 0 && <Points n={gain} className="ws-gain" />}
               </button>
             </footer>
           </>
@@ -536,14 +536,14 @@ export default function Workshop({ token, cards, shards, forgeCard = null, onClo
             card={chosen}
             cost={info?.forge?.[chosen.rarity] ?? null}
             loading={!info}
-            shards={balance}
+            points={balance}
             busy={busy || !info}
             err={err}
             onForge={forge}
             onBack={() => setChosen(null)}
           />
         ) : (
-          <ForgeTab token={token} info={info} shards={balance} onChoose={setChosen} />
+          <ForgeTab token={token} info={info} points={balance} onChoose={setChosen} />
         )}
       </div>
     </div>,
