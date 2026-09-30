@@ -37,6 +37,7 @@ import { useToast } from "../context/ToastContext";
 // pictogrammes : qui bat qui.
 
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
+const ROMAN = ["", "I", "II", "III", "IV", "V"];
 
 // Miroir de BEATS (server/src/lib/cardBattle.js) — pour le tableau seulement.
 const BEATS = {
@@ -64,6 +65,7 @@ export default function CardBattle() {
   const [opening, setOpening] = useState(null); // { tier, edition, origin, run }
   const navigate = useNavigate();
   const startRef = useRef(null);
+  const nextPass = useRef(null); // la passe qui s'ouvre après le dernier palier
 
   const load = useCallback(() => {
     if (!token) return () => {};
@@ -323,8 +325,20 @@ export default function CardBattle() {
         <section className="bp">
           <header className="bp-head">
             <h2 className="bl-h2">
-              Passe <em>Saison {pass.season}</em>
+              Passe {ROMAN[pass.rank || 1]}
+              {pass.season > 1 && <em>Saison {pass.season}</em>}
             </h2>
+            <span className="bp-ranks" title="Finir une passe ouvre la suivante">
+              {Array.from({ length: pass.ranks || 1 }, (_, i) => {
+                const r = i + 1;
+                const cur = pass.rank || 1;
+                return (
+                  <span key={r} className={`bp-rank ${r < cur ? "done" : r === cur ? "cur" : ""}`}>
+                    {r > cur ? <Lock /> : ROMAN[r]}
+                  </span>
+                );
+              })}
+            </span>
             <span className="bp-stars">
               <Star />
               {pass.stars}
@@ -405,14 +419,21 @@ export default function CardBattle() {
           request={() =>
             apiFetch("/cards/battle/pass/claim", { method: "POST", token, body: { tier: opening.tier } })
           }
-          onOpened={(res) =>
+          onOpened={(res) => {
+            nextPass.current = res.next || null;
             setHome((h) =>
               h ? { ...h, pass: res.pass, stats: { ...h.stats, claimable: res.pass.claimable } } : h
-            )
-          }
+            );
+          }}
           onAgain={() => {}}
           onBinder={() => navigate("/cartes")}
-          onClose={() => setOpening(null)}
+          onClose={() => {
+            setOpening(null);
+            // La passe finie ouvre la suivante : on le dit une fois le booster refermé.
+            const n = nextPass.current;
+            nextPass.current = null;
+            if (n) toast.show({ title: `Passe ${ROMAN[n.rank]}`, text: n.rank > 1 ? "Débloquée" : `Saison ${n.season}` });
+          }}
         />
       )}
 

@@ -17,8 +17,10 @@ const cardBattleStatSchema = new mongoose.Schema(
     level: { type: Number, default: 1 },
     day: { type: String, default: "" },
     dayGames: { type: Number, default: 0 },
-    // La passe : saison, étoiles gagnées, paliers dont le booster est récupéré.
+    // La passe : saison, passe en cours (I, II, III), étoiles gagnées,
+    // paliers dont le booster est récupéré.
     passSeason: { type: Number, default: 1 },
+    passRank: { type: Number, default: 1 },
     passStars: { type: Number, default: 0 },
     passClaimed: { type: [Number], default: [] },
     // Les duels entre joueurs : un palmarès à part (le niveau du bot et la

@@ -449,7 +449,7 @@ async function payOne(userId, st, s) {
       $set: {
         day: E.today(),
         dayGames: r.dayGames,
-        passStars: Math.min(E.PASS_TOTAL, before.stars + (r.stars || 0)),
+        passStars: E.passStarsAfter(before, r.stars),
       },
     },
     { upsert: true, new: true }

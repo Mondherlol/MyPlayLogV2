@@ -519,36 +519,51 @@ function statView(s) {
 // ----------------------------------------------------------------------
 // Une victoire donne 2 étoiles (3 si elle est parfaite), une défaite 1 si on a
 // gagné au moins une manche. Chaque palier débloque un booster — les éditions
-// tournent (Origines, Néon, Braise…) — et le dernier un booster DORÉ. Pas de
-// date limite : une fois tous les boosters récupérés, la saison suivante
-// repart de zéro.
-export const PASS_TIERS = [3, 3, 4, 4, 5, 5, 6, 6, 7, 8];
-const PASS_NEED = PASS_TIERS.reduce((acc, n) => [...acc, (acc.at(-1) || 0) + n], []);
-const PASS_TOTAL = PASS_NEED.at(-1);
+// tournent (Origines, Néon, Braise…) — et certains un booster DORÉ.
+// Trois passes se suivent : finir la Passe I (tous ses boosters récupérés)
+// ouvre la Passe II, plus longue et plus riche en dorés, puis la III. Après
+// la III, la saison suivante repart de la Passe I. Pas de date limite.
+export const PASSES = [
+  { tiers: [3, 3, 4, 4, 5, 5, 6, 6, 7, 8], golden: [10] },
+  { tiers: [4, 4, 5, 5, 6, 6, 7, 7, 8, 10], golden: [5, 10] },
+  { tiers: [5, 5, 6, 6, 7, 7, 8, 9, 10, 12], golden: [4, 7, 10] },
+].map((p) => {
+  const need = p.tiers.reduce((acc, n) => [...acc, (acc.at(-1) || 0) + n], []);
+  return { ...p, need, total: need.at(-1) };
+});
+const passRankOf = (s) => Math.min(PASSES.length, Math.max(1, s?.passRank || 1));
+const passOf = (s) => PASSES[passRankOf(s) - 1];
 // Les éditions tournent dans l'ordre de la boutique : Origines, Néon, Braise.
 const PASS_EDITIONS = ["origines", "neon", "braise"].filter((k) => EDITION_KEYS.includes(k));
 const tierEdition = (t) => PASS_EDITIONS[(t - 1) % PASS_EDITIONS.length];
 
 function passView(s) {
-  const stars = Math.min(PASS_TOTAL, s?.passStars || 0);
+  const rank = passRankOf(s);
+  const P = PASSES[rank - 1];
+  const stars = Math.min(P.total, s?.passStars || 0);
   const claimed = s?.passClaimed || [];
-  const tiers = PASS_NEED.map((need, i) => ({
+  const tiers = P.need.map((need, i) => ({
     n: i + 1,
     need,
-    from: i ? PASS_NEED[i - 1] : 0,
+    from: i ? P.need[i - 1] : 0,
     edition: tierEdition(i + 1),
-    golden: i === PASS_NEED.length - 1,
+    golden: P.golden.includes(i + 1),
     done: stars >= need,
     claimed: claimed.includes(i + 1),
   }));
   return {
     season: s?.passSeason || 1,
+    rank,
+    ranks: PASSES.length,
     stars,
-    total: PASS_TOTAL,
+    total: P.total,
     tiers,
     claimable: tiers.filter((t) => t.done && !t.claimed).length,
   };
 }
+
+// Les étoiles d'une partie, plafonnées au bout de la passe en cours.
+const passStarsAfter = (before, gained) => Math.min(before.total, before.stars + (gained || 0));
 
 // Le gain : moins de points qu'avant (un booster coûte 500) — c'est la passe
 // qui récompense vraiment. 40 + 10 par manche d'avance (3-0 → 70), ×(1 + 5 %
@@ -604,7 +619,7 @@ async function payOut(userId, st) {
         level: r.level.to,
         day: today(),
         dayGames: r.dayGames,
-        passStars: Math.min(PASS_TOTAL, before.stars + (r.stars || 0)),
+        passStars: passStarsAfter(before, r.stars),
       },
     },
     { upsert: true, new: true }
@@ -674,13 +689,17 @@ export async function battleHome(userId) {
 export async function claimPassTier(userId, tierRaw) {
   const cat = await catalogReady();
   const tier = Number(tierRaw);
-  if (!Number.isInteger(tier) || tier < 1 || tier > PASS_TIERS.length) throw new BattleError(400, "Palier inconnu.");
   const stat = await getStat(userId);
-  const need = PASS_NEED[tier - 1];
+  const rank = passRankOf(stat);
+  const P = PASSES[rank - 1];
+  if (!Number.isInteger(tier) || tier < 1 || tier > P.tiers.length) throw new BattleError(400, "Palier inconnu.");
+  const need = P.need[tier - 1];
+  // `passRank` absent = Passe I (les palmarès d'avant les trois passes).
   const s = await CardBattleStat.findOneAndUpdate(
     {
       user: userId,
       passSeason: stat.passSeason || 1,
+      passRank: rank === 1 ? { $in: [1, null] } : rank,
       passStars: { $gte: need },
       passClaimed: { $ne: tier },
     },
@@ -690,7 +709,7 @@ export async function claimPassTier(userId, tierRaw) {
   if (!s) throw new BattleError(409, "Ce booster n'est pas (ou plus) à récupérer.");
 
   const edition = tierEdition(tier);
-  const golden = tier === PASS_TIERS.length;
+  const golden = P.golden.includes(tier);
   let ids;
   let isGold;
   let counts;
@@ -702,15 +721,27 @@ export async function claimPassTier(userId, tierRaw) {
     throw e;
   }
 
-  // Tout est récupéré : la saison suivante repart de zéro.
+  // Tout est récupéré : la passe suivante s'ouvre, ou, après la dernière, la
+  // saison suivante repart de la Passe I.
   let fresh = s;
-  if ((s.passClaimed || []).length >= PASS_TIERS.length) {
+  let next = null;
+  if ((s.passClaimed || []).length >= P.tiers.length) {
+    const last = rank >= PASSES.length;
+    const season = s.passSeason || 1;
     fresh =
       (await CardBattleStat.findOneAndUpdate(
-        { user: userId, passSeason: s.passSeason || 1 },
-        { $set: { passSeason: (s.passSeason || 1) + 1, passStars: 0, passClaimed: [] } },
+        { user: userId, passSeason: season, passRank: rank === 1 ? { $in: [1, null] } : rank },
+        {
+          $set: {
+            passSeason: last ? season + 1 : season,
+            passRank: last ? 1 : rank + 1,
+            passStars: 0,
+            passClaimed: [],
+          },
+        },
         { new: true }
       ).lean()) || s;
+    next = { rank: passRankOf(fresh), season: fresh.passSeason || 1 };
   }
 
   recordActivity({
@@ -725,6 +756,7 @@ export async function claimPassTier(userId, tierRaw) {
     tier,
     cards: ids.map((id) => ({ ...cat.byId.get(id), count: counts.get(id), isNew: counts.get(id) === 1 })),
     pass: passView(fresh),
+    next,
   };
 }
 
@@ -955,7 +987,7 @@ export const engine = {
   MAX_ROUNDS,
   LATE_MS,
   FULL_GAMES_PER_DAY,
-  PASS_TOTAL,
+  passStarsAfter,
   BINARY,
   rnd,
   pick,
