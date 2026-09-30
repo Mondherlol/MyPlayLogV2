@@ -1277,3 +1277,204 @@
     width: 66px;
   }
 }
+
+/* ---------- Le cercle (image à télécharger) ---------- */
+.ps-circle {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(240px, 1fr);
+  gap: 1.3rem;
+  align-items: start;
+}
+.ps-circle-stage {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  overflow: hidden;
+  transition: background 0.2s ease;
+}
+.ps-circle-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ps-circle-canvas.pointing {
+  cursor: pointer;
+}
+.ps-circle-canvas.hidden {
+  visibility: hidden;
+}
+.ps-circle-loading,
+.ps-circle-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.ps-circle-loading {
+  color: #fff;
+  background: rgba(0, 0, 0, 0.18);
+}
+.ps-circle-empty {
+  padding: 2rem;
+  text-align: center;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+}
+.ps-circle-tip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 8px));
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 9px;
+  background: #16161a;
+  color: #fff;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+.ps-circle-tip span {
+  color: #b5b5bd;
+  font-size: 0.72rem;
+}
+.ps-circle-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+.ps-circle-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.ps-circle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.4rem;
+}
+.ps-circle-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+.ps-circle-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.ps-circle-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.ps-circle-chip:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.ps-circle-chip.active {
+  background: #f2b70b;
+  border-color: #f2b70b;
+  color: #16161a;
+}
+.ps-circle-swatches {
+  display: flex;
+  gap: 0.45rem;
+  padding: 3px 0;
+}
+.ps-circle-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  padding: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.ps-circle-swatch:hover {
+  transform: scale(1.08);
+}
+.ps-circle-swatch.active {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px #f2b70b;
+}
+.ps-circle-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.ps-circle-list button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.38rem 0.5rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+.ps-circle-list button:hover {
+  background: var(--surface-2);
+}
+.ps-circle-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: #f2b70b;
+  color: #16161a;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.ps-circle-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.ps-circle-value {
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+}
+.ps-circle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+.ps-circle-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+@media (max-width: 760px) {
+  .ps-circle {
+    grid-template-columns: 1fr;
+  }
+}

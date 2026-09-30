@@ -19,6 +19,11 @@ const gameMetaSchema = new mongoose.Schema(
     franchiseKind: { type: String },
     year: { type: Number, default: null }, // année de première sortie
     rating: { type: Number, default: null }, // total_rating IGDB arrondi
+    // Nature du jeu chez IGDB (game_type : 0 jeu, 6 épisode, 1 DLC…) et ce
+    // dont il dépend. Sans défaut, comme franchiseId : absent = pas cherché.
+    gameType: { type: Number },
+    parentGame: { type: Number },
+    versionParent: { type: Number },
   },
   { timestamps: true }
 );

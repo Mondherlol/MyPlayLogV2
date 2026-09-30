@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
+import StatsCircle from "./StatsCircle";
 
 // Cache stale-while-revalidate des stats (par pseudo) : réaffichage instantané,
 // revalidation en fond — même pattern que le profil.
@@ -613,6 +614,13 @@ export default function ProfileStats({ username, token }) {
       </section>
 
       <div className="ps-grid">
+        {/* ---------- Le cercle : sagas, studios… autour du profil ---------- */}
+        <StatsCircle
+          username={username}
+          token={token}
+          onPick={(it, Icon) => openFacet(it.name, Icon, it.list, it.games)}
+        />
+
         {/* ---------- Backlog : donut des statuts ---------- */}
         <Card Icon={Layers} title="État du backlog" sub={`${nf.format(t.games)} jeux`}>
           <StatusDonut

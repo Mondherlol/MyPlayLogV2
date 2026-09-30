@@ -8,7 +8,7 @@ const STALE_MS = 30 * 24 * 60 * 60 * 1000; // on re-rafraîchit passé 30 jours
 const CHUNK = 400; // marge sous la limite IGDB (500 ids par requête)
 
 const META_FIELDS =
-  "fields name,genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,franchises.name,collections.name,first_release_date,total_rating";
+  "fields name,genres.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,franchises.name,collections.name,first_release_date,total_rating,game_type,parent_game,version_parent";
 
 function toDoc(g) {
   const companies = g.involved_companies || [];
@@ -27,7 +27,70 @@ function toDoc(g) {
       ? new Date(g.first_release_date * 1000).getFullYear()
       : null,
     rating: g.total_rating ? Math.round(g.total_rating) : null,
+    ...kindOf(g),
   };
+}
+
+// La nature du jeu chez IGDB (jeu, épisode, DLC…) et ce dont il dépend : de
+// quoi ranger un épisode sous son jeu plutôt que de le compter à part.
+function kindOf(g) {
+  return {
+    gameType: g.game_type ?? null,
+    parentGame: g.parent_game ?? null,
+    versionParent: g.version_parent ?? null,
+  };
+}
+
+// Ce qui n'est pas un jeu à part entière mais un morceau (ou une autre version)
+// du jeu parent : DLC (1), extension (2), épisode (6), version enrichie (10,
+// Persona 3 FES), portage (11), pack (13), mise à jour (14). Les remakes et
+// remasters (8, 9) et les extensions autonomes (4, Half-Life 2: Episode One)
+// restent des jeux à part.
+const PART_TYPES = new Set([1, 2, 6, 10, 11, 13, 14]);
+
+/**
+ * Le « jeu » auquel une fiche appartient : lui-même, ou son jeu parent
+ * quand c'est un épisode, un DLC… ou une édition (GOTY, Deluxe) d'un autre.
+ * Cinq épisodes de The Walking Dead font ainsi UN jeu, pas cinq.
+ */
+export function unitOf(gameId, m) {
+  if (!m) return gameId;
+  if (m.versionParent) return m.versionParent;
+  if (PART_TYPES.has(m.gameType) && m.parentGame) return m.parentGame;
+  return gameId;
+}
+
+/**
+ * Complète la nature (gameType, parentGame, versionParent) des fiches mises
+ * en cache avant qu'on la demande à IGDB. Même principe que `franchiseRefs` :
+ * `undefined` veut dire « jamais cherché ». `byId` (rendu par ensureGameMeta)
+ * est mis à jour en place.
+ */
+export async function ensureGameKinds(byId) {
+  const todo = [...byId.values()]
+    .filter((m) => m.gameType === undefined && !isLocalId(m.gameId))
+    .map((m) => m.gameId);
+  for (let i = 0; i < todo.length; i += CHUNK) {
+    const chunk = todo.slice(i, i + CHUNK);
+    try {
+      const raw = await igdbQuery(
+        "games",
+        `fields game_type,parent_game,version_parent; where id = (${chunk.join(",")}); limit ${chunk.length};`
+      );
+      const found = new Map(raw.map((g) => [g.id, g]));
+      // Un jeu qu'IGDB ne rend plus est marqué quand même (null) : sinon il
+      // repartirait chez IGDB à chaque visite.
+      const ops = chunk.map((id) => {
+        const kind = kindOf(found.get(id) || {});
+        Object.assign(byId.get(id) || {}, kind);
+        return { updateOne: { filter: { gameId: id }, update: { $set: kind } } };
+      });
+      if (ops.length) await GameMeta.bulkWrite(ops, { ordered: false });
+    } catch (err) {
+      console.error("game kinds fetch error:", err.message);
+    }
+  }
+  return byId;
 }
 
 // L'identifiant IGDB de la saga retenue dans `franchise`, et sa nature : c'est

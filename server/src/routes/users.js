@@ -16,7 +16,7 @@ import GameTracker from "../models/GameTracker.js";
 import Notification from "../models/Notification.js";
 import Activity from "../models/Activity.js";
 import { igdbQuery } from "../lib/igdb.js";
-import { ensureGameMeta, franchiseRefs } from "../lib/gameMeta.js";
+import { ensureGameMeta, ensureGameKinds, franchiseRefs, unitOf } from "../lib/gameMeta.js";
 import { createTtlCache } from "../lib/ttlCache.js";
 import { isLocalId } from "../lib/localGame.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
@@ -2187,6 +2187,143 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
   } catch (err) {
     console.error("profile stats error:", err.message);
     res.status(500).json({ error: "Erreur lors du calcul des statistiques." });
+  }
+});
+
+// --- Le cercle (onglet Stats) ----------------------------------------------
+// L'image « cercle » : le profil au centre, et autour ses sagas (ou studios,
+// éditeurs, genres, consoles) classées par temps de jeu, note ou nombre de
+// jeux. Le classement se fait côté client — la réponse porte les trois
+// mesures de chaque bulle, et l'union des 50 premières selon chacune.
+//
+// ⚠️ UN ÉPISODE N'EST PAS UN JEU. Les cinq épisodes de The Walking Dead, les
+// DLC d'un jeu ou son édition GOTY comptent pour UN jeu de la saga (cf.
+// `unitOf`) ; leurs heures s'additionnent, leurs notes se moyennent d'abord
+// entre elles.
+//
+// Une facette par requête (?kind=) : chaque bulle emporte un aperçu de ses
+// jeux pour le pop-up du clic, et tout envoyer d'un coup pèserait lourd. Le
+// calcul, lui, est fait une fois pour toutes les facettes et gardé une minute.
+const circleCache = createTtlCache({ name: "users:circle", max: 200, ttl: 60 * 1000 });
+const CIRCLE_KINDS = ["franchises", "developers", "publishers", "genres", "platforms"];
+const CIRCLE_TOP = 50;
+const CIRCLE_GAMES = 24;
+
+async function computeCircle(user) {
+  const entries = await UserGame.find({ user: user._id, status: { $ne: "wishlist" } })
+    .select("gameId name cover platform playtimeHours favorite rating")
+    .lean();
+  const meta = await ensureGameMeta(entries.map((e) => e.gameId));
+  await ensureGameKinds(meta);
+
+  // Le visage d'une bulle : un jeu principal (pas un DLC) qu'on a aimé.
+  const weight = (e, main) =>
+    (main ? 10000 : 0) +
+    (e.favorite ? 1000 : 0) +
+    (e.rating ?? 0) * 2 +
+    Math.min(e.playtimeHours || 0, 200) / 10;
+
+  const groups = Object.fromEntries(CIRCLE_KINDS.map((k) => [k, new Map()]));
+  const add = (kind, name, e, unit) => {
+    if (!name) return;
+    const map = groups[kind];
+    let g = map.get(name);
+    if (!g) map.set(name, (g = { name, hours: 0, units: new Map(), best: null, bestW: -1 }));
+    g.hours += e.playtimeHours || 0;
+    if (!g.units.has(unit)) g.units.set(unit, { ratings: [], entries: [] });
+    const u = g.units.get(unit);
+    if (e.rating != null) u.ratings.push(e.rating);
+    u.entries.push(e);
+    const w = weight(e, unit === e.gameId);
+    if (e.cover && w > g.bestW) {
+      g.best = e;
+      g.bestW = w;
+    }
+  };
+
+  for (const e of entries) {
+    const m = meta.get(e.gameId) || {};
+    const unit = unitOf(e.gameId, m);
+    add("franchises", m.franchise, e, unit);
+    for (const d of new Set(m.developers || [])) add("developers", d, e, unit);
+    for (const p of new Set(m.publishers || [])) add("publishers", p, e, unit);
+    for (const g of new Set(m.genres || [])) add("genres", g, e, unit);
+    if (e.platform && e.platform !== "Vu en let's play") add("platforms", e.platform, e, unit);
+  }
+
+  const out = {};
+  for (const kind of CIRCLE_KINDS) {
+    const rows = [...groups[kind].values()].map((g) => {
+      const unitRatings = [...g.units.values()]
+        .filter((u) => u.ratings.length)
+        .map((u) => u.ratings.reduce((s, r) => s + r, 0) / u.ratings.length);
+      // Les jeux du pop-up : un par « jeu » (le plus représentatif), les
+      // plus joués d'abord.
+      const games = [...g.units.entries()]
+        .map(([unit, u]) =>
+          u.entries.reduce((a, b) =>
+            weight(b, unit === b.gameId) > weight(a, unit === a.gameId) ? b : a
+          )
+        )
+        .sort((a, b) => (b.playtimeHours || 0) - (a.playtimeHours || 0));
+      return {
+        name: g.name,
+        hours: Math.round(g.hours * 10) / 10,
+        games: g.units.size,
+        rated: unitRatings.length,
+        rating: unitRatings.length
+          ? Math.round(unitRatings.reduce((s, r) => s + r, 0) / unitRatings.length)
+          : null,
+        cover: g.best?.cover || null,
+        list: games
+          .slice(0, CIRCLE_GAMES)
+          .map((e) => ({ gameId: e.gameId, name: e.name, cover: e.cover })),
+      };
+    });
+    const top = (cmp, filter = () => true) => rows.filter(filter).sort(cmp).slice(0, CIRCLE_TOP);
+    const keep = new Set([
+      ...top((a, b) => b.hours - a.hours || b.games - a.games, (r) => r.hours > 0),
+      ...top((a, b) => b.games - a.games || b.hours - a.hours),
+      ...top((a, b) => b.rating - a.rating || b.rated - a.rated, (r) => r.rating != null),
+    ]);
+    out[kind] = [...keep];
+  }
+
+  // Logos : studios et éditeurs (IGDB companies), consoles (IGDB platforms).
+  const [companyLogos, platformLogos] = await Promise.all([
+    ensureEntityLogos("company", [
+      ...out.developers.map((d) => d.name),
+      ...out.publishers.map((p) => p.name),
+    ]),
+    ensureEntityLogos("platform", out.platforms.map((p) => p.name)),
+  ]);
+  for (const r of [...out.developers, ...out.publishers]) r.logo = companyLogos.get(r.name) || null;
+  for (const r of out.platforms) r.logo = platformLogos.get(r.name) || null;
+
+  return { user: { username: user.username, avatar: user.avatar || null }, kinds: out };
+}
+
+router.get("/:username/circle", optionalAuth, async (req, res) => {
+  try {
+    const kind = CIRCLE_KINDS.includes(req.query.kind) ? req.query.kind : "franchises";
+    const user = await User.findOne({ username: req.params.username }).select(
+      "_id username avatar privacy"
+    );
+    if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, user, req.userId)) return;
+
+    const cacheKey = String(user._id);
+    let data = req.query.fresh ? null : circleCache.get(cacheKey);
+    if (!data) {
+      data = JSON.stringify(await computeCircle(user));
+      circleCache.set(cacheKey, data);
+    }
+    // Une COPIE (cf. /stats) : le filtre des photos masquées réécrit la réponse.
+    const parsed = JSON.parse(data);
+    res.json({ user: parsed.user, kind, items: parsed.kinds[kind] });
+  } catch (err) {
+    console.error("profile circle error:", err.message);
+    res.status(500).json({ error: "Erreur lors du calcul du cercle." });
   }
 });
 
