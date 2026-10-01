@@ -59,6 +59,7 @@ import {
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import BackloggdImportModal from "../components/BackloggdImportModal";
+import StashImportModal from "../components/StashImportModal";
 import {
   getRatingScale,
   setRatingScale,
@@ -73,6 +74,7 @@ import SteamIcon from "../components/SteamIcon";
 import DiscordIcon from "../components/DiscordIcon";
 import GoogleIcon from "../components/GoogleIcon";
 import BackloggdIcon from "../components/BackloggdIcon";
+import { StashMark } from "../components/StashIcon";
 import SteamImportModal from "../components/SteamImportModal";
 import PsnIcon from "../components/PsnIcon";
 import PsnImportModal, {
@@ -227,6 +229,7 @@ function ImportsPanel() {
         <SteamCard />
         <PsnCard />
         <BackloggdCard />
+        <StashCard />
         <CompanionCard />
       </div>
       <div className="import-soon-row">
@@ -276,6 +279,35 @@ function BackloggdCard() {
           <BackloggdImportModal onClose={() => setOpen(false)} />,
           document.body
         )}
+    </>
+  );
+}
+
+// --- Stash : un pseudo, une photo, et c'est parti ---
+// Même principe que Backloggd (pages publiques, rien à relier), avec une
+// vérification de plus : on montre le profil trouvé avant de le lire.
+function StashCard() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <div className="import-card">
+        <div className="import-card-main">
+          <div className="import-logo stash-logo">
+            <StashMark size={24} />
+          </div>
+          <div className="import-card-info">
+            <div className="import-card-title">Stash</div>
+            <p className="import-card-desc">Statuts, notes et avis</p>
+          </div>
+        </div>
+        <div className="import-actions">
+          <button className="btn-set-primary clickable" onClick={() => setOpen(true)}>
+            <DownloadCloud size={15} /> Importer
+          </button>
+        </div>
+      </div>
+      {open && <StashImportModal onClose={() => setOpen(false)} />}
     </>
   );
 }

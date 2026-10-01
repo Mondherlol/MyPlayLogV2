@@ -1,0 +1,489 @@
+/* ======================================================================
+   Import Stash
+   ======================================================================
+   La coque est celle des imports Steam et Backloggd (.steam-modal,
+   .bl-list, .bl-row… — cf. app-15-settings.css et app-46-backloggd.css) :
+   c'est le même geste. Ici, ce qui est propre à Stash — le « c'est toi ? »,
+   l'écran d'attente qui se remplit, les filtres — en aplats, avec le jaune du
+   site (Stash a presque le même, c'est une chance).
+   ====================================================================== */
+
+.stash-modal {
+  width: min(680px, 100%);
+}
+/* L'en-tête porte le logo, à plat : pas le dégradé teinté des autres imports. */
+.stash-head {
+  justify-content: flex-start;
+  background: var(--surface);
+  color: var(--text);
+  padding: 1.05rem 1.35rem;
+}
+
+/* --- Boutons --- */
+.stash-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 42px;
+  padding: 0.6rem 1.15rem;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  background: #f2b70b;
+  color: #161618;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: var(--cursor-pointer), pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.stash-btn:hover:not(:disabled) {
+  background: var(--amber);
+}
+/* Éteint, il passe au gris : un jaune à moitié transparent vire au brun. */
+.stash-btn:disabled {
+  background: var(--surface-2);
+  color: var(--text-soft);
+  cursor: var(--cursor-default), auto;
+}
+.stash-btn.ghost:disabled {
+  background: transparent;
+}
+.stash-btn.ghost {
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--text);
+}
+.stash-btn.ghost:hover:not(:disabled) {
+  border-color: #f2b70b;
+  background: transparent;
+}
+
+/* --- 1. Le pseudo --- */
+.stash-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.4rem 1.35rem 1.5rem;
+}
+.stash-field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.9rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.stash-field:focus-within {
+  border-color: #f2b70b;
+}
+.stash-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.78rem 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+}
+.stash-field input:focus {
+  outline: none;
+}
+
+/* --- 2. C'est toi ? --- */
+.stash-who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1.5rem 1.35rem 1.7rem;
+  text-align: center;
+}
+.stash-who-q {
+  margin: 0 0 0.9rem;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.stash-avatar {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  margin-bottom: 0.7rem;
+  animation: stash-pop 0.38s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.stash-avatar > img,
+.stash-avatar-letter {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid #f2b70b;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.stash-avatar-letter {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: var(--text);
+}
+/* La marque, posée sur la photo comme un badge d'appli. */
+.stash-avatar-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 3px solid var(--surface);
+  background: #0b0b0d;
+  color: #fff;
+}
+.stash-who-name {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.stash-who-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+.stash-who-user:hover {
+  color: #f2b70b;
+}
+.stash-who-stats,
+.stash-done-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+.stash-who-stats span,
+.stash-done-stats span {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+.stash-who-stats b,
+.stash-done-stats b {
+  color: var(--text);
+}
+.stash-who-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+.stash-who-actions .stash-btn {
+  min-width: 120px;
+}
+
+/* --- 3. L'écran d'attente --- */
+.stash-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 1.4rem 1.35rem 1.6rem;
+}
+.stash-wall {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 6px;
+}
+.stash-tile {
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+.stash-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: stash-in 0.35s ease both;
+}
+.stash-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.stash-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #f2b70b;
+  transition: width 0.5s ease;
+}
+.stash-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem 1.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stash-step {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.86rem;
+  transition: opacity 0.2s ease;
+}
+.stash-step.todo {
+  opacity: 0.4;
+}
+.stash-step-ico {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  color: #f2b70b;
+}
+.stash-step.done .stash-step-ico {
+  border-color: transparent;
+  background: #f2b70b;
+  color: #161618;
+}
+.stash-step.active .stash-step-ico {
+  border-color: transparent;
+}
+.stash-step-label {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.stash-step-n {
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 4. L'aperçu --- */
+.stash-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  padding: 0.75rem 1.35rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+.stash-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.stash-summary b {
+  color: var(--text);
+}
+.stash-summary-av {
+  width: 26px;
+  height: 26px;
+  margin-right: -0.5rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.stash-summary .stash-summary-user {
+  color: var(--text);
+  font-weight: 700;
+}
+.stash-filters {
+  /* Une rangée qui défile en largeur n'a pas de hauteur minimale : sans ça,
+     la liste en dessous l'écrase jusqu'à un trait. */
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.75rem 1.35rem 0.1rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.stash-filters::-webkit-scrollbar {
+  display: none;
+}
+.stash-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.75rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: var(--cursor-pointer), pointer;
+}
+.stash-chip span {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.stash-chip:hover {
+  border-color: #f2b70b;
+}
+.stash-chip.on {
+  border-color: transparent;
+  background: #f2b70b;
+  color: #161618;
+}
+.stash-chip.on span {
+  color: rgba(22, 22, 24, 0.65);
+}
+/* Deux mille lignes, ça se peint vite si le navigateur ne peint que celles
+   qu'on voit. */
+.stash-list .stash-row {
+  flex: 0 0 auto;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 52px;
+}
+.stash-row.on {
+  border-color: #f2b70b;
+}
+.stash-row.on .bl-box {
+  background: #f2b70b;
+  color: #161618;
+}
+.bl-row .bl-status.st-notInterested {
+  color: var(--text-soft);
+}
+.stash-star {
+  color: #f2b70b;
+  fill: #f2b70b;
+  vertical-align: -1px;
+}
+.stash-unmatched {
+  margin: 0.4rem 0 0.2rem;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.stash-back {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: var(--cursor-pointer), pointer;
+}
+.stash-back:hover {
+  color: #f2b70b;
+}
+
+/* --- Fin --- */
+.stash-spin {
+  color: #f2b70b;
+}
+.stash-done-check {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 0.3rem;
+  border-radius: 50%;
+  background: #f2b70b;
+  color: #161618;
+  animation: stash-pop 0.38s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.stash-done-check.muted {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+@keyframes stash-pop {
+  from {
+    transform: scale(0.82);
+    opacity: 0;
+  }
+}
+@keyframes stash-in {
+  from {
+    transform: scale(0.88);
+    opacity: 0;
+  }
+}
+
+/* --- Les tuiles et cartes d'import (Réglages, parcours d'accueil) --- */
+.settings-page .stash-logo {
+  background: #0b0b0d;
+  color: #fff;
+}
+.onb-imp.stash {
+  background: #0b0b0d;
+  color: #fff;
+  border-color: rgba(247, 191, 0, 0.35);
+}
+/* Trois tuiles au lieu de deux : sur un téléphone, elles rapetissent pour
+   tenir sur une ligne plutôt que d'en laisser une seule en bas. */
+@media (max-width: 700px) {
+  .onb-imports {
+    gap: 10px;
+  }
+  .onb-imp {
+    width: min(29vw, 150px);
+    padding: 10px;
+    gap: 6px;
+    border-radius: 20px;
+  }
+  .onb-imp-logo {
+    height: 44px;
+  }
+  .onb-imp-logo svg {
+    height: 40px;
+    width: auto;
+  }
+  .onb-imp-name {
+    font-size: 0.92rem;
+  }
+  .onb-imp-act {
+    padding: 4px 9px;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .stash-body,
+  .stash-who,
+  .stash-scan,
+  .stash-summary,
+  .stash-filters {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .stash-wall {
+    grid-template-columns: repeat(8, 1fr);
+  }
+  .stash-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* Pleine largeur, et un libellé ne se coupe jamais : s'ils ne tiennent pas
+     côte à côte, les boutons passent l'un sous l'autre. */
+  .stash-who-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .stash-who-actions .stash-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+}

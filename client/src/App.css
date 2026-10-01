@@ -77,4 +77,6 @@
 /* L'atelier des cartes : recycler, forger. */
 @import "./styles/app-63-card-workshop.css";
 @import "./styles/app-64-admin-stats.css";
+/* L'import Stash (pseudo → « c'est toi ? » → lecture en direct). */
+@import "./styles/app-65-stash.css";
 @import "./styles/app-99-mobile-perf.css";

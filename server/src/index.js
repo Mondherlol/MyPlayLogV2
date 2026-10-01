@@ -47,6 +47,7 @@ import cardRoutes from "./routes/cards.js";
 import steamRoutes from "./routes/steam.js";
 import companionRoutes from "./routes/companion.js";
 import backloggdRoutes from "./routes/backloggd.js";
+import stashRoutes from "./routes/stash.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import steamGameRoutes from "./routes/steamGames.js";
 import psnRoutes from "./routes/psn.js";
@@ -220,6 +221,8 @@ app.use("/api/steam", steamRoutes);
 app.use("/api/companion", companionRoutes);
 // Import d'une bibliothèque Backloggd (lecture des pages publiques du profil).
 app.use("/api/backloggd", backloggdRoutes);
+// Import d'une bibliothèque Stash (pages publiques du profil, cf. lib/stash.js).
+app.use("/api/stash", stashRoutes);
 // Le parcours d'accueil des nouveaux inscrits : les jeux et les sagas qu'il
 // leur propose de reconnaître (cf. routes/onboarding.js).
 app.use("/api/onboarding", onboardingRoutes);

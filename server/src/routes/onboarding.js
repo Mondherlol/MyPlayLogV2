@@ -147,19 +147,21 @@ router.get("/picks", requireAuth, async (_req, res) => {
 // propose simplement d'importer — ce qui ne duplique rien.)
 router.get("/imports", requireAuth, async (req, res) => {
   try {
-    const [user, steam, backloggd] = await Promise.all([
+    const [user, steam, backloggd, stash] = await Promise.all([
       User.findById(req.userId).select("steam").lean(),
       UserGame.countDocuments({ user: req.userId, steamImported: true }),
       UserGame.countDocuments({ user: req.userId, backloggdImported: true }),
+      UserGame.countDocuments({ user: req.userId, stashImported: true }),
     ]);
     res.json({
       steam: { linked: !!user?.steam?.steamId, count: steam },
       backloggd: { count: backloggd },
+      stash: { count: stash },
     });
   } catch (err) {
     console.error("onboarding imports error:", err.message);
     // Des cartes sans compteur valent mieux qu'un écran en erreur.
-    res.json({ steam: { linked: false, count: 0 }, backloggd: { count: 0 } });
+    res.json({ steam: { linked: false, count: 0 }, backloggd: { count: 0 }, stash: { count: 0 } });
   }
 });
 

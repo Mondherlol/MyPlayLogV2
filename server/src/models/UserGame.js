@@ -148,6 +148,9 @@ const userGameSchema = new mongoose.Schema(
     // « 123 jeux importés » sur la carte Backloggd, au lieu de proposer de
     // refaire un import déjà fait.
     backloggdImported: { type: Boolean, default: false },
+    // Origine « import Stash » : même logique. Sert aussi à l'annulation d'un
+    // import (routes/stash.js) : on ne retire que ce que l'import a créé.
+    stashImported: { type: Boolean, default: false },
     // Origine « import PSN » : npCommunicationId PSN rattaché, et vrai UNIQUEMENT
     // si l'entrée a été CRÉÉE par un import PSN (même logique que Steam). Sert à
     // proposer de retirer les jeux ajoutés lors d'une déliaison du compte PSN.

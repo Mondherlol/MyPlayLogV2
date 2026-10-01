@@ -39,6 +39,8 @@ import { STORES } from "../lib/storeIcons";
 import AddItemsModal from "../components/AddItemsModal";
 import BackloggdImportModal from "../components/BackloggdImportModal";
 import BackloggdIcon from "../components/BackloggdIcon";
+import StashImportModal from "../components/StashImportModal";
+import { StashMark } from "../components/StashIcon";
 import CoverPickerModal from "../components/CoverPickerModal";
 import DiscordIcon from "../components/DiscordIcon";
 import FavoritePicker from "../components/FavoritePicker";
@@ -1479,6 +1481,7 @@ function StepImport() {
   const [error, setError] = useState(null);
   const [steamOpen, setSteamOpen] = useState(false);
   const [backloggdOpen, setBackloggdOpen] = useState(false);
+  const [stashOpen, setStashOpen] = useState(false);
   const popupRef = useRef(null);
 
   const load = useCallback(() => {
@@ -1562,6 +1565,14 @@ function StepImport() {
           action="Importer"
           onClick={() => setBackloggdOpen(true)}
         />
+        <ImportTile
+          kind="stash"
+          name="Stash"
+          logo={<StashMark size={58} />}
+          count={counts?.stash?.count || 0}
+          action="Importer"
+          onClick={() => setStashOpen(true)}
+        />
       </div>
 
       <div className="onb-soon">
@@ -1588,6 +1599,8 @@ function StepImport() {
           <BackloggdImportModal onClose={() => setBackloggdOpen(false)} onDone={imported} />,
           document.body
         )}
+      {/* Celle-ci se rend déjà dans <body> elle-même. */}
+      {stashOpen && <StashImportModal onClose={() => setStashOpen(false)} onDone={imported} />}
     </div>
   );
 }
