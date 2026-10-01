@@ -18,7 +18,9 @@
 import { useState } from "react";
 import { Copy, Check, ExternalLink, RefreshCw, Sparkles, Loader2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { SiItchdotio } from "react-icons/si";
 import SteamIcon from "./SteamIcon";
+import { ITCH_STATUS_FR } from "./SteamLinkModal";
 
 export default function LocalGameBanner({ game, token, onRefreshed }) {
   const [sheet, setSheet] = useState(null); // le dossier prêt à coller
@@ -26,6 +28,9 @@ export default function LocalGameBanner({ game, token, onRefreshed }) {
   const [copied, setCopied] = useState(false);
   const [submitted, setSubmitted] = useState(!!game.submittedToIgdb);
   const appid = game.steamAppId;
+  // Une fiche tirée d'itch.io : même bandeau, autre boutique — et pas de
+  // dossier IGDB (il est bâti à partir de la page Steam).
+  const itch = game.localSource === "itch";
 
   async function openSheet() {
     if (sheet) return setSheet(null);
@@ -52,7 +57,10 @@ export default function LocalGameBanner({ game, token, onRefreshed }) {
   async function refresh() {
     setBusy("refresh");
     try {
-      await apiFetch(`/steam-games/${appid}/refresh`, { method: "POST", token });
+      await apiFetch(itch ? `/itch-games/${game.itchId}/refresh` : `/steam-games/${appid}/refresh`, {
+        method: "POST",
+        token,
+      });
       onRefreshed?.();
     } catch {
       /* sans conséquence : la fiche affichée reste celle d'avant */
@@ -76,25 +84,37 @@ export default function LocalGameBanner({ game, token, onRefreshed }) {
 
   return (
     <div className="local-game-banner">
-      <SteamIcon size={20} className="local-game-banner-icon" />
+      {itch ? (
+        <SiItchdotio size={20} className="local-game-banner-icon" />
+      ) : (
+        <SteamIcon size={20} className="local-game-banner-icon" />
+      )}
       <div style={{ minWidth: 0, flex: 1 }}>
-        <h4>Fiche provisoire, tirée de Steam</h4>
+        <h4>
+          Fiche provisoire, tirée {itch ? "d'itch.io" : "de Steam"}
+          {itch && game.itchStatus && ` · ${ITCH_STATUS_FR[game.itchStatus] || game.itchStatus}`}
+        </h4>
         <p>
           Ce jeu n'est pas encore au catalogue IGDB, d'où viennent nos fiches. Celle-ci a
-          été construite à partir de sa page Steam&nbsp;: tu peux l'ajouter à ta
+          été construite à partir de sa page {itch ? "itch.io" : "Steam"}&nbsp;: tu peux l'ajouter à ta
           collection, la noter et écrire ton avis normalement. Le jour où IGDB
           l'ajoutera, tout sera repris automatiquement sur la vraie fiche —{" "}
           <b>rien de ce que tu écris ici n'est perdu</b>.
         </p>
 
         <div className="local-game-actions">
-          {game.steamUrl && (
+          {itch && game.itchUrl && (
+            <a className="local-game-btn" href={game.itchUrl} target="_blank" rel="noreferrer">
+              <SiItchdotio size={14} /> Voir sur itch.io <ExternalLink size={12} />
+            </a>
+          )}
+          {!itch && game.steamUrl && (
             <a className="local-game-btn" href={game.steamUrl} target="_blank" rel="noreferrer">
               <SteamIcon size={14} /> Voir sur Steam <ExternalLink size={12} />
             </a>
           )}
 
-          {token && (
+          {token && !itch && (
             <button className="local-game-btn clickable" onClick={openSheet} disabled={busy === "sheet"}>
               {busy === "sheet" ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} />}
               {sheet ? "Masquer le dossier IGDB" : "Aider : l'ajouter à IGDB"}
@@ -106,7 +126,7 @@ export default function LocalGameBanner({ game, token, onRefreshed }) {
               className="local-game-btn clickable"
               onClick={refresh}
               disabled={busy === "refresh"}
-              title="Relire la page Steam (jaquette, description, date)"
+              title={`Relire la page ${itch ? "itch.io" : "Steam"} (jaquette, description, date)`}
             >
               <RefreshCw size={13} className={busy === "refresh" ? "spin" : ""} /> Actualiser
             </button>

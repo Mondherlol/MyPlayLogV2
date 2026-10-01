@@ -541,8 +541,8 @@ export default function Explorer() {
                 type="button"
                 className="explorer-search-steam clickable"
                 onClick={() => setSteamLinkOpen(true)}
-                title="Ajouter un jeu par son lien Steam"
-                aria-label="Ajouter un jeu par son lien Steam"
+                title="Ajouter un jeu par son lien Steam ou itch.io"
+                aria-label="Ajouter un jeu par son lien Steam ou itch.io"
               >
                 <SteamIcon size={17} />
               </button>
@@ -624,7 +624,7 @@ export default function Explorer() {
                       onClick={() => setSteamLinkOpen(true)}
                     >
                       <SteamIcon size={16} />
-                      Tu as son lien Steam&nbsp;? Ajoute-le par là
+                      Tu as son lien Steam ou itch.io&nbsp;? Ajoute-le par là
                     </button>
                   )}
                 </div>

@@ -1,10 +1,16 @@
 // ======================================================================
-//  Les fiches locales : un jeu Steam qui n'est pas (encore) chez IGDB
+//  Les fiches locales : un jeu Steam ou itch.io qui n'est pas (encore) chez IGDB
 // ======================================================================
 //
 // LA CONVENTION, EN UNE LIGNE : un identifiant de jeu NÉGATIF désigne une fiche
 // locale, et sa valeur absolue est l'appid Steam. `-4887440` est donc le jeu
 // dont la page est store.steampowered.com/app/4887440.
+//
+// ⚠️ SAUF AU-DELÀ D'UN MILLIARD : ITCH.IO. Un jeu itch.io reçoit
+// `-(1 000 000 000 + son identifiant itch)`. Les deux numérotations se
+// chevauchent (des millions de jeux chacune), il leur fallait deux plages ; un
+// appid Steam n'approchera jamais le milliard. `appIdOf` rend donc `null` pour
+// un jeu itch.io — c'est ce qui empêche d'aller demander son prix à Steam.
 //
 // POURQUOI PAS UNE COLLECTION À PART AVEC SES PROPRES IDENTIFIANTS. Parce que
 // `gameId` est un NOMBRE dans une douzaine de modèles (bibliothèque, listes,
@@ -20,13 +26,26 @@
 // à afficher, et la fiche le dit au lieu de faire semblant.
 
 import SteamGame from "../models/SteamGame.js";
+import ItchGame from "../models/ItchGame.js";
 import { storeUrl } from "./steamStore.js";
 
 /** Vrai si cet identifiant désigne une fiche locale (et non un jeu IGDB). */
 export const isLocalId = (id) => Number(id) < 0;
 
-/** L'appid Steam derrière un identifiant local. */
-export const appIdOf = (id) => Math.abs(Number(id));
+// La plage des fiches itch.io (cf. en-tête).
+export const ITCH_BASE = 1_000_000_000;
+
+/** Vrai si cet identifiant désigne une fiche locale itch.io. */
+export const isItchId = (id) => Number(id) <= -ITCH_BASE;
+
+/** L'identifiant itch.io derrière un identifiant local itch.io. */
+export const itchIdOf = (id) => -Number(id) - ITCH_BASE;
+
+/** L'identifiant de jeu à donner à la fiche locale d'un jeu itch.io. */
+export const itchLocalIdOf = (itchId) => -(ITCH_BASE + Math.abs(Number(itchId)));
+
+/** L'appid Steam derrière un identifiant local — `null` pour un jeu itch.io. */
+export const appIdOf = (id) => (isItchId(id) ? null : Math.abs(Number(id)));
 
 /** L'identifiant de jeu à donner à la fiche locale d'un appid Steam. */
 export const localIdOf = (appid) => -Math.abs(Number(appid));
@@ -132,6 +151,7 @@ export function coreFromSteam(doc) {
     // La fiche et l'app s'en servent pour dire ce qu'elles sont : une fiche
     // provisoire tirée de Steam, en attendant qu'IGDB connaisse le jeu.
     local: true,
+    localSource: "steam",
     steamAppId: doc.appid,
     steamUrl: url,
     steamHeader: doc.header || null,
@@ -141,9 +161,99 @@ export function coreFromSteam(doc) {
   };
 }
 
+// ----------------------------------------------------------------------
+//  itch.io
+// ----------------------------------------------------------------------
+
+// Les plateformes telles qu'itch les écrit, en identifiants IGDB (même raison
+// que OS_TO_IGDB : les icônes et les filtres les connaissent déjà).
+const ITCH_TO_IGDB = {
+  windows: { id: 6, name: "PC (Microsoft Windows)", abbreviation: "PC" },
+  macos: { id: 14, name: "Mac", abbreviation: "Mac" },
+  linux: { id: 3, name: "Linux", abbreviation: "Linux" },
+  android: { id: 34, name: "Android", abbreviation: "Android" },
+  ios: { id: 39, name: "iOS", abbreviation: "iOS" },
+  html5: { id: 82, name: "Web browser", abbreviation: "browser" },
+};
+const WEBSITE_ITCH = 15;
+
+/** Une fiche `ItchGame` habillée en RÉPONSE IGDB (cf. `coreFromSteam`). */
+export function coreFromItch(doc) {
+  if (!doc) return null;
+  const authors = (doc.authors || []).map((name) => ({
+    company: { name },
+    developer: true,
+    publisher: false,
+  }));
+  const shots = (doc.screenshots || []).map((u) => ({ image_id: u, width: null, height: null }));
+  return {
+    id: itchLocalIdOf(doc.itchId),
+    name: doc.name,
+    summary: doc.shortDescription || "",
+    storyline: doc.description || "",
+    game_type: 0,
+    cover: doc.cover ? { image_id: doc.cover } : null,
+    // La jaquette itch est PAYSAGE (630×500) : en fond de page elle rend mieux
+    // qu'une capture d'écran recadrée.
+    artworks: doc.cover ? [{ image_id: doc.cover, width: null, height: null }] : [],
+    screenshots: shots,
+    genres: doc.genre ? doc.genre.split(/,\s*/).map((name) => ({ id: 0, name })) : [],
+    themes: [],
+    game_modes: [],
+    player_perspectives: [],
+    platforms: (doc.platforms || [])
+      .map((p) => ITCH_TO_IGDB[String(p).toLowerCase()])
+      .filter(Boolean),
+    release_dates: doc.releaseDate ? [{ date: doc.releaseDate, human: null, platform: 6 }] : [],
+    first_release_date: doc.releaseDate || null,
+    rating: null,
+    rating_count: 0,
+    total_rating: null,
+    total_rating_count: 0,
+    aggregated_rating: null,
+    aggregated_rating_count: 0,
+    language_supports: [],
+    involved_companies: authors,
+    videos: [],
+    websites: [{ url: doc.url, type: WEBSITE_ITCH }],
+    game_engines: [],
+    franchises: [],
+    collections: [],
+    alternative_names: [],
+    similar_games: [],
+    external_games: [],
+
+    // --- Ce qui n'existe QUE sur une fiche locale ---
+    local: true,
+    localSource: "itch",
+    itchId: doc.itchId,
+    itchUrl: doc.url,
+    itchStatus: doc.status || null,
+    // Une page itch.io publiée se joue : il n'y a pas de « bientôt » chez eux.
+    comingSoon: false,
+    submittedToIgdb: false,
+  };
+}
+
 /** La fiche locale d'un identifiant négatif, au format IGDB — ou `null`. */
 export async function localCore(gameId) {
+  if (isItchId(gameId)) {
+    const doc = await ItchGame.findOne({ itchId: itchIdOf(gameId) }).lean();
+    return doc ? coreFromItch(doc) : null;
+  }
   const doc = await SteamGame.findOne({ appid: appIdOf(gameId) }).lean();
   if (!doc) return null;
   return coreFromSteam(doc);
+}
+
+/** Les fiches locales (Steam et itch.io) d'une liste d'identifiants. */
+export async function localCores(ids) {
+  const locals = (ids || []).filter(isLocalId);
+  const itch = locals.filter(isItchId).map(itchIdOf);
+  const steam = locals.filter((id) => !isItchId(id)).map(appIdOf);
+  const [s, i] = await Promise.all([
+    steam.length ? SteamGame.find({ appid: { $in: steam } }).lean() : [],
+    itch.length ? ItchGame.find({ itchId: { $in: itch } }).lean() : [],
+  ]);
+  return [...s.map(coreFromSteam), ...i.map(coreFromItch)].filter(Boolean);
 }

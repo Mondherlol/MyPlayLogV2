@@ -50,6 +50,7 @@ import backloggdRoutes from "./routes/backloggd.js";
 import stashRoutes from "./routes/stash.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import steamGameRoutes from "./routes/steamGames.js";
+import itchGameRoutes from "./routes/itchGames.js";
 import psnRoutes from "./routes/psn.js";
 import patchnoteRoutes from "./routes/patchnotes.js";
 import adminRoutes from "./routes/admin.js";
@@ -62,6 +63,7 @@ import downloadRoutes from "./routes/downloads.js";
 import appReleaseRoutes from "./routes/appRelease.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
 import { startSteamIgdbSync } from "./lib/steamIgdbSync.js";
+import { startItchIgdbSync } from "./lib/itchIgdbSync.js";
 import { startCatalogSync } from "./lib/catalogs.js";
 import { startRecoCatalogSync } from "./lib/recoCatalog.js";
 import { getRecoIndex } from "./lib/recoEngine.js";
@@ -229,6 +231,8 @@ app.use("/api/onboarding", onboardingRoutes);
 // Ajouter un jeu à partir de son lien Steam — y compris un jeu qu'IGDB ne
 // connaît pas encore (cf. routes/steamGames.js).
 app.use("/api/steam-games", steamGameRoutes);
+// Même chose pour itch.io : un jeu absent d'IGDB s'ajoute par son lien.
+app.use("/api/itch-games", itchGameRoutes);
 // Liaison du compte Discord (OAuth2 « identify ») : c'est elle qui permettra
 // au bot de reconnaître un joueur du site depuis un serveur Discord.
 app.use("/api/discord", discordRoutes);
@@ -358,6 +362,7 @@ async function start() {
     // on redemande régulièrement, et le jour où IGDB les ajoute on recolle les
     // bibliothèques sur la vraie fiche (cf. lib/steamIgdbSync.js).
     startSteamIgdbSync();
+    startItchIgdbSync();
     // Les catalogues Game Pass et GeForce NOW, relevés deux fois par jour :
     // les rails de l'accueil, et la place d'un jeu dans chacun sur sa fiche
     // (cf. lib/catalogs.js).

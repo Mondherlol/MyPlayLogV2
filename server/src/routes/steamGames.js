@@ -32,6 +32,8 @@ import { parseAppId, fetchAppDetails, storeUrl } from "../lib/steamStore.js";
 import { matchAppsToIgdb } from "../lib/steam.js";
 import { coreFromSteam, localIdOf } from "../lib/localGame.js";
 import { mergeIntoIgdb } from "../lib/steamIgdbSync.js";
+import { parseItchUrl } from "../lib/itchStore.js";
+import { resolveItchLink } from "./itchGames.js";
 
 const router = express.Router();
 
@@ -73,11 +75,15 @@ function shortLocal(doc) {
 // `kind` puis naviguer vers `/game/${gameId}` dans les deux premiers cas.
 router.post("/resolve", requireAuth, async (req, res) => {
   try {
+    // Un lien itch.io : même geste, autre boutique (cf. routes/itchGames.js).
+    if (parseItchUrl(req.body?.url)) {
+      return res.json(await resolveItchLink(req.body.url, req.userId));
+    }
     const appid = parseAppId(req.body?.url);
     if (!appid) {
       return res.status(400).json({
         error:
-          "Ce lien n'est pas une page de jeu Steam. Colle l'adresse complète, du genre store.steampowered.com/app/3101040/.",
+          "Ce lien n'est pas une page de jeu Steam ou itch.io. Colle l'adresse complète, du genre store.steampowered.com/app/3101040/ ou auteur.itch.io/nom-du-jeu.",
       });
     }
 

@@ -1,7 +1,8 @@
 import GameMeta from "../models/GameMeta.js";
 import SteamGame from "../models/SteamGame.js";
+import ItchGame from "../models/ItchGame.js";
 import { igdbQuery } from "./igdb.js";
-import { isLocalId, appIdOf } from "./localGame.js";
+import { isLocalId, isItchId, appIdOf, itchIdOf, itchLocalIdOf } from "./localGame.js";
 import { GENRES_FR, frName } from "./translations.js";
 
 const STALE_MS = 30 * 24 * 60 * 60 * 1000; // on re-rafraîchit passé 30 jours
@@ -199,8 +200,32 @@ export async function ensureGameMeta(gameIds) {
 // déjà enregistrée chez nous : aucune requête réseau ici.
 async function fillLocalMeta(ids, byId) {
   try {
-    const docs = await SteamGame.find({ appid: { $in: ids.map(appIdOf) } }).lean();
+    const steamIds = ids.filter((id) => !isItchId(id)).map(appIdOf);
+    const itchIds = ids.filter(isItchId).map(itchIdOf);
+    const [docs, itchDocs] = await Promise.all([
+      steamIds.length ? SteamGame.find({ appid: { $in: steamIds } }).lean() : [],
+      itchIds.length ? ItchGame.find({ itchId: { $in: itchIds } }).lean() : [],
+    ]);
     const ops = [];
+    // Une fiche itch.io : son genre, son auteur (qui est aussi son éditeur).
+    for (const d of itchDocs) {
+      const gameId = itchLocalIdOf(d.itchId);
+      const doc = {
+        name: d.name || "",
+        genres: String(d.genre || "")
+          .split(/,\s*/)
+          .filter(Boolean)
+          .map((g) => frName(GENRES_FR, g))
+          .filter(Boolean),
+        developers: d.authors || [],
+        publishers: d.authors || [],
+        franchise: null,
+        year: d.releaseDate ? new Date(d.releaseDate * 1000).getFullYear() : null,
+        rating: null,
+      };
+      byId.set(gameId, { gameId, ...doc });
+      ops.push({ updateOne: { filter: { gameId }, update: { $set: doc }, upsert: true } });
+    }
     for (const d of docs) {
       const gameId = -d.appid;
       const doc = {

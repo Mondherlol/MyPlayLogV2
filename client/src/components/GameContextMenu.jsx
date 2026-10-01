@@ -269,7 +269,12 @@ function Menu({ menu, onClose, onSheet }) {
   // feuille de suivi qui demandait une note et une date de fin. Tant qu'on ne
   // connaît pas la date (la fiche minimale arrive), on la laisse : la cacher
   // puis la remettre serait pire que de l'afficher.
-  const unreleased = game.releaseDate != null && game.releaseDate * 1000 > Date.now();
+  // Une bêta ou un accès anticipé déjà ouverts se jouent avant la date
+  // (cf. GamePage, `playable`).
+  const unreleased =
+    game.releaseDate != null &&
+    game.releaseDate * 1000 > Date.now() &&
+    !game.earlyAccess?.started;
   const url = `/game/${game.id}`;
 
   // ⚠️ ON MESURE AVANT DE PLACER. Un menu posé au pixel du curseur déborde dès

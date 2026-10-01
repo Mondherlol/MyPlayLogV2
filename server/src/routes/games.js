@@ -86,9 +86,10 @@ import {
 } from "../lib/gameIgdb.js";
 // Les jeux ajoutés par lien Steam qu'IGDB ne connaît pas encore : identifiant
 // négatif, fiche tirée de leur page boutique (cf. lib/localGame.js).
-import { isLocalId, appIdOf, coreFromSteam } from "../lib/localGame.js";
+import { isLocalId, appIdOf, localCores, coreFromSteam, coreFromItch } from "../lib/localGame.js";
 import { similarGames } from "../lib/recoEngine.js";
 import SteamGame from "../models/SteamGame.js";
+import ItchGame from "../models/ItchGame.js";
 import {
   decorateFranchises,
   franchiseGames,
@@ -149,10 +150,32 @@ const igdbImg = (size, imageId) =>
  * locaux — et on les sert d'ici, au même format, pour ne rien perdre.
  */
 async function localRows(ids) {
-  const appids = ids.filter(isLocalId).map(appIdOf);
-  if (!appids.length) return [];
-  const docs = await SteamGame.find({ appid: { $in: appids } }).lean();
-  return docs.map(coreFromSteam).filter(Boolean);
+  return localCores(ids);
+}
+
+// Échappe un texte pour l'utiliser tel quel dans une expression régulière.
+const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Les fiches locales (Steam et itch.io) dont le nom contient TOUS les mots
+ * cherchés, au format des résultats de recherche. Ne sert que de secours,
+ * quand IGDB ne trouve rien (cf. GET /).
+ */
+async function searchLocalGames(search, limit) {
+  const words = String(search || "")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 2)
+    .slice(0, 6);
+  if (!words.length) return [];
+  const filter = { $and: words.map((w) => ({ name: { $regex: escapeRe(w), $options: "i" } })) };
+  const [steam, itch] = await Promise.all([
+    SteamGame.find({ ...filter, igdbId: null }).limit(limit).lean(),
+    ItchGame.find({ ...filter, igdbId: null }).limit(limit).lean(),
+  ]);
+  return [...steam.map(coreFromSteam), ...itch.map(coreFromItch)]
+    .filter(Boolean)
+    .slice(0, limit)
+    .map(mapGame);
 }
 
 // --- Upload de covers custom ---
@@ -727,6 +750,23 @@ router.get("/", requireAuth, async (req, res) => {
       sort === "trending" && !search
         ? (await fetchTrending()).slice(offset, offset + limit)
         : await fetchGames(search);
+
+    // LES JEUX AJOUTÉS PAR LEUR LIEN (Steam ou itch.io), quand IGDB n'a pas une
+    // page entière à montrer. Un quart des jeux itch.io populaires n'existent
+    // pas chez IGDB (visual novels, démos, jeux de jam) : une fois qu'une
+    // personne a ajouté le sien, les suivantes doivent le trouver en tapant
+    // son nom.
+    //
+    // ⚠️ TOUJOURS APRÈS LE CATALOGUE, JAMAIS DEVANT (cf. plus bas : c'est ce
+    // qu'on avait retiré), et seulement sur une recherche assez précise pour
+    // ne pas remplir une page. AVANT la correction des fautes : sinon « kid at
+    // the back » devenait « kid the back » et rendait Kid Gloves II.
+    if (search && page === 1 && games.length < limit) {
+      const locals = await searchLocalGames(search, limit).catch(() => []);
+      const seen = new Set(games.map((g) => g.id));
+      const extra = locals.filter((g) => !seen.has(g.id));
+      if (extra.length) games = [...games, ...extra].slice(0, limit);
+    }
 
     // ZÉRO RÉSULTAT ET UN MOT MAL ÉCRIT : on cherche la version corrigée TOUT
     // DE SUITE, au lieu de rendre une page vide avec une proposition. Comme
@@ -1979,26 +2019,51 @@ function storesFrom(externalGames) {
 // sortie (cf. RELEASE_STATUS_FR — 3 = accès anticipé, 34 = accès anticipé sur
 // précommande, 6 = sortie complète). On la remonte ici pour que la fiche
 // puisse le dire au lieu de le taire.
-const EARLY_ACCESS_STATUSES = new Set([3, 34]);
+//
+// ⚠️ L'ALPHA ET LA BÊTA AUSSI. Un jeu en bêta publique n'a souvent AUCUNE date
+// de sortie chez IGDB — `first_release_date` ne compte que les vraies sorties —
+// et les clients le prenaient donc pour « pas encore sorti » : impossible de
+// le marquer joué alors que des gens y jouent depuis des mois (The Freak
+// Circus, bêta publiée par morceaux depuis juin 2025 ; 1 686 jeux IGDB dans ce
+// cas en octobre 2026). `started` est ce qui débloque « j'y ai joué ».
+const EARLY_STAGES = new Map([
+  [1, "alpha"],
+  [2, "beta"],
+  [3, "early"],
+  [34, "early"],
+]);
 
 /**
- * `{ since, started, fullDate }` si le jeu est (ou sera) en accès anticipé,
- * `null` sinon — y compris quand la 1.0 est déjà là : un jeu terminé n'a plus
- * à porter l'étiquette de ce qu'il a été.
+ * `{ since, started, fullDate, stage }` si le jeu est (ou sera) jouable avant
+ * sa sortie — accès anticipé, bêta ou alpha —, `null` sinon, y compris quand
+ * la 1.0 est déjà là : un jeu terminé n'a plus à porter l'étiquette de ce
+ * qu'il a été. `stage` est le dernier stade atteint (« beta » quand l'alpha
+ * est passée et la bêta ouverte), sinon le premier annoncé.
  */
 function earlyAccessOf(g) {
   const now = Math.floor(Date.now() / 1000);
   let since = null;
   let full = null;
+  let first = null; // la ligne la plus ancienne : le stade annoncé
+  let latest = null; // la plus récente déjà ouverte : le stade atteint
   for (const r of g?.release_dates || []) {
     if (!r?.date) continue;
-    if (EARLY_ACCESS_STATUSES.has(r.status)) {
-      if (since == null || r.date < since) since = r.date;
+    if (EARLY_STAGES.has(r.status)) {
+      if (since == null || r.date < since) {
+        since = r.date;
+        first = r;
+      }
+      if (r.date <= now && (!latest || r.date > latest.date)) latest = r;
     } else if (full == null || r.date < full) full = r.date;
   }
   if (since == null) return null;
   if (full != null && full <= now) return null;
-  return { since, started: since <= now, fullDate: full };
+  return {
+    since,
+    started: since <= now,
+    fullDate: full,
+    stage: EARLY_STAGES.get((latest || first).status),
+  };
 }
 
 router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
@@ -2715,8 +2780,12 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       ...(g.local
         ? {
             local: true,
+            localSource: g.localSource || "steam",
             steamAppId: g.steamAppId,
             steamUrl: g.steamUrl,
+            itchId: g.itchId,
+            itchUrl: g.itchUrl,
+            itchStatus: g.itchStatus,
             comingSoon: g.comingSoon,
             submittedToIgdb: g.submittedToIgdb,
           }

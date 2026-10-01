@@ -78,7 +78,25 @@ async function dueGames(limit) {
  * titre japonais qu'on ne retrouvait pas.
  */
 export async function mergeIntoIgdb(appid, igdbId, igdb = {}, { dryRun = false } = {}) {
-  const localId = localIdOf(appid);
+  return mergeLocalIntoIgdb(localIdOf(appid), igdbId, igdb, {
+    dryRun,
+    appid,
+    isSourceImage: isSteamImage,
+  });
+}
+
+/**
+ * La même fusion pour N'IMPORTE QUELLE fiche locale (Steam ou itch.io, cf.
+ * lib/itchIgdbSync.js). `isSourceImage` reconnaît une jaquette posée par la
+ * fiche locale — que la jaquette officielle a le droit de remplacer —, et
+ * `appid` n'est donné que pour Steam.
+ */
+export async function mergeLocalIntoIgdb(
+  localId,
+  igdbId,
+  igdb = {},
+  { dryRun = false, appid = null, isSourceImage = () => false } = {}
+) {
   const out = { moved: 0, merged: 0, lists: 0, other: 0 };
 
   const locals = await UserGame.find({ gameId: localId });
@@ -95,8 +113,8 @@ export async function mergeIntoIgdb(appid, igdbId, igdb = {}, { dryRun = false }
       // La jaquette officielle remplace celle de Steam — mais PAS une jaquette
       // que le joueur a choisie lui-même. On les distingue à leur adresse :
       // une image Steam vient des serveurs de Valve.
-      if (igdb.cover && isSteamImage(local.cover)) local.cover = igdb.cover;
-      local.steamAppId = appid;
+      if (igdb.cover && isSourceImage(local.cover)) local.cover = igdb.cover;
+      if (appid) local.steamAppId = appid;
       await local.save();
       continue;
     }
@@ -142,7 +160,7 @@ export async function mergeIntoIgdb(appid, igdbId, igdb = {}, { dryRun = false }
     // jouait réellement.
     if (existing.status === "wishlist" && local.status !== "wishlist")
       existing.status = local.status;
-    existing.steamAppId = appid;
+    if (appid) existing.steamAppId = appid;
 
     await existing.save();
     await local.deleteOne();

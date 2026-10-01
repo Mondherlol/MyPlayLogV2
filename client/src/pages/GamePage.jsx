@@ -24,6 +24,7 @@ import {
   Layers,
   Clock,
   CalendarClock,
+  Hammer,
   Play,
   Pause,
   X,
@@ -394,6 +395,9 @@ const isNumericId = (s) => /^-?\d+$/.test(s);
 export function rememberGameSlug(id, slug) {
   if (id && slug) slugToId.set(String(slug), String(id));
 }
+
+// Le stade d'un jeu jouable avant sa sortie (cf. `earlyAccessOf` côté serveur).
+const EARLY_STAGE_FR = { early: "Accès anticipé", beta: "Bêta", alpha: "Alpha" };
 
 export default function GamePage(props) {
   const params = useParams();
@@ -877,7 +881,22 @@ function GameSheet({
   // Jeu « TBD » : pas de date de sortie et jamais noté par la communauté → il
   // n'est pas encore sorti. On masque « déjà joué » (impossible d'y avoir joué)
   // et on l'indique. (Un jeu déjà noté est forcément sorti, même sans date IGDB.)
-  const tbd = releaseTs == null && !game.ratingCount;
+  // Sauf une fiche locale (ajoutée par lien) qui n'est pas « bientôt » : une
+  // page itch.io publiée n'a souvent aucune date, mais se joue.
+  const tbd =
+    releaseTs == null && !game.ratingCount && !(game.local && !game.comingSoon);
+  // ⚠️ PAS SORTI NE VEUT PAS DIRE PAS JOUABLE. Une alpha, une bêta ou un accès
+  // anticipé déjà ouverts (cf. `earlyAccessOf`, server/routes/games.js) : pas
+  // de date de sortie — ou une date future —, mais des gens y jouent. « J'y ai
+  // joué » reste donc possible (The Freak Circus, en bêta publique sans aucune
+  // date IGDB). `upcoming` et `tbd` gardent leur sens de DATE.
+  const early = game.earlyAccess || null;
+  const playable = !!early?.started;
+  const earlyLabel = early
+    ? `${EARLY_STAGE_FR[early.stage] || EARLY_STAGE_FR.early} depuis ${new Date(
+        early.since * 1000
+      ).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}`
+    : null;
 
   const ttb = game.timeToBeat || {};
   const ttbChips = [
@@ -981,8 +1000,21 @@ function GameSheet({
             {/* Compteur à rebours si le jeu n'est pas encore sorti */}
             {upcoming && <ReleaseCountdown ts={releaseTs} dateLabel={release} />}
 
+            {/* Pas de date, mais déjà jouable : on dit depuis quand. */}
+            {tbd && playable && (
+              <div className="gp-tbd">
+                <span className="gp-tbd-ic">
+                  <Hammer size={18} />
+                </span>
+                <div className="gp-tbd-txt">
+                  <b>{earlyLabel}</b>
+                  <span>Pas encore de date de sortie</span>
+                </div>
+              </div>
+            )}
+
             {/* Date de sortie indéterminée (TBD) */}
-            {tbd && (
+            {tbd && !playable && (
               <div className="gp-tbd">
                 <span className="gp-tbd-ic">
                   <CalendarClock size={18} />
@@ -996,17 +1028,18 @@ function GameSheet({
 
             {/* Boutons d'action côte à côte */}
             <div className="gp-actions">
-              {/* « déjà joué » masqué tant que le jeu n'est pas sorti (TBD) */}
-              {!tbd &&
+              {/* « déjà joué » masqué tant que le jeu n'est pas sorti (TBD) —
+                  sauf s'il est déjà jouable (alpha, bêta, accès anticipé) */}
+              {(!tbd || playable) &&
                 (() => {
                   const st = isPlayed ? STATUS_META[entry.status] : null;
                   const StatusIcon = st?.Icon || Gamepad;
                   return (
                     <button
-                      className={`gp-action ${isPlayed ? "active" : ""} ${upcoming ? "disabled" : ""}`}
-                      onClick={() => requireLogin() && !upcoming && setShowPlayed(true)}
-                      disabled={upcoming}
-                      title={upcoming ? "Pas encore sorti" : "J'y ai joué"}
+                      className={`gp-action ${isPlayed ? "active" : ""} ${upcoming && !playable ? "disabled" : ""}`}
+                      onClick={() => requireLogin() && (!upcoming || playable) && setShowPlayed(true)}
+                      disabled={upcoming && !playable}
+                      title={upcoming && !playable ? "Pas encore sorti" : "J'y ai joué"}
                     >
                       <StatusIcon size={18} />
                       <span>{st ? st.label : "Jouer"}</span>
@@ -1149,11 +1182,16 @@ function GameSheet({
                       <Calendar size={14} /> {release}
                     </span>
                   )}
-                  {tbd && (
-                    <span>
-                      <CalendarClock size={14} /> À venir · TBD
-                    </span>
-                  )}
+                  {tbd &&
+                    (playable ? (
+                      <span>
+                        <Hammer size={14} /> {earlyLabel}
+                      </span>
+                    ) : (
+                      <span>
+                        <CalendarClock size={14} /> À venir · TBD
+                      </span>
+                    ))}
                   {game.developers?.[0] && (
                     <span>
                       <Code2 size={14} />{" "}
@@ -1309,7 +1347,7 @@ function GameSheet({
               <GameReviews
                 game={{ id: Number(id), name: game.name, cover: game.cover }}
                 viewerStatus={entry?.status}
-                upcoming={upcoming || tbd}
+                upcoming={(upcoming || tbd) && !playable}
                 onWantPlay={() => requireLogin() && setShowPlayed(true)}
               />
             )}
