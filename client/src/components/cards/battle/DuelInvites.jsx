@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Swords } from "lucide-react";
+import { Bomb, Swords } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { useChat } from "../../../context/ChatContext";
 import { apiFetch } from "../../../lib/api";
@@ -36,7 +36,20 @@ export default function DuelInvites() {
   useEffect(() => {
     if (!subscribe || !user) return undefined;
     return subscribe((event, data) => {
-      if ((event !== "cardduel" && event !== "cardteam") || !data?.code) return;
+      if ((event !== "cardduel" && event !== "cardteam" && event !== "bombe") || !data?.code) return;
+      // La Bombe passe par la même fenêtre : une table qui t'attend.
+      if (event === "bombe") {
+        if (data.kind !== "invite" || window.location.pathname === `/bombe/${data.code}`) return;
+        const id = `b:${data.code}`;
+        setList((l) => [{ id, code: data.code, bomb: true, by: data.by, at: Date.now() }, ...l.filter((x) => x.id !== id)].slice(0, 3));
+        playMessageSound();
+        clearTimeout(timers.current.get(id));
+        timers.current.set(
+          id,
+          setTimeout(() => drop(id), TTL)
+        );
+        return;
+      }
       const team = event === "cardteam";
       const id = `${team ? "t" : "d"}:${data.code}`;
       // Le défi ne tient plus (salon fermé, quelqu'un d'autre défié).
@@ -67,20 +80,18 @@ export default function DuelInvites() {
         <div key={x.id} className="dinv" role="alertdialog" aria-label={`${x.by?.username} ${x.team ? "t'invite en 2 contre 2" : "te défie en duel"}`}>
           <span className="dinv-art">
             <FriendFace u={x.by} size={46} />
-            <i className="dinv-badge">
-              <Swords />
-            </i>
+            <i className="dinv-badge">{x.bomb ? <Bomb /> : <Swords />}</i>
           </span>
           <span className="dinv-txt">
             <b>{x.by?.username}</b>
-            <span>{x.team ? "t'invite en 2 contre 2" : "te défie en duel"}</span>
+            <span>{x.bomb ? "t'invite à La Bombe" : x.team ? "t'invite en 2 contre 2" : "te défie en duel"}</span>
           </span>
           <span className="dinv-actions">
             <button
               className="dinv-btn ghost clickable"
               onClick={() => {
                 drop(x.id);
-                if (!x.team) apiFetch(`/cards/duel/${x.code}/decline`, { method: "POST", token }).catch(() => {});
+                if (!x.team && !x.bomb) apiFetch(`/cards/duel/${x.code}/decline`, { method: "POST", token }).catch(() => {});
               }}
             >
               Refuser
@@ -90,7 +101,9 @@ export default function DuelInvites() {
               onClick={() => {
                 drop(x.id);
                 navigate(
-                  x.team
+                  x.bomb
+                    ? `/bombe/${x.code}`
+                    : x.team
                     ? `/cartes/equipe/${x.code}${x.seat != null ? `?place=${x.seat}` : "?rejoindre"}`
                     : `/cartes/duel/${x.code}?rejoindre`
                 );

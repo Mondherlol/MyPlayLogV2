@@ -1625,7 +1625,7 @@ function Reveal({ state, onShowWin }) {
       <h2 className="mdj-reveal-word">{state.word}</h2>
       {state.solved && (
         <span className="mdj-reveal-score">
-          <Sparkles size={15} /> +{fmt(state.score)} points
+          <Sparkles size={15} /> +{fmt(state.pointsEarned ?? state.score)} points
         </span>
       )}
       <button className="mdj-reveal-more clickable" onClick={onShowWin}>
@@ -2090,7 +2090,7 @@ function WinModal({ state, onClose }) {
           <h2 className="mdj-win-word">{state.word}</h2>
           {state.solved && (
             <span className="mdj-win-score">
-              <Sparkles size={15} /> +{fmt(state.score)} points
+              <Sparkles size={15} /> +{fmt(state.pointsEarned ?? state.score)} points
             </span>
           )}
         </div>

@@ -148,60 +148,82 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/cards/open — débite, tire cinq cartes, les range.
+// POST /api/cards/open — débite, tire cinq cartes par booster, les range.
+// `count` (1 à 10) ouvre plusieurs boosters d'un coup : un seul débit, et une
+// réponse `packs` en plus des champs d'un booster seul (le premier), que
+// l'ouverture classique continue de lire.
+const MAX_BULK = 10;
+
 router.post("/open", requireAuth, async (req, res) => {
   try {
     const cat = await getCatalog();
     if (cat.size < PACK_SIZE)
       return res.status(503).json({ error: "Le set se prépare, reviens dans un instant." });
 
-    // L'édition choisie ; sans choix valable, une au hasard.
-    const edition = EDITION_KEYS.includes(req.body?.edition)
-      ? req.body.edition
-      : EDITION_KEYS[Math.floor(Math.random() * EDITION_KEYS.length)];
+    const count = Math.max(1, Math.min(MAX_BULK, Math.floor(Number(req.body?.count) || 1)));
+    // L'édition choisie ; sans choix valable, une au hasard — par booster.
+    const chosen = EDITION_KEYS.includes(req.body?.edition) ? req.body.edition : null;
+    const editions = Array.from(
+      { length: count },
+      () => chosen || EDITION_KEYS[Math.floor(Math.random() * EDITION_KEYS.length)]
+    );
 
     let balance;
     try {
-      balance = await spendPoints(req.userId, PACK_PRICE, "cards", { set: CURRENT_SET, edition });
+      balance = await spendPoints(req.userId, PACK_PRICE * count, "cards", {
+        set: CURRENT_SET,
+        edition: chosen || editions[0],
+        ...(count > 1 ? { count } : {}),
+      });
     } catch (e) {
       if (e.code === "INSUFFICIENT_POINTS")
         return res.status(402).json({ error: "Pas assez de points." });
       throw e;
     }
 
-    let ids, golden, counts;
+    // Booster par booster : storeCards compte les doublons d'après l'état AVANT
+    // son écriture, deux boosters rangés d'un bloc se tromperaient de « NEW ».
+    const packs = [];
     try {
-      ({ ids, golden } = drawPack(cat, edition));
-      counts = await storeCards(req.userId, ids);
+      for (const edition of editions) {
+        const { ids, golden } = drawPack(cat, edition);
+        // eslint-disable-next-line no-await-in-loop
+        const counts = await storeCards(req.userId, ids);
+        packs.push({ ids, golden, edition, counts });
+      }
     } catch (e) {
-      // Payé mais rien rangé : on rend les points.
-      await grantPoints(req.userId, PACK_PRICE, "cards", { refund: true });
-      throw e;
+      // Payé mais pas tout rangé : on rend les boosters qui manquent.
+      const refund = PACK_PRICE * (count - packs.length);
+      await grantPoints(req.userId, refund, "cards", { refund: true });
+      if (!packs.length) throw e;
+      console.error("cards bulk open partial:", e.message);
+      balance += refund;
     }
 
-    // Le fil des abonnés : « a ouvert un booster » (best-effort — les cartes
-    // sont déjà rangées, une panne ici ne doit rien lui reprendre).
-    recordActivity({
-      actor: req.userId,
-      type: "card_pack",
-      meta: {
-        cards: ids,
-        news: ids.filter((id) => counts.get(id) === 1),
-        golden,
-        edition,
-      },
-    });
+    // Le fil des abonnés : « a ouvert un booster », un par booster — le fil
+    // les regroupe déjà par joueur (best-effort, les cartes sont rangées).
+    for (const p of packs)
+      recordActivity({
+        actor: req.userId,
+        type: "card_pack",
+        meta: {
+          cards: p.ids,
+          news: p.ids.filter((id) => p.counts.get(id) === 1),
+          golden: p.golden,
+          edition: p.edition,
+        },
+      });
 
-    res.json({
-      points: balance,
-      golden,
-      edition,
-      cards: ids.map((id) => ({
+    const out = packs.map((p) => ({
+      golden: p.golden,
+      edition: p.edition,
+      cards: p.ids.map((id) => ({
         ...cat.byId.get(id),
-        count: counts.get(id),
-        isNew: counts.get(id) === 1,
+        count: p.counts.get(id),
+        isNew: p.counts.get(id) === 1,
       })),
-    });
+    }));
+    res.json({ points: balance, ...out[0], packs: out });
   } catch (err) {
     console.error("cards open error:", err.message);
     res.status(500).json({ error: "Impossible d'ouvrir le booster." });
@@ -261,6 +283,8 @@ router.get("/u/:username", async (req, res) => {
       getCatalog(),
       CardOwn.find({ user: owner._id }).lean(),
     ]);
+    // Ses classeurs aussi, en lecture : ce qu'il collectionne, et où il en est.
+    const binders = await listBinders(owner._id, new Map(owned.map((o) => [o.card, o])));
     const chances = packChances();
     const ownedBy = Object.fromEntries(RARITY_ORDER.map((r) => [r, 0]));
     const cards = [];
@@ -268,7 +292,7 @@ router.get("/u/:username", async (req, res) => {
       const c = cat.byId.get(o.card);
       if (!c) continue;
       ownedBy[c.rarity]++;
-      cards.push({ ...c, count: o.count, firstAt: o.firstAt });
+      cards.push({ ...c, count: o.count, firstAt: o.firstAt, fav: !!o.fav });
     }
     res.json({
       user: who(owner),
@@ -280,9 +304,27 @@ router.get("/u/:username", async (req, res) => {
         chance: chances[r],
       })),
       cards,
+      binders,
     });
   } catch (err) {
     console.error("cards user error:", err.message);
+    res.status(500).json({ error: "Impossible de charger ce classeur." });
+  }
+});
+
+// GET /api/cards/u/:username/binders/:id — un de ses classeurs, en entier
+// (cartes qu'il a, et celles qui lui manquent). Mêmes règles de confidentialité.
+router.get("/u/:username/binders/:id", async (req, res) => {
+  try {
+    const owner = await User.findOne({ username: req.params.username })
+      .select("username privacy")
+      .lean();
+    if (!owner) return res.status(404).json({ error: "Joueur introuvable." });
+    if (await blockIfPrivate(res, owner, req.userId)) return;
+    res.json(await getBinder(owner._id, req.params.id));
+  } catch (err) {
+    if (err instanceof BinderError) return res.status(err.status).json({ error: err.message });
+    console.error("cards user binder error:", err.message);
     res.status(500).json({ error: "Impossible de charger ce classeur." });
   }
 });

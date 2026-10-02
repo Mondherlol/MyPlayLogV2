@@ -7,7 +7,7 @@ import QuizSeen from "../models/QuizSeen.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
-import { grantPoints } from "../lib/points.js";
+import { grantPoints, arcadePoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { person } from "./blindtest.js";
 import { userCovers } from "./pixel.js";
@@ -295,9 +295,10 @@ router.post("/finish", requireAuth, async (req, res) => {
         console.error("quiz seen error:", e.message)
       );
 
-    // Le score devient des points dépensables à l'arcade (1 pour 1), comme les
-    // trois autres mini-jeux.
-    const balance = await grantPoints(req.userId, score, "quiz", {
+    // Le score devient des points dépensables à l'arcade, au taux du quiz
+    // (cf. ARCADE_RATE).
+    const earned = arcadePoints("quiz", score);
+    const balance = await grantPoints(req.userId, earned, "quiz", {
       quizGameId: String(doc._id),
       correct: correctCount,
       total: rounds.length,
@@ -333,7 +334,7 @@ router.post("/finish", requireAuth, async (req, res) => {
       score,
       correctCount,
       roundCount: rounds.length,
-      pointsEarned: balance != null ? score : null,
+      pointsEarned: balance != null ? earned : null,
       points: balance,
       challenge,
       rounds: rounds.map((r, i) => ({

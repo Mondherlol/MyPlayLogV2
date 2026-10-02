@@ -1,0 +1,252 @@
+/* ======================================================================
+   Plusieurs boosters d'un coup : la grille (BulkOpening) et le choix ×N
+   ====================================================================== */
+.bo {
+  display: flex;
+  flex-direction: column;
+  touch-action: auto;
+}
+.bo-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 22px 76px 12px 24px;
+  font: 800 1.05rem/1.2 var(--font-display);
+}
+.bo-tally {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+  animation: poBtnIn 0.35s both;
+}
+.bo-new {
+  color: #ff5470;
+}
+.bo-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 24px 110px;
+}
+.bo-scroll > .po-wait {
+  left: calc(50% - 13px);
+  top: 30vh;
+}
+.bo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 26px 16px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.bo-slot {
+  position: relative;
+  animation: boDeal 0.4s both cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+@keyframes boDeal {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.92);
+  }
+}
+.bo-slot.is-up .tcg {
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--rc) 45%, transparent));
+}
+@media (max-width: 600px) {
+  .bo-head {
+    padding: 18px 68px 8px 16px;
+  }
+  .bo-scroll {
+    padding: 12px 16px 100px;
+  }
+  .bo-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px 10px;
+  }
+}
+
+/* --- Le choix du nombre, à côté du bouton « Ouvrir » --- */
+.cd-buy-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.6rem;
+}
+.cd-qty {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.cd-qty button {
+  min-width: 42px;
+  padding: 0.5rem 0.7rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-soft);
+  font: 800 0.9rem/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.cd-qty button.on {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.cd-qty button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ======================================================================
+   La vitrine des classeurs d'un joueur (BinderShowcase)
+   ====================================================================== */
+.bsc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.bsc-title {
+  margin: 0;
+  font: 800 1.15rem/1.2 var(--font-display);
+}
+.bsc-title small {
+  margin-left: 0.35rem;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+.bsc-row {
+  display: flex;
+  gap: 0.9rem;
+  overflow-x: auto;
+  padding: 0.4rem 0.1rem 0.9rem;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+.bsc-album {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: 188px;
+  padding: 0 0 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 14px 18px 18px 14px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.3),
+    border-color 0.15s;
+}
+.bsc-album:hover {
+  transform: translateY(-4px);
+  border-color: var(--bc);
+}
+.bsc-album:active {
+  transform: translateY(-1px) scale(0.98);
+}
+/* La tranche de l'album, à sa couleur. */
+.bsc-spine {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 7px;
+  background: var(--bc);
+}
+.bsc-fan {
+  position: relative;
+  display: block;
+  height: 132px;
+  margin: 0 0 0.7rem 7px;
+  background: color-mix(in srgb, var(--bc) 14%, var(--surface-2));
+}
+.bsc-c {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  width: 64px;
+  aspect-ratio: 3 / 4;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.bsc-c.empty {
+  border: 1px dashed var(--border-strong, var(--border));
+  box-shadow: none;
+}
+.bsc-c.c0 {
+  transform: translateX(-50%) translateX(-44px) rotate(-12deg);
+}
+.bsc-c.c2 {
+  transform: translateX(-50%) translateX(44px) rotate(12deg);
+}
+.bsc-c.c1 {
+  z-index: 1;
+  bottom: -2px;
+  transform: translateX(-50%);
+}
+.bsc-album:hover .bsc-c.c0 {
+  transform: translateX(-50%) translateX(-52px) rotate(-16deg) translateY(-6px);
+}
+.bsc-album:hover .bsc-c.c2 {
+  transform: translateX(-50%) translateX(52px) rotate(16deg) translateY(-6px);
+}
+.bsc-album:hover .bsc-c.c1 {
+  transform: translateX(-50%) translateY(-8px);
+}
+.bsc-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0 0.85rem 0 1.15rem;
+}
+.bsc-name {
+  overflow: hidden;
+  font: 800 0.98rem/1.2 var(--font-display);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.bsc-prog {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.bsc-prog i {
+  display: block;
+  height: 100%;
+  width: calc(var(--p) * 100%);
+  border-radius: inherit;
+  background: var(--bc);
+}
+.bsc-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-soft);
+  font: 700 0.82rem/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.bsc-album.done .bsc-count {
+  color: var(--bc);
+}
+@media (max-width: 600px) {
+  .bsc-album {
+    width: 160px;
+  }
+  .bsc-fan {
+    height: 116px;
+  }
+  .bsc-c {
+    width: 56px;
+  }
+}

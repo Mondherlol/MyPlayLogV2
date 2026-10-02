@@ -16,7 +16,7 @@ import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth } from "../middleware/auth.js";
 import { emitTo, onlineAmong } from "../lib/realtime.js";
 import { recordActivity } from "../lib/activity.js";
-import { grantPoints } from "../lib/points.js";
+import { grantPoints, arcadePoints } from "../lib/points.js";
 import { person } from "./blindtest.js";
 import { deliverCard, deliverCardToConversation } from "./chat.js";
 import {
@@ -484,7 +484,7 @@ async function finish(room) {
     const p = table[i];
     const pts = p.score || 0;
     if (pts > 0)
-      grantPoints(idOf(p.user), pts, "imposteur", {
+      grantPoints(idOf(p.user), arcadePoints("imposteur", pts), "imposteur", {
         code: room.code,
         rank: i + 1,
         rounds: room.rounds.length,

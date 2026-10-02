@@ -31,6 +31,18 @@
 .cd-wallet.ws-wallet:hover {
   border-color: var(--coin);
 }
+/* Le raccourci vers le combat, à côté de l'atelier. */
+.cd-wallet.cd-battle-btn svg {
+  color: #ff5470;
+}
+.cd-wallet.cd-battle-btn:hover {
+  border-color: #ff5470;
+}
+@media (max-width: 560px) {
+  .cd-wallet.cd-battle-btn b {
+    display: none;
+  }
+}
 
 /* --- la fenêtre --- */
 .bd-sheet.ws {

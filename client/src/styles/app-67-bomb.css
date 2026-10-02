@@ -1,0 +1,2607 @@
+/* ======================================================================
+   La Bombe — pages/Bomb.jsx
+   ======================================================================
+   Même idiome que l'arène des combats de cartes (app-59-card-battle.css) :
+   fond #0d0d10 et motif de l'appli en bas, plaques #1d1d23 à bord or, gros
+   boutons en Lilita capitales, une barre du haut réduite à deux icônes.
+   L'or #f2b70b pour le jeu et ce qui est à moi, le rose #ff5470 pour le
+   danger (celui qui tient la bombe, l'explosion, la triche). */
+
+.bb {
+  --acc: #f2b70b;
+  --hot: #ff5470;
+  --ok: #3ddc97;
+  --plate: #1d1d23;
+  --plate-2: #26262c;
+  --line: rgba(255, 255, 255, 0.08);
+  --soft: rgba(255, 255, 255, 0.55);
+  --paper: #f4f1ea;
+  --ink: #161618;
+  position: fixed;
+  inset: 0;
+  z-index: 460;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  background: #0d0d10;
+  color: #fff;
+  font-family: var(--font-body);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  animation: bbFade 0.25s ease both;
+}
+/* Grand écran : le chat est replié par défaut, la table au centre. */
+.bb.wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+.bb.wide.chat-open {
+  grid-template-columns: minmax(0, 1fr) 330px;
+}
+.bb::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--app-motif);
+  background-size: 182px 182px;
+  -webkit-mask-image: linear-gradient(to top, #000, transparent 55%);
+  mask-image: linear-gradient(to top, #000, transparent 55%);
+}
+@keyframes bbFade {
+  from {
+    opacity: 0;
+  }
+}
+.bb-wait {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1rem;
+}
+.bb-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------------
+   La barre du haut
+   --------------------------------------------------------------------- */
+.bb-hud {
+  position: relative;
+  z-index: 6;
+  flex: none;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0 0.6rem;
+}
+.bb-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+}
+.bb-icon:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.bb-icon svg {
+  width: 20px;
+  height: 20px;
+}
+/* Qui est encore en vie : une pastille par siège. */
+.bb-alive {
+  display: flex;
+  gap: 6px;
+}
+.bb-alive i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.14);
+  transition: background 0.3s;
+}
+.bb-alive i.on {
+  background: var(--acc);
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------------
+   Gros boutons (ceux du lobby des combats)
+   --------------------------------------------------------------------- */
+.bb-big {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  width: min(340px, 100%);
+  padding: 1rem 2rem;
+  border: 0;
+  border-radius: 16px;
+  font: 400 1.55rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.12s,
+    opacity 0.2s;
+}
+.bb-big svg {
+  width: 24px;
+  height: 24px;
+}
+.bb-big:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.bb-big:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.bb-big.gold {
+  background: var(--acc);
+  color: var(--ink);
+}
+.bb-big.gold:hover:not(:disabled) {
+  background: #ffc933;
+}
+.bb-big.pink {
+  background: var(--hot);
+  color: #fff;
+}
+.bb-big.pink:hover:not(:disabled) {
+  background: #ff6b83;
+}
+.bb-line {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: min(340px, 100%);
+  padding: 0.75rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  font: 700 0.95rem/1 var(--font-display);
+  cursor: pointer;
+}
+.bb-line:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+.bb-line:disabled {
+  opacity: 0.45;
+}
+
+/* ---------------------------------------------------------------------
+   Le salon d'attente
+   --------------------------------------------------------------------- */
+.bbl {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem 2rem;
+}
+.bbl-card {
+  margin: auto 0;
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.6rem 1.4rem 1.4rem;
+  border-radius: 24px;
+  background: #16161a;
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 30px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.bbl-hero {
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 150px;
+  margin-top: 0.4rem;
+}
+.bbl-title {
+  margin: 0;
+  font: 400 2.5rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.bbl-pitch {
+  margin: -0.3rem 0 0;
+  max-width: 340px;
+  color: var(--soft);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.bbl-seats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px 12px;
+  margin: 0.4rem 0;
+}
+.bbl-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 74px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  animation: bbSeatIn 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+@keyframes bbSeatIn {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+.bbl-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--plate-2);
+  box-shadow: 0 0 0 3px var(--acc);
+}
+.bbl-seat.bot .bbl-face {
+  background: #2a1a20;
+  color: var(--hot);
+  box-shadow: 0 0 0 3px var(--hot);
+}
+.bbl-face img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.bbl-face > i {
+  font: 400 1.5rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+}
+.bbl-seat > b {
+  max-width: 100%;
+  font: 700 0.8rem/1.1 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bbl-seat.empty {
+  cursor: pointer;
+}
+.bbl-seat.empty .bbl-face {
+  background: transparent;
+  color: var(--soft);
+  box-shadow: none;
+  border: 2px dashed rgba(255, 255, 255, 0.22);
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.bbl-seat.empty:hover .bbl-face {
+  border-color: var(--acc);
+  color: var(--acc);
+}
+.bbl-seat.empty > b {
+  color: var(--soft);
+}
+.bbl-crown {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-8deg);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--acc);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px #16161a;
+}
+.bbl-kick {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: #3a3a40;
+  color: #fff;
+  box-shadow: 0 0 0 2px #16161a;
+  cursor: pointer;
+}
+.bbl-kick:hover {
+  background: var(--hot);
+}
+.bbl-lvl {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 84, 112, 0.16);
+  color: var(--hot);
+  font: 400 0.72rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+button.bbl-lvl {
+  cursor: pointer;
+}
+button.bbl-lvl:hover:not(:disabled) {
+  background: var(--hot);
+  color: #fff;
+}
+.bbl-rules {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.bbl-rule {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 40px;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font: inherit;
+}
+button.bbl-rule {
+  cursor: pointer;
+}
+button.bbl-rule:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+}
+button.bbl-rule:disabled {
+  cursor: default;
+}
+.bbl-rule-k {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.bbl-rule > b {
+  font: 400 1rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.bbl-hearts {
+  display: inline-flex;
+  gap: 2px;
+}
+.bbl-hearts button {
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+}
+.bbl-hearts button:disabled {
+  cursor: default;
+}
+.bbl-hearts svg {
+  width: 19px;
+  height: 19px;
+  transition: transform 0.2s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.bbl-hearts button.on {
+  color: var(--hot);
+}
+.bbl-hearts button.on svg {
+  fill: var(--hot);
+}
+.bbl-hearts button:hover:not(:disabled) svg {
+  transform: scale(1.2);
+}
+.bbl-go {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  margin-top: 0.3rem;
+}
+.bbl-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0;
+  color: var(--soft);
+  font-weight: 700;
+}
+.bbl-hint {
+  margin: 0;
+  color: var(--soft);
+  font-size: 0.82rem;
+}
+.bbl-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+  padding: 0.3rem;
+  border: 0;
+  background: transparent;
+  color: var(--soft);
+  font: 700 0.82rem/1 var(--font-body);
+  cursor: pointer;
+}
+.bbl-link:hover {
+  color: #fff;
+}
+
+/* ---------------------------------------------------------------------
+   La table
+   --------------------------------------------------------------------- */
+.bb-stage {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 1rem;
+}
+.bb-stage.shaking {
+  animation: bbQuake 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+@keyframes bbQuake {
+  10%,
+  90% {
+    transform: translate(-2px, 1px);
+  }
+  20%,
+  80% {
+    transform: translate(5px, -3px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translate(-9px, 4px) rotate(-0.6deg);
+  }
+  40%,
+  60% {
+    transform: translate(9px, -4px) rotate(0.6deg);
+  }
+}
+.bb-table {
+  position: relative;
+  width: min(100%, calc(100dvh - 240px), 700px);
+  min-width: 260px;
+  aspect-ratio: 1;
+  container-type: size;
+}
+/* Le tapis : un disque à bord fin, comme le tapis des combats. */
+.bb-table::before {
+  content: "";
+  position: absolute;
+  inset: 14%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* ---------------------------------------------------------------------
+   La bombe — une plaque ronde, le défi écrit dessus
+   --------------------------------------------------------------------- */
+.bbm {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 44%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+}
+@keyframes bbFlicker {
+  50% {
+    transform: scale(0.75);
+    opacity: 0.85;
+  }
+}
+@keyframes bbSparkFly {
+  from {
+    transform: rotate(var(--a)) translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: rotate(var(--a)) translateX(28px);
+    opacity: 0;
+  }
+}
+.bbm-body {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--plate);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 26px 50px rgba(0, 0, 0, 0.6);
+  transition: box-shadow 0.3s;
+}
+.bbm.lit .bbm-body {
+  box-shadow:
+    0 0 0 3px var(--acc),
+    0 26px 50px rgba(0, 0, 0, 0.6);
+  animation: bbThrob 0.6s ease-in-out infinite alternate;
+}
+/* Le reflet qui passe, comme sur la plaque de l'objectif des combats. */
+.bbm.lit .bbm-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, 0.09) 48%, transparent 64%);
+  transform: translateX(-100%);
+  animation: bbSweep 3s ease-in-out 0.3s infinite;
+}
+@keyframes bbSweep {
+  45%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+.bbm.mine .bbm-body {
+  box-shadow:
+    0 0 0 4px var(--hot),
+    0 0 46px rgba(255, 84, 112, 0.45),
+    0 26px 50px rgba(0, 0, 0, 0.6);
+  animation: bbThrob 0.32s ease-in-out infinite alternate;
+}
+@keyframes bbThrob {
+  to {
+    transform: scale(1.03);
+  }
+}
+.bbm-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 82%;
+  text-align: center;
+  animation: bbObjIn 0.6s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+@keyframes bbObjIn {
+  from {
+    transform: rotateX(90deg) scale(0.8);
+    opacity: 0;
+  }
+}
+.bbm-cap-txt {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.bbm-ico {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--acc);
+  color: var(--ink);
+}
+.bbm-ico svg {
+  width: 24px;
+  height: 24px;
+}
+.bbm-label {
+  font: 400 clamp(1.2rem, 3.6cqmin, 1.8rem) / 1.05 "Lilita One", var(--font-display);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.bbm-label.long {
+  font-size: clamp(1.05rem, 3cqmin, 1.4rem);
+}
+.bbm-label.xlong {
+  font-size: clamp(0.95rem, 2.6cqmin, 1.15rem);
+}
+.bbm-syl {
+  font: 400 clamp(2.4rem, 8cqmin, 3.6rem) / 1 "Lilita One", var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--acc);
+}
+/* Les logos (noirs, colorés, sur fond transparent) passent tous en blanc :
+   lisibles sur la plaque sombre, et tous du même ton. */
+.bbm-logo {
+  display: block;
+  max-width: 100%;
+  max-height: clamp(36px, 11cqmin, 70px);
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+.bbm-name {
+  font: 400 clamp(0.95rem, 2.8cqmin, 1.2rem) / 1.1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+.bbm-count {
+  font: 400 clamp(3.4rem, 13cqmin, 5.5rem) / 1 "Lilita One", var(--font-display);
+  color: var(--acc);
+  animation: bbCount 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes bbCount {
+  0% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+/* Après l'explosion : ce qu'il fallait répondre — discret, et ça s'en va
+   tout seul avant que la bombe ne reparte. */
+.bbm-missed {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem 0.55rem;
+  border-radius: 14px;
+  background: rgba(29, 29, 35, 0.92);
+  box-shadow: 0 0 0 1px var(--line);
+  transform: translate(-50%, -50%);
+  animation:
+    bbMissedIn 0.35s 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    bbMissedOut 0.3s 1.75s ease-in forwards;
+}
+@keyframes bbMissedIn {
+  from {
+    transform: translate(-50%, -50%) scale(0.7);
+    opacity: 0;
+  }
+}
+@keyframes bbMissedOut {
+  to {
+    transform: translate(-50%, -50%) scale(0.9);
+    opacity: 0;
+  }
+}
+.bbm-missed .bbm-cap-txt {
+  font-size: 0.56rem;
+}
+.bbm-missed ul {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bbm-missed li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  width: 54px;
+}
+.bbm-missed img,
+.bbm-missed li > i {
+  display: block;
+  width: 34px;
+  height: 46px;
+  border-radius: 5px;
+  object-fit: cover;
+  background: var(--plate-2);
+}
+.bbm-missed li span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--soft);
+  text-align: center;
+}
+
+/* ---- L'explosion ---- */
+.bb-blast {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.bb-blast .ring {
+  position: absolute;
+  width: 80%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 12px solid var(--acc);
+  animation: bbRing 0.7s cubic-bezier(0.15, 0.75, 0.3, 1) both;
+}
+.bb-blast .ring.two {
+  border-color: var(--hot);
+  border-width: 7px;
+  animation-delay: 0.07s;
+}
+.bb-blast::before {
+  content: "";
+  position: absolute;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #ff8a3d;
+  box-shadow: 0 0 60px 20px rgba(255, 138, 61, 0.6);
+  animation: bbBall 0.5s ease-out both;
+}
+@keyframes bbRing {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+@keyframes bbBall {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+.bb-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  background: #fff;
+  pointer-events: none;
+  animation: bbFlash 0.5s ease-out both;
+}
+@keyframes bbFlash {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Les sièges
+   --------------------------------------------------------------------- */
+.bb-seat {
+  --face: clamp(48px, 9.5cqmin, 70px);
+  --tx: -50%;
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  width: 128px;
+}
+.bb-seat.side-r {
+  --tx: -86%;
+}
+.bb-seat.side-l {
+  --tx: -14%;
+}
+.bb-seat-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--face);
+  height: var(--face);
+  border-radius: 50%;
+  background: var(--plate-2);
+  box-shadow:
+    0 0 0 3px #0d0d10,
+    0 0 0 4px rgba(255, 255, 255, 0.12);
+  transition:
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease,
+    filter 0.3s ease;
+}
+.bb-seat-face img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.bb-seat-face .letters {
+  display: grid;
+  place-items: center;
+  font: 400 calc(var(--face) * 0.42) / 1 "Lilita One", var(--font-display);
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.75);
+}
+.bb-seat.me .bb-seat-face {
+  box-shadow:
+    0 0 0 3px #0d0d10,
+    0 0 0 5px var(--acc);
+}
+.bb-seat.holding .bb-seat-face {
+  margin: 6px 0;
+  transform: scale(1.2);
+  box-shadow:
+    0 0 0 3px #0d0d10,
+    0 0 0 6px var(--hot),
+    0 0 36px rgba(255, 84, 112, 0.5);
+  animation: bbHold 0.9s ease-in-out infinite;
+}
+@keyframes bbHold {
+  50% {
+    box-shadow:
+      0 0 0 3px #0d0d10,
+      0 0 0 6px var(--hot),
+      0 0 52px rgba(255, 84, 112, 0.75);
+  }
+}
+.bb-seat.away .bb-seat-face {
+  filter: brightness(0.6);
+}
+.bb-seat.out .bb-seat-face {
+  filter: grayscale(1) brightness(0.45);
+  transform: scale(0.9);
+}
+.bb-seat.out .bb-seat-name,
+.bb-seat.out .bb-seat-lives {
+  opacity: 0.35;
+}
+.bb-seat-skull {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  animation: bbStamp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes bbStamp {
+  from {
+    transform: scale(2.4) rotate(-20deg);
+    opacity: 0;
+  }
+}
+.bb-seat-sus {
+  position: absolute;
+  right: -10px;
+  bottom: -4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--hot);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  box-shadow: 0 0 0 2px #0d0d10;
+  animation: bbWobble 0.6s ease both;
+}
+@keyframes bbWobble {
+  0% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1.3) rotate(-12deg);
+  }
+  70% {
+    transform: scale(0.95) rotate(8deg);
+  }
+}
+.bb-seat-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+  font: 700 0.82rem/1.2 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bb-seat.holding .bb-seat-name {
+  color: var(--hot);
+}
+.bb-seat-lives {
+  display: inline-flex;
+  gap: 2px;
+}
+.bb-seat-lives .on {
+  color: var(--hot);
+  fill: var(--hot);
+}
+.bb-seat-lives .off {
+  color: rgba(255, 255, 255, 0.18);
+}
+
+/* ---- La triche : ça sort des deux côtés de la tête ---- */
+.bb-sus {
+  position: absolute;
+  top: 50%;
+  z-index: 6;
+  pointer-events: none;
+}
+.bb-sus.tag {
+  right: calc(100% + 10px);
+  padding: 0.35rem 0.6rem 0.3rem;
+  border-radius: 10px;
+  background: var(--hot);
+  color: #fff;
+  font: 400 0.9rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  animation: bbOutLeft 4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/* Au bord droit de la table, on inverse : la réplique part vers l'intérieur. */
+.bb-seat.side-r .bb-sus.tag {
+  right: auto;
+  left: calc(100% + 10px);
+  animation-name: bbOutRight;
+}
+@keyframes bbOutLeft {
+  0% {
+    transform: translate(40px, -50%) scale(0.4);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(-6px, -50%) scale(1.05) rotate(-3deg);
+    opacity: 1;
+  }
+  16% {
+    transform: translate(0, -50%) rotate(-3deg);
+  }
+  88% {
+    transform: translate(0, -50%) rotate(-3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(20px, -50%) scale(0.8);
+    opacity: 0;
+  }
+}
+@keyframes bbOutRight {
+  0% {
+    transform: translate(-40px, -50%) scale(0.4);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(6px, -50%) scale(1.05) rotate(2deg);
+    opacity: 1;
+  }
+  16% {
+    transform: translate(0, -50%) rotate(2deg);
+  }
+  88% {
+    transform: translate(0, -50%) rotate(2deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-20px, -50%) scale(0.8);
+    opacity: 0;
+  }
+}
+
+/* ---- La frappe en direct ---- */
+.bb-typed {
+  position: absolute;
+  left: 50%;
+  z-index: 5;
+  transform: translateX(-50%);
+  max-width: 320px;
+  padding: 0.32rem 0.7rem;
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 700 1.05rem/1.25 var(--font-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+.bb-seat.below .bb-typed {
+  top: calc(100% + 0.3rem);
+}
+.bb-seat.above .bb-typed {
+  bottom: calc(100% + 0.5rem);
+}
+.bb-typed b {
+  display: inline-block;
+  font-weight: 800;
+  animation: bbKey 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes bbKey {
+  from {
+    transform: translateY(-6px) scale(1.7);
+    color: var(--hot);
+  }
+}
+.bb-typed.miss {
+  background: var(--hot);
+  color: #fff;
+  animation: bbNo 0.42s ease both;
+}
+@keyframes bbNo {
+  20%,
+  60% {
+    transform: translateX(calc(-50% - 7px));
+  }
+  40%,
+  80% {
+    transform: translateX(calc(-50% + 7px));
+  }
+}
+.bb-typed-wait {
+  display: inline-flex;
+  gap: 3px;
+  padding: 0.35rem 0.1rem;
+}
+.bb-typed-wait i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8a8a92;
+  animation: bbDots 0.9s ease-in-out infinite;
+}
+.bb-typed-wait i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.bb-typed-wait i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes bbDots {
+  50% {
+    transform: translateY(-4px);
+    background: var(--ink);
+  }
+}
+
+/* ---- Ce qui jaillit d'un siège ---- */
+.bb-pop {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 0.2rem);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.bb-seat.above .bb-pop {
+  bottom: calc(100% + 2.9rem);
+}
+.bb-pop.good {
+  padding: 0.3rem 0.7rem 0.3rem 0.3rem;
+  border-radius: 12px;
+  background: var(--plate);
+  color: #fff;
+  box-shadow:
+    0 0 0 2px var(--ok),
+    0 14px 28px rgba(0, 0, 0, 0.5);
+  animation: bbRise 1.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.bb-pop.good img {
+  width: 32px;
+  height: 43px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.bb-pop.good > span {
+  display: flex;
+  flex-direction: column;
+  max-width: 190px;
+}
+.bb-pop.good b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 400 0.92rem/1.1 "Lilita One", var(--font-display);
+  letter-spacing: 0.01em;
+}
+.bb-pop.good em {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--soft);
+}
+.bb-pop-life {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--hot);
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+.bb-pop-life svg {
+  fill: var(--hot);
+}
+@keyframes bbRise {
+  0% {
+    transform: translate(var(--tx, -50%), 20px) scale(0.4);
+    opacity: 0;
+  }
+  14% {
+    transform: translate(var(--tx, -50%), -6px) scale(1.08);
+    opacity: 1;
+  }
+  22% {
+    transform: translate(var(--tx, -50%), 0) scale(1);
+  }
+  78% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx, -50%), -34px) scale(0.96);
+    opacity: 0;
+  }
+}
+.bb-pop.bad {
+  max-width: 230px;
+  padding: 0.38rem 0.7rem 0.32rem;
+  border-radius: 10px;
+  background: var(--hot);
+  color: #fff;
+  font: 400 0.88rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: bbRiseShort 1.5s ease both;
+}
+@keyframes bbRiseShort {
+  0% {
+    transform: translate(var(--tx, -50%), 10px) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(var(--tx, -50%), 0) scale(1);
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx, -50%), -18px);
+    opacity: 0;
+  }
+}
+.bb-pop.broke {
+  flex-direction: column;
+  gap: 0.2rem;
+  color: var(--hot);
+  animation: bbBroke 2.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.bb-pop.broke svg {
+  filter: drop-shadow(0 4px 10px rgba(255, 84, 112, 0.6));
+}
+.bb-pop.broke b {
+  padding: 0.2rem 0.55rem 0.15rem;
+  border-radius: 6px;
+  background: var(--hot);
+  color: #fff;
+  font: 400 0.85rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transform: rotate(-6deg);
+}
+@keyframes bbBroke {
+  0% {
+    transform: translate(var(--tx, -50%), 10px) scale(2.2);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(var(--tx, -50%), 0) scale(1);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx, -50%), 26px) rotate(14deg);
+    opacity: 0;
+  }
+}
+.bb-seat.hit-boom .bb-seat-face {
+  animation: bbHurt 0.6s ease both;
+}
+@keyframes bbHurt {
+  0% {
+    box-shadow:
+      0 0 0 3px #0d0d10,
+      0 0 0 10px var(--hot),
+      0 0 60px rgba(255, 84, 112, 0.9);
+  }
+  30% {
+    transform: scale(0.85) rotate(-8deg);
+  }
+  60% {
+    transform: scale(1.05) rotate(5deg);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Le pupitre
+   --------------------------------------------------------------------- */
+.bb-dock {
+  position: relative;
+  z-index: 5;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+.bb-answer {
+  display: flex;
+  gap: 0.5rem;
+  width: min(580px, 100%);
+}
+.bb-answer input {
+  flex: 1;
+  min-width: 0;
+  height: 58px;
+  padding: 0 1.15rem;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--plate);
+  color: #fff;
+  font: 700 1.15rem/1 var(--font-body);
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+.bb-answer input::placeholder {
+  color: rgba(255, 255, 255, 0.36);
+  font-weight: 600;
+}
+.bb-answer input:disabled {
+  opacity: 0.6;
+}
+.bb-answer.on input {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 5px rgba(242, 183, 11, 0.14);
+}
+.bb-answer.shake {
+  animation: bbShakeX 0.45s ease both;
+}
+.bb-answer.shake input {
+  border-color: var(--hot);
+  box-shadow: 0 0 0 5px rgba(255, 84, 112, 0.2);
+}
+@keyframes bbShakeX {
+  15%,
+  55% {
+    transform: translateX(-9px);
+  }
+  35%,
+  75% {
+    transform: translateX(9px);
+  }
+}
+.bb-send {
+  display: grid;
+  place-items: center;
+  flex: 0 0 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--acc);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    opacity 0.2s ease;
+}
+.bb-send svg {
+  width: 24px;
+  height: 24px;
+}
+.bb-send:active {
+  transform: scale(0.93);
+}
+.bb-send:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.bb-letters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+}
+.bb-letters i {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 25px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.3);
+  font: 400 0.78rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+.bb-letters i.on {
+  background: var(--acc);
+  color: var(--ink);
+}
+.bb-letters i.fresh {
+  animation: bbLetterOn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes bbLetterOn {
+  0% {
+    transform: translateY(-12px) scale(1.8);
+  }
+}
+.bb-letters-heart {
+  margin-left: 4px;
+  color: var(--hot);
+}
+.bb-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  color: var(--soft);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------
+   Fin de partie
+   --------------------------------------------------------------------- */
+.bb-results {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 8, 10, 0.75);
+  animation: bbFade 0.3s ease both;
+}
+.bb-results-card {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.8rem 1.3rem 1.3rem;
+  border-radius: 24px;
+  background: #16161a;
+  box-shadow:
+    0 0 0 2px var(--acc),
+    0 30px 60px rgba(0, 0, 0, 0.6);
+  animation: bbMissedIn2 0.45s 0.1s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes bbMissedIn2 {
+  from {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+}
+.bb-winner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+}
+.bb-winner-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--plate-2);
+  box-shadow:
+    0 0 0 4px #16161a,
+    0 0 0 7px var(--acc);
+}
+.bb-winner-face img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.bb-winner-face > i {
+  font: 400 2.6rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+}
+.bb-winner-crown {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  color: var(--acc);
+  fill: var(--acc);
+  transform: translateX(-50%) rotate(-10deg);
+  animation: bbCrown 0.7s 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes bbCrown {
+  from {
+    transform: translate(-50%, -30px) rotate(-40deg);
+    opacity: 0;
+  }
+}
+.bb-winner h2 {
+  margin: 0;
+  font: 400 2rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.bb-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  margin: 1.2rem 0 1.1rem;
+  padding: 0;
+  list-style: none;
+}
+.bb-rank li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.92rem;
+}
+.bb-rank li.me {
+  box-shadow: inset 0 0 0 2px var(--acc);
+}
+.bb-rank li > b {
+  width: 1.4rem;
+  font: 400 1.2rem/1 "Lilita One", var(--font-display);
+  color: var(--soft);
+}
+.bb-rank li:first-child > b {
+  color: var(--acc);
+}
+.bb-rank-name {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bb-rank em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--soft);
+}
+.bb-rank strong {
+  min-width: 3.4rem;
+  text-align: right;
+  font: 400 1rem/1 "Lilita One", var(--font-display);
+  color: var(--acc);
+}
+.bb-results-go {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------------
+   Messages
+   --------------------------------------------------------------------- */
+.bb-err {
+  margin: 0;
+  color: var(--hot);
+  font-weight: 700;
+}
+.bb-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 1.2rem;
+  z-index: 10;
+  transform: translateX(-50%);
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 12px;
+  background: var(--plate);
+  color: #fff;
+  box-shadow:
+    0 0 0 2px var(--acc),
+    0 14px 30px rgba(0, 0, 0, 0.5);
+  font: 700 0.88rem/1.2 var(--font-display);
+  cursor: pointer;
+  animation: bbToast 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.bb-toast.bad {
+  box-shadow:
+    0 0 0 2px var(--hot),
+    0 14px 30px rgba(0, 0, 0, 0.5);
+}
+@keyframes bbToast {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Le chat, en colonne à droite (grand écran)
+   --------------------------------------------------------------------- */
+.bb-chat {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  min-height: 0;
+  background: #121216;
+  box-shadow: inset 1px 0 0 var(--line);
+}
+.gc-dock.gc-side {
+  position: static;
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.gc-side .gc-scroll {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.gc-side-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 60px;
+  padding: 0 1rem;
+  font: 400 1.05rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.gc-sys.boom,
+.gc-sys.cheat {
+  color: #ff8095;
+}
+.gc-sys.win {
+  color: #f2b70b;
+}
+/* Sur téléphone, le tiroir du chat passe DEVANT la table, et descend du
+   coin haut-droit (en bas à gauche, il recouvrirait le champ de réponse). */
+body.bb-on .gc-dock {
+  z-index: 470;
+  top: 64px;
+  right: 0.75rem;
+  bottom: auto;
+  left: auto;
+}
+
+/* ---------------------------------------------------------------------
+   Téléphone
+   --------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  .bb-table {
+    width: min(100%, calc(100dvh - 260px));
+    min-width: 240px;
+  }
+  .bbm {
+    width: 50%;
+  }
+  .bbm-ico {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+  .bbm-ico svg {
+    width: 19px;
+    height: 19px;
+  }
+  .bbm-face {
+    gap: 5px;
+  }
+  .bbm-cap-txt {
+    font-size: 0.56rem;
+  }
+  .bbm-missed li {
+    width: 56px;
+  }
+  .bbm-missed img,
+  .bbm-missed li > i {
+    width: 40px;
+    height: 54px;
+  }
+  .bb-seat {
+    width: 92px;
+    --face: 44px;
+  }
+  .bb-seat-name {
+    font-size: 0.7rem;
+  }
+  .bb-typed {
+    max-width: 210px;
+    font-size: 0.9rem;
+  }
+  .bb-pop.good > span {
+    max-width: 130px;
+  }
+  .bb-answer input,
+  .bb-send {
+    height: 52px;
+  }
+  .bb-send {
+    flex-basis: 52px;
+  }
+  .bb-letters i {
+    width: 17px;
+    height: 21px;
+    font-size: 0.66rem;
+  }
+  /* L'onglet du chat descend du coin haut-droit : la carte passe dessous. */
+  .bbl {
+    padding-top: 2.6rem;
+  }
+  .bbl-card {
+    padding: 1.2rem 1rem 1.1rem;
+    border-radius: 20px;
+  }
+  .bbl-hero {
+    width: 120px;
+    height: 120px;
+  }
+  .bbx.still {
+    width: 88px;
+  }
+  .bbl-title {
+    font-size: 2rem;
+  }
+  .bb-big {
+    font-size: 1.35rem;
+    padding: 0.9rem 1.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bb-stage.shaking,
+  .bbm.lit .bbm-body,
+  .bbm.mine .bbm-body,
+  .bb-seat.holding .bb-seat-face {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   La carte de l'arcade : la même bombe, en miniature
+   --------------------------------------------------------------------- */
+.arc-game.g-bombe {
+  --g-1: #ff5470;
+  --g-2: #f2b70b;
+}
+.arc-art-bombe {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 90px;
+}
+.arc-bombe {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin-top: 14px;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.arc-bombe-arm {
+  position: absolute;
+  inset: 0;
+  transform: rotate(35deg);
+}
+.arc-bombe-cap {
+  position: absolute;
+  left: 50%;
+  top: -7%;
+  width: 28%;
+  height: 14%;
+  transform: translateX(-50%);
+  border-radius: 5px;
+  background: #26262c;
+}
+.arc-bombe-fuse {
+  position: absolute;
+  left: 50%;
+  top: -21%;
+  width: 4px;
+  height: 16%;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: #c9a467;
+}
+.arc-bombe-spark {
+  position: absolute;
+  left: 50%;
+  top: -21%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: #fff6cf;
+  box-shadow:
+    0 0 6px 3px rgba(255, 210, 74, 0.95),
+    0 0 14px 6px rgba(255, 120, 40, 0.5);
+  animation: bbFlicker 0.14s steps(2) infinite;
+}
+.arc-bombe-body {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #1d1d23;
+  box-shadow:
+    0 0 0 3px #f2b70b,
+    0 10px 18px rgba(0, 0, 0, 0.35);
+  color: #f2b70b;
+  font: 400 1.15rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.06em;
+}
+.arc-game.g-bombe:hover .arc-bombe {
+  transform: rotate(-8deg) scale(1.08);
+}
+
+/* ---------------------------------------------------------------------
+   La bombe qui voyage (.bbx) — ronde, une mèche, une petite tête
+   --------------------------------------------------------------------- */
+/* `--heat` (0 → 1, posé par TravelBomb) : du noir au rouge, des tremblements
+   de plus en plus forts, le sourire qui tourne à la panique. */
+.bbx {
+  --heat: 0;
+  --red: calc(var(--heat) * 100%);
+  position: absolute;
+  z-index: 4;
+  width: clamp(58px, 14cqmin, 96px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  transition:
+    left 0.42s cubic-bezier(0.4, 0, 0.2, 1),
+    top 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+.bbx.still {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 104px;
+  transform: none;
+}
+.bbx-hop {
+  position: absolute;
+  inset: 0;
+  animation: bbxHop 0.55s cubic-bezier(0.3, 0, 0.3, 1) both;
+}
+.bbx.still .bbx-hop {
+  animation: none;
+}
+/* Le bond : il s'écrase pour partir, s'étire en l'air, s'écrase en arrivant. */
+/* La bombe GLISSE en ligne droite d'un joueur à l'autre (la transition de
+   left/top de .bbx) — pas d'arc, pas de lancer. Seul l'atterrissage se voit :
+   un léger écrasement une fois arrivée. */
+@keyframes bbxHop {
+  0%,
+  72% {
+    transform: scale(1, 1);
+  }
+  84% {
+    transform: scale(1.12, 0.88);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
+}
+.bbx-wob {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 85%;
+  animation: bbxWob 0.5s ease-in-out infinite;
+}
+.bbx.mine .bbx-wob {
+  animation-duration: 0.32s;
+}
+@keyframes bbxWob {
+  0%,
+  100% {
+    transform: rotate(calc(-1.5deg - var(--heat) * 7deg));
+  }
+  50% {
+    transform: rotate(calc(1.5deg + var(--heat) * 7deg)) scale(calc(1 + var(--heat) * 0.05));
+  }
+}
+/* ---------------------------------------------------------------------
+   La bombe elle-même (.bba, components/bomb/BombArt.jsx)
+   ---------------------------------------------------------------------
+   Le modèle donné : sphère ardoise à plat, ombre en croissant en bas à
+   droite, reflet ovale en haut à gauche, col sombre incliné, mèche claire en
+   courbe, étincelle en étoile rouge et jaune, tête de mort claire sur la
+   panse. Tout est en unités du conteneur (cqw) : la même bombe à 60 px sur la
+   table, à 420 px dans l'atelier. `--skin` : la couleur du corps (le reste en
+   découle) ; `--heat` : elle rougit à mesure que la mèche brûle. */
+.bba {
+  --body: color-mix(in srgb, #e0283f calc(var(--heat, 0) * 65%), var(--skin, #34445b));
+  position: absolute;
+  inset: 0;
+  display: block;
+  container-type: size;
+}
+.bba-body {
+  position: absolute;
+  left: 4cqw;
+  top: 22cqw;
+  z-index: 1;
+  width: 74cqw;
+  height: 74cqw;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--body);
+  box-shadow: 0 2.5cqw 6cqw rgba(0, 0, 0, 0.35);
+}
+.bba-body > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bba-skull {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 48%;
+  height: 48%;
+  color: #f7f6fc;
+  transform: translate(-50%, -50%);
+}
+.bba-skull.ghost {
+  opacity: 0.45;
+  pointer-events: none;
+}
+/* L'ombre : un croissant franc en bas à droite (pas de dégradé). */
+.bba-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 38%, transparent 61%, rgba(0, 0, 0, 0.2) 61.5%);
+  pointer-events: none;
+}
+/* Le reflet : un fin liseré clair qui suit le bord en haut à gauche, pas une
+   tache. */
+.bba-shine {
+  position: absolute;
+  inset: 7%;
+  z-index: 2;
+  border-radius: 50%;
+  border-top: 2.4cqw solid rgba(255, 255, 255, 0.2);
+  border-left: 2.4cqw solid transparent;
+  border-right: 2.4cqw solid transparent;
+  transform: rotate(-38deg);
+  pointer-events: none;
+}
+/* Le col : petit, posé SUR la panse (en haut à droite, à 45°), avec son
+   ouverture d'où sort la mèche. */
+.bba-cap {
+  position: absolute;
+  left: 58cqw;
+  top: 25cqw;
+  z-index: 2;
+  width: 15cqw;
+  height: 10cqw;
+  border-radius: 2.6cqw 2.6cqw 1.6cqw 1.6cqw;
+  /* Un ton plus sombre que la panse, mais assez clair pour se détacher du
+     fond de la table (sombre lui aussi). */
+  background: color-mix(in srgb, var(--body) 80%, #000);
+  box-shadow:
+    inset 0 -1.4cqw 0 color-mix(in srgb, var(--body) 62%, #000),
+    0 0 0 0.6cqw color-mix(in srgb, var(--body) 55%, #000);
+  transform: rotate(45deg);
+}
+.bba-cap i {
+  position: absolute;
+  left: 24%;
+  top: 14%;
+  width: 52%;
+  height: 34%;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--body) 40%, #000);
+}
+/* La mèche : un arc (bords haut et gauche d'une boîte arrondie). */
+.bba-fuse {
+  position: absolute;
+  left: 68cqw;
+  top: 13cqw;
+  z-index: 1;
+  width: 20cqw;
+  height: 17cqw;
+  border-top: 3.8cqw solid #e6e4f0;
+  border-left: 3.8cqw solid #e6e4f0;
+  border-top-left-radius: 100% 100%;
+}
+.bba-spark {
+  position: absolute;
+  left: 87cqw;
+  top: 15cqw;
+  z-index: 3;
+  width: 30cqw;
+  height: 30cqw;
+  transform: translate(-50%, -50%);
+  animation:
+    bbaLight 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    bbaSpark 0.24s steps(2) infinite;
+}
+/* L'allumage : l'étincelle jaillit au lancement de la partie. */
+@keyframes bbaLight {
+  from {
+    scale: 0;
+  }
+}
+.bba-spark i {
+  position: absolute;
+  clip-path: polygon(59.5% 0.9%, 64.4% 28.3%, 91.5% 22%, 75.5% 44.8%, 99.1% 59.5%, 71.7% 64.4%, 78% 91.5%, 55.2% 75.5%, 40.5% 99.1%, 35.6% 71.7%, 8.5% 78%, 24.5% 55.2%, 0.9% 40.5%, 28.3% 35.6%, 22% 8.5%, 44.8% 24.5%);
+}
+.bba-spark .out {
+  inset: 0;
+  background: #e8325f;
+}
+.bba-spark .in {
+  inset: 17%;
+  background: linear-gradient(160deg, #f7cd55 50%, #f0a54c 50%);
+}
+@keyframes bbaSpark {
+  50% {
+    transform: translate(-50%, -50%) rotate(14deg) scale(0.86);
+  }
+}
+
+/* L'explosion : elle gonfle et disparaît dans le souffle. */
+.bbx.boom .bbx-hop {
+  animation: bbxPop 0.3s ease-in forwards;
+}
+@keyframes bbxPop {
+  60% {
+    transform: scale(1.35);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+}
+.bbx .bb-blast {
+  inset: -110%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bbx-wob,
+  .bbx-hop,
+  .bba-spark {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Déjà sortis — la liste à gauche de la table (écran large)
+   --------------------------------------------------------------------- */
+/* Avec la liste « Déjà sortis » à gauche : une colonne vide de même largeur
+   à droite tant que le chat est replié — la table reste au centre de l'écran. */
+.bb.wide.with-log {
+  grid-template-columns: 250px minmax(0, 1fr) 250px;
+}
+.bb.wide.with-log.chat-open {
+  grid-template-columns: 250px minmax(0, 1fr) 330px;
+}
+.bb-log {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #121216;
+  box-shadow: inset -1px 0 0 var(--line);
+}
+.bb-log-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 60px;
+  flex: none;
+  padding: 0 1rem;
+  font: 400 1.05rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.bb-log-head small {
+  color: var(--soft);
+  font-size: 0.85rem;
+}
+.bb-log-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0.6rem 0.6rem 1rem;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.bb-log-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.4rem;
+  border-radius: 10px;
+  animation: bbLogIn 0.35s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+.bb-log-list li:first-child {
+  background: rgba(255, 255, 255, 0.05);
+}
+@keyframes bbLogIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+.bb-log-list img,
+.bb-log-list li > i {
+  flex: none;
+  width: 30px;
+  height: 40px;
+  border-radius: 5px;
+  object-fit: cover;
+  background: var(--plate-2);
+}
+.bb-log-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.1rem;
+}
+.bb-log-txt b {
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.bb-log-txt em {
+  overflow: hidden;
+  font-size: 0.7rem;
+  font-style: normal;
+  color: var(--soft);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.bb-log-empty {
+  margin: 1rem;
+  font-size: 0.8rem;
+  color: var(--soft);
+}
+/* Pas la place pour trois colonnes : la liste s'efface, la table d'abord. */
+@media (max-width: 1279px) {
+  .bb.wide.with-log {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bb.wide.with-log.chat-open {
+    grid-template-columns: minmax(0, 1fr) 330px;
+  }
+  .bb-log {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Ma bombe, dans le salon : on clique dessus pour la dessiner
+   --------------------------------------------------------------------- */
+button.bbl-hero {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+button.bbl-hero .bbx.still {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+button.bbl-hero:hover .bbx.still {
+  transform: rotate(-6deg) scale(1.06);
+}
+.bbl-paint {
+  position: absolute;
+  right: 8px;
+  bottom: 10px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--acc);
+  color: var(--ink);
+  box-shadow: 0 0 0 3px #16161a;
+}
+
+/* ---------------------------------------------------------------------
+   Déjà sortis : la tête de qui l'a dit
+   --------------------------------------------------------------------- */
+.bb-log-list li .bb-log-txt {
+  flex: 1;
+}
+.bb-log-face {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--plate-2);
+  color: var(--soft);
+  font: 400 0.7rem/1 "Lilita One", var(--font-display);
+}
+.bb-log-face.bot {
+  background: #2a1a20;
+  color: var(--hot);
+}
+.bb-log-face img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.bb-log-txt em.lic {
+  color: var(--acc);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.6rem;
+}
+
+/* ---------------------------------------------------------------------
+   Le toast (avec « Annuler »)
+   --------------------------------------------------------------------- */
+.bb-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.25rem;
+}
+.bb-toast-txt,
+.bb-toast-undo {
+  padding: 0.45rem 0.7rem;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #fff;
+  font: 700 0.88rem/1.2 var(--font-display);
+  cursor: pointer;
+}
+.bb-toast-undo {
+  background: var(--acc);
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------------
+   L'atelier « Ma bombe » (components/bomb/BombStudio.jsx)
+   --------------------------------------------------------------------- */
+.bbs-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(6, 6, 8, 0.78);
+  animation: bbFade 0.2s ease both;
+}
+.bbs {
+  --acc: #f2b70b;
+  --hot: #ff5470;
+  --ink: #161618;
+  --plate: #1d1d23;
+  --plate-2: #26262c;
+  --line: rgba(255, 255, 255, 0.08);
+  --soft: rgba(255, 255, 255, 0.55);
+  width: min(980px, 100%);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  padding: 1.2rem 1.4rem 1.4rem;
+  border-radius: 24px;
+  background: #16161a;
+  color: #fff;
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+  animation: bbMissedIn2 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.bbs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.bbs-head h3 {
+  margin: 0;
+  font: 400 1.7rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.bbs-x {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+}
+.bbs-x:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.bbs-work {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 1.6rem;
+  align-items: center;
+}
+.bbs-bomb {
+  position: relative;
+  width: min(100%, 470px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+.bbs-bomb.loading .bba {
+  opacity: 0.4;
+}
+.bbs-wait {
+  position: absolute;
+  left: 42%;
+  top: 58%;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+}
+/* Dans l'atelier, la panse est la toile : le canevas la remplit. */
+.bbs-bomb .bba-body .dc {
+  position: absolute;
+  inset: 0;
+}
+.bbs-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.bbs-k {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.bbs-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.bbs-swatch {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bbs-swatch:hover {
+  transform: scale(1.12);
+}
+.bbs-swatch.on {
+  box-shadow:
+    0 0 0 3px #16161a,
+    0 0 0 5px var(--acc);
+}
+.bbs-swatch.custom {
+  overflow: hidden;
+  background: conic-gradient(#ef130b, #ffe400, #00cc00, #00b2ff, #a300ba, #ef130b);
+}
+.bbs-swatch.custom input,
+.dt-swatch.custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.bbs-err {
+  margin: 0;
+  color: var(--hot);
+  font-weight: 700;
+}
+.bbs-go {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.bbs-go .bb-big,
+.bbs-go .bb-line {
+  width: 100%;
+}
+@media (max-width: 760px) {
+  .bbs-modal {
+    padding: 0;
+    place-items: stretch;
+  }
+  .bbs {
+    max-height: none;
+    height: 100dvh;
+    border-radius: 0;
+    padding: 0.9rem 0.9rem 1.2rem;
+  }
+  .bbs-work {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  .bbs-bomb {
+    width: min(100%, 360px);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Logos sur fond plein, indice, pops des joueurs du haut
+   --------------------------------------------------------------------- */
+/* Un logo qui a son propre fond (Valve, 2K…) : tel quel, dans une vignette
+   arrondie — le passer en blanc en ferait un rectangle blanc. */
+.bbm-logo.box {
+  max-height: clamp(40px, 12cqmin, 74px);
+  border-radius: 10px;
+  filter: none;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.bbm-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.25rem;
+  padding: 0.3rem 0.65rem 0.3rem 0.3rem;
+  border-radius: 10px;
+  background: rgba(242, 183, 11, 0.12);
+  max-width: 100%;
+  animation: bbHintIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+/* La jaquette d'une réponse, floutée : on devine les couleurs, la silhouette,
+   pas le titre. */
+.bbm-hint img {
+  flex: none;
+  width: clamp(30px, 8cqmin, 44px);
+  aspect-ratio: 3 / 4;
+  border-radius: 5px;
+  object-fit: cover;
+  filter: blur(4px) saturate(1.2);
+  transform: scale(1.02);
+}
+.bbm-hint b {
+  overflow: hidden;
+  color: var(--acc);
+  font: 700 clamp(0.85rem, 2.5cqmin, 1.05rem) / 1.2 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.bbm-hint em {
+  flex: none;
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+@keyframes bbHintIn {
+  from {
+    transform: translateY(6px) scale(0.7);
+    opacity: 0;
+  }
+}
+.bb-seat.top .bb-pop {
+  bottom: auto;
+  top: calc(100% + 2.6rem);
+}
+
+/* ---- Le bouton du chat (grand écran) ---- */
+.bb-hud-right {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+.bb-icon {
+  position: relative;
+}
+.bb-icon.on {
+  background: rgba(242, 183, 11, 0.16);
+  color: var(--acc);
+}
+.bb-icon-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--hot);
+  color: #fff;
+  font: 400 0.7rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+  box-shadow: 0 0 0 2px #0d0d10;
+  animation: bbWobble 0.5s ease both;
+}
+.bb-chat {
+  animation: bbChatIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes bbChatIn {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+.gc-side-x {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+}
+.gc-side-x:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ---- « Un jeu favori de X » : sa tête et son pseudo ---- */
+.bbm-fav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+.bbm-fav img,
+.bbm-fav > i {
+  display: grid;
+  place-items: center;
+  width: clamp(44px, 12cqmin, 64px);
+  height: clamp(44px, 12cqmin, 64px);
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--plate-2);
+  box-shadow: 0 0 0 3px var(--acc);
+  font: 400 1.4rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+}
+.bbm-fav b {
+  font: 400 clamp(1.2rem, 3.6cqmin, 1.7rem) / 1.05 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+
+/* ---- Classement de fin : la tête de chacun ---- */
+.bb-rank-face {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--plate-2);
+  color: var(--soft);
+}
+.bb-rank-face img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.bb-rank-face i {
+  font: 400 0.95rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+}
+.bb-rank li.me .bb-rank-face {
+  box-shadow: 0 0 0 2px var(--acc);
+}
+
+/* ---- Celui qui tient la bombe : son pseudo ne passe plus sous l'anneau ---- */
+.bb-seat.holding .bb-seat-face {
+  margin: 10px 0 12px;
+}
+
+/* L'étiquette « Indice » : la jaquette floutée n'est PAS le jeu qu'on vient de
+   taper (retour utilisateur : « ça me met un autre jeu bizarre »). */
+.bbm-hint {
+  position: relative;
+}
+.bbm-hint-k {
+  position: absolute;
+  top: -0.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: var(--acc);
+  color: var(--ink);
+  font: 400 0.62rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.bb-pop.bad {
+  max-width: 300px;
+}

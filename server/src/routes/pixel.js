@@ -7,7 +7,7 @@ import User from "../models/User.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
-import { grantPoints } from "../lib/points.js";
+import { grantPoints, arcadePoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 // Règles communes aux mini-jeux « devine le jeu » (cf. routes/blindtest.js) :
 // comparaison de titres, pool de gros jeux, indices, noms alternatifs.
@@ -615,9 +615,10 @@ router.post("/finish", requireAuth, async (req, res) => {
     });
     sessions.delete(sessionId);
 
-    // Le score se transforme en points dépensables à l'arcade (1 pour 1), comme
-    // le blind test. Best-effort : la partie reste valide si le crédit échoue.
-    const balance = await grantPoints(req.userId, score, "pixel", {
+    // Le score se transforme en points dépensables à l'arcade, au taux du jeu
+    // (cf. ARCADE_RATE). Best-effort : la partie reste valide si le crédit échoue.
+    const earned = arcadePoints("pixel", score);
+    const balance = await grantPoints(req.userId, earned, "pixel", {
       pixelGameId: String(doc._id),
       correct: correctCount,
       total: rounds.length,
@@ -651,7 +652,7 @@ router.post("/finish", requireAuth, async (req, res) => {
       correctCount,
       roundCount: rounds.length,
       durationSec: dur,
-      pointsEarned: balance != null ? score : null,
+      pointsEarned: balance != null ? earned : null,
       points: balance,
       challenge: session.challengedUser
         ? {

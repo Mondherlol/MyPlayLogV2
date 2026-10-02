@@ -79,4 +79,10 @@
 @import "./styles/app-64-admin-stats.css";
 /* L'import Stash (pseudo → « c'est toi ? » → lecture en direct). */
 @import "./styles/app-65-stash.css";
+/* Plusieurs boosters d'un coup. */
+@import "./styles/app-66-bulk-open.css";
+/* La Bombe (BombParty avec des jeux). */
+@import "./styles/app-67-bomb.css";
+/* Le canevas de dessin (La Bombe, et le futur jeu de dessin à deviner). */
+@import "./styles/app-68-draw.css";
 @import "./styles/app-99-mobile-perf.css";

@@ -24,7 +24,17 @@ export function FriendFace({ u, size = 40, dot = false }) {
   );
 }
 
-export default function DuelFriends({ token, title = "Défier un pote", action = "Défier", onPick, onLink, onClose }) {
+// `endpoint` : la liste à demander (La Bombe a la sienne, sans minimum de
+// cartes — cf. server/src/routes/bomb.js, GET /friends).
+export default function DuelFriends({
+  token,
+  title = "Défier un pote",
+  action = "Défier",
+  endpoint = "/cards/duel/friends",
+  onPick,
+  onLink,
+  onClose,
+}) {
   useScrollLock(true);
   const [data, setData] = useState(null);
   const [q, setQ] = useState("");
@@ -33,13 +43,13 @@ export default function DuelFriends({ token, title = "Défier un pote", action =
 
   useEffect(() => {
     let alive = true;
-    apiFetch("/cards/duel/friends", { token })
+    apiFetch(endpoint, { token })
       .then((d) => alive && setData(d))
       .catch((e) => alive && (setData({ friends: [] }), setErr(e.message)));
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [token, endpoint]);
   useEffect(() => {
     const on = (e) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", on);
@@ -107,7 +117,7 @@ export default function DuelFriends({ token, title = "Défier un pote", action =
                   <span className="df-who">
                     <b>{f.username}</b>
                     <small className={f.online && !off ? "on" : ""}>
-                      {f.busy ? "En duel" : !f.ready ? `Moins de ${min} cartes` : f.online ? "En ligne" : "Hors ligne"}
+                      {f.busy ? (endpoint === "/cards/duel/friends" ? "En duel" : "En partie") : !f.ready ? `Moins de ${min} cartes` : f.online ? "En ligne" : "Hors ligne"}
                     </small>
                   </span>
                   <button className="df-go clickable" disabled={off || !!busy} onClick={() => pick(f)}>

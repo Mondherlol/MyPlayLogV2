@@ -92,10 +92,14 @@ function push(event, room, message) {
 //
 // Appelée depuis les routes /join et /leave des jeux, APRÈS le save et le
 // populate (il faut le pseudo, donc le document peuplé).
-export function gameChatSystem(event, room, kind, user) {
+//
+// `text` : une ligne toute faite, pour les jeux qui annoncent autre chose
+// qu'une arrivée ou un départ (La Bombe : « 💥 X a explosé », « X tente de
+// tricher… »). Le client l'affiche telle quelle.
+export function gameChatSystem(event, room, kind, user, text = null) {
   if (!room?.code) return null;
   const name = user?.username || "Quelqu'un";
-  return push(event, room, { system: kind, name });
+  return push(event, room, text ? { system: kind, name, text } : { system: kind, name });
 }
 
 // Vide la conversation d'un salon (relance de partie : le fil de la précédente

@@ -155,6 +155,7 @@ const SOURCE_LABELS = {
   mot: "Mot du jour",
   perroquet: "Le Perroquet",
   imposteur: "L'Imposteur",
+  bombe: "La Bombe",
   case: "Ouverture de caisse",
   cards: "Booster de cartes",
   cardbattle: "Combat de cartes",
@@ -503,6 +504,7 @@ export default function Arcade() {
             cover={covers.length ? covers[GAMES.length % covers.length] : null}
             cover2={covers.length ? covers[(GAMES.length + 1) % covers.length] : null}
           />
+          <BombCard />
         </div>
 
         {/* ---------- La caisse de collection ----------
@@ -802,6 +804,43 @@ function BattleCard({ token, cover, cover2 }) {
   );
 }
 
+// ---------- La carte « La Bombe » ----------
+// Pas de classement : c'est un jeu de table, on y vient à plusieurs. L'art est
+// la règle elle-même — la bombe dont la mèche grésille, avec le défi écrit
+// dessus (ici des lettres, à la BombParty).
+function BombCard() {
+  return (
+    <Link to="/bombe" className="arc-game g-bombe clickable">
+      <span className="arc-game-glow" aria-hidden="true" />
+      <span className="arc-game-top">
+        <span className="arc-game-art arc-art-bombe" aria-hidden="true">
+          <span className="arc-bombe">
+            <span className="arc-bombe-arm">
+              <i className="arc-bombe-fuse" />
+              <i className="arc-bombe-cap" />
+              <i className="arc-bombe-spark" />
+            </span>
+            <b className="arc-bombe-body">ONS</b>
+          </span>
+        </span>
+        <span className="arc-game-head">
+          <span className="arc-game-name">La Bombe</span>
+          <span className="arc-game-pitch">
+            Un studio, une console, des lettres : tape un jeu qui colle et passe la bombe avant qu'elle explose.
+          </span>
+        </span>
+      </span>
+      <span className="arc-game-foot">
+        <span className="arc-game-stat">
+          <Users size={13} /> Jusqu'à <b>8</b> joueurs
+        </span>
+        <span className="arc-game-cta">
+          Jouer <ArrowRight size={16} className="arc-game-arrow" />
+        </span>
+      </span>
+    </Link>
+  );
+}
 
 // Format du canvas de la jaquette pixelisée : 3/4, comme une jaquette.
 const ART_CV_W = 186;

@@ -17,7 +17,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { emitTo, onlineAmong } from "../lib/realtime.js";
 import * as voice from "../lib/voiceRooms.js";
 import { recordActivity } from "../lib/activity.js";
-import { grantPoints } from "../lib/points.js";
+import { grantPoints, arcadePoints } from "../lib/points.js";
 import { contourOf, compare } from "../lib/soundContour.js";
 import { person } from "./blindtest.js";
 import { deliverCard, deliverCardToConversation } from "./chat.js";
@@ -334,7 +334,7 @@ async function finish(room) {
     const avg = Math.round((p.score || 0) / n);
     const pts = avg + (i === 0 && avg > 0 ? 20 : 0);
     if (pts > 0)
-      grantPoints(idOf(p.user), pts, "perroquetversus", {
+      grantPoints(idOf(p.user), arcadePoints("perroquetversus", pts), "perroquetversus", {
         code: room.code,
         rank: i + 1,
         average: avg,

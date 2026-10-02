@@ -6,6 +6,7 @@ import { apiFetch } from "../lib/api";
 import { cardCover } from "../lib/cards";
 import { useToast } from "../context/ToastContext";
 import CardCollection from "../components/cards/CardCollection";
+import BinderShowcase from "../components/cards/BinderShowcase";
 import TradeComposer from "../components/cards/TradeComposer";
 
 // ======================================================================
@@ -14,7 +15,8 @@ import TradeComposer from "../components/cards/TradeComposer";
 // Mêmes chiffres et même classeur que le mien, sans boutique ni chances de
 // tirage. Un compte privé ne s'ouvre qu'à ses abonnés (le serveur tranche).
 // Les cartes que JE cherche (celles de mes classeurs que je n'ai pas) y sont
-// marquées, et on peut lui proposer un échange.
+// marquées, et on peut lui proposer un échange. Ses classeurs s'affichent en
+// vitrine au-dessus, et s'ouvrent (en lecture) dans la grille.
 
 export default function CardsUser() {
   const { username } = useParams();
@@ -23,6 +25,7 @@ export default function CardsUser() {
   const [err, setErr] = useState(null);
   const [lite, setLite] = useState(null);
   const [compose, setCompose] = useState(null); // null | { want }
+  const [focusBinder, setFocusBinder] = useState(null); // { id, k }
   const toast = useToast();
 
   useEffect(() => {
@@ -96,14 +99,21 @@ export default function CardsUser() {
           <p>{err.message}</p>
         </div>
       ) : (
-        <CardCollection
-          cards={data?.cards || []}
-          rarities={data?.rarities || []}
-          setSize={data?.setSize || 0}
-          loading={!data}
-          wants={isMe ? null : wants}
-          onRequest={isMe ? null : (card) => setCompose({ want: card })}
-        />
+        <>
+          <BinderShowcase binders={data?.binders} onOpen={(id) => setFocusBinder({ id, k: Date.now() })} />
+          <CardCollection
+            token={token}
+            binders={data?.binders || []}
+            binderUrl={(id) => `/cards/u/${encodeURIComponent(username)}/binders/${id}`}
+            focusBinder={focusBinder}
+            cards={data?.cards || []}
+            rarities={data?.rarities || []}
+            setSize={data?.setSize || 0}
+            loading={!data}
+            wants={isMe ? null : wants}
+            onRequest={isMe ? null : (card) => setCompose({ want: card })}
+          />
+        </>
       )}
 
       {compose && data && (

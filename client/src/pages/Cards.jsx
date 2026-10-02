@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Anvil, Coins } from "lucide-react";
+import { Anvil, Coins, Swords } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import { EDITIONS, cardCover } from "../lib/cards";
 import { useToast } from "../context/ToastContext";
 import PackOpening from "../components/cards/PackOpening";
+import BulkOpening from "../components/cards/BulkOpening";
 import CardCollection from "../components/cards/CardCollection";
 import FriendsBinders from "../components/cards/FriendsBinders";
 import PackShop from "../components/cards/PackShop";
@@ -29,7 +30,7 @@ export default function Cards() {
   const meId = user?.id || null;
   const [data, setData] = useState(() => (meId && memo.get(meId)) || null);
   const [err, setErr] = useState("");
-  const [opening, setOpening] = useState(null); // { edition, origin, run }
+  const [opening, setOpening] = useState(null); // { edition, origin, count, run }
   const [focusRecent, setFocusRecent] = useState(0);
   // Un échange conclu : on recharge le classeur (les cartes reçues arrivent).
   const [reload, setReload] = useState(0);
@@ -205,7 +206,9 @@ export default function Cards() {
         if (!d) return d;
         const byId = new Map(d.cards.map((c) => [c.id, c]));
         const now = new Date().toISOString();
-        for (const c of res.cards) {
+        // Plusieurs boosters : leurs cartes dans l'ordre, la dernière
+        // occurrence portant le bon compte.
+        for (const c of (res.packs || [res]).flatMap((p) => p.cards)) {
           const had = byId.get(c.id);
           byId.set(c.id, had ? { ...had, count: c.count } : { ...c, firstAt: now, fresh: true });
         }
@@ -215,14 +218,19 @@ export default function Cards() {
     [commit, updateUser]
   );
 
-  function openPack(edition, el) {
-    if (!canBuy || opening) return;
+  // `count` > 1 : plusieurs boosters d'un coup ; `edition` nulle = au hasard.
+  function openPack(edition, el, count = 1) {
+    if (points < price * count || opening) return;
     const origin = el?.getBoundingClientRect?.() || null;
-    setOpening({ edition, origin, run: Date.now() });
+    setOpening({ edition, origin, count, run: Date.now() });
   }
-  // « Encore » : un nouveau sachet de la même édition.
+  // « Encore » : le même lot, de la même édition.
   function again() {
-    setOpening((o) => ({ edition: o?.edition || EDITIONS[0].key, origin: null, run: Date.now() }));
+    setOpening((o) =>
+      o?.count > 1
+        ? { ...o, run: Date.now() }
+        : { edition: o?.edition || EDITIONS[0].key, origin: null, count: 1, run: Date.now() }
+    );
   }
   function closeOpening() {
     setOpening(null);
@@ -243,6 +251,10 @@ export default function Cards() {
         <div className="cd-head-right">
           {/* Les échanges en attente : une pastille, le détail dans un panneau. */}
           <TradeInbox token={token} me={user} onChanged={refresh} onBinder={() => setFocusRecent((n) => n + 1)} />
+          <Link to="/cartes/combat" className="cd-wallet cd-battle-btn clickable" title="Combat de cartes">
+            <Swords size={18} />
+            <b>Combat</b>
+          </Link>
           <button
             className="cd-wallet ws-wallet clickable"
             onClick={() => setWorkshop({ forgeCard: null })}
@@ -305,7 +317,20 @@ export default function Cards() {
         />
       )}
 
-      {opening && (
+      {opening?.count > 1 && (
+        <BulkOpening
+          key={opening.run}
+          token={token}
+          edition={opening.edition}
+          count={opening.count}
+          price={price}
+          onOpened={onOpened}
+          onAgain={again}
+          onBinder={toBinder}
+          onClose={closeOpening}
+        />
+      )}
+      {opening && !(opening.count > 1) && (
         <PackOpening
           key={opening.run}
           token={token}

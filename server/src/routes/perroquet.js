@@ -10,7 +10,7 @@ import PerroquetTake from "../models/PerroquetTake.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
-import { grantPoints } from "../lib/points.js";
+import { grantPoints, arcadePoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { contourOf, compare } from "../lib/soundContour.js";
 import { person } from "./blindtest.js";
@@ -404,8 +404,9 @@ router.post("/:id/finish", requireAuth, async (req, res) => {
     await game.save();
 
     // Points : la MOYENNE, pas le total — sinon allonger la partie suffirait à
-    // grimper au classement. Un sans-faute rapporte 100, une partie moyenne 60.
-    const pts = Math.round(game.average);
+    // grimper au classement. Un sans-faute vaut 100, une partie moyenne 60 —
+    // convertis au taux du perroquet (cf. ARCADE_RATE).
+    const pts = arcadePoints("perroquet", game.average);
     if (pts > 0)
       grantPoints(req.userId, pts, "perroquet", {
         gameId: String(game._id),
@@ -446,6 +447,8 @@ const serializeGame = (req, g) => ({
   gameId: String(g._id),
   score: g.score,
   average: g.average,
+  // Les points d'arcade de la partie : la moyenne passée au taux du jeu.
+  pointsEarned: arcadePoints("perroquet", g.average),
   bestBand: g.bestBand,
   rounds: g.rounds.map((r) => ({
     label: r.label,

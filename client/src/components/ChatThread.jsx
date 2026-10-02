@@ -28,6 +28,7 @@ import {
   Globe2,
   Grid2x2,
   Layers,
+  Bomb,
   Trophy,
   Swords,
   Zap,
@@ -1579,7 +1580,9 @@ function useVersusRoom(code, game, token) {
                   `/imposteur/${code}/card`
                 : game === "cd"
                   ? `/cards/duel/${code}/card`
-                  : `/geo/versus/${code}/card`;
+                  : game === "bb"
+                    ? `/bombe/${code}/card`
+                    : `/geo/versus/${code}/card`;
 
     async function pull() {
       try {
@@ -1641,7 +1644,9 @@ function VersusCard({ versus }) {
   const im = versus.kind === "imposteur";
   // Le duel de cartes : 1 contre 1, premier à 3 manches.
   const cd = versus.kind === "cards";
-  const game = bt ? "bt" : px ? "px" : qz ? "qz" : pq ? "pq" : im ? "im" : cd ? "cd" : "geo";
+  // La Bombe : une table de 8, des vies plutôt que des manches.
+  const bb = versus.kind === "bombe";
+  const game = bt ? "bt" : px ? "px" : qz ? "qz" : pq ? "pq" : im ? "im" : cd ? "cd" : bb ? "bb" : "geo";
   const live = useVersusRoom(versus.code, game, token);
 
   // Trois sources, dans cet ordre : le salon s'il a répondu, sinon ce que porte
@@ -1653,7 +1658,7 @@ function VersusCard({ versus }) {
   const rounds = known ? live.rounds : versus.rounds || 8;
   const faces = known ? live.players || [] : [];
   const buzzer =
-    !bt && !px && !qz && !pq && !im && !cd && (known ? live.mode : versus.mode) === "buzzer";
+    !bt && !px && !qz && !pq && !im && !cd && !bb && (known ? live.mode : versus.mode) === "buzzer";
   const mine = !!live?.mine;
 
   // Une porte n'est ouverte que si le serveur laisserait vraiment entrer : le
@@ -1661,7 +1666,9 @@ function VersusCard({ versus }) {
   // d'autre (cf. POST /:code/join).
   const joinable =
     live !== null &&
-    ((state === "lobby" && (count < max || mine)) || (state === "live" && mine));
+    ((state === "lobby" && (count < max || mine)) ||
+      // La Bombe se regarde : on entre en spectateur et on joue la suivante.
+      (state === "live" && (mine || bb)));
 
   const status =
     live === null
@@ -1679,7 +1686,9 @@ function VersusCard({ versus }) {
                 tone: "live",
                 label: mine
                   ? "Reprendre la partie"
-                  : `En cours · manche ${(live.index || 0) + 1}/${rounds}`,
+                  : bb
+                    ? "Regarder la partie"
+                    : `En cours · manche ${(live.index || 0) + 1}/${rounds}`,
               }
             : joinable
               ? { tone: "open", label: mine ? "Retourner au salon" : "Rejoindre le salon" }
@@ -1696,7 +1705,9 @@ function VersusCard({ versus }) {
           qz ? "qz" : ""
         } ${im ? "im" : ""} ${cd ? "cd" : ""}`}
       >
-        {cd ? (
+        {bb ? (
+          <Bomb size={22} />
+        ) : cd ? (
           <Layers size={22} />
         ) : bt ? (
           <Music size={22} />
@@ -1727,9 +1738,13 @@ function VersusCard({ versus }) {
                     ? "L'Imposteur"
                     : cd
                       ? "Duel de cartes"
-                      : "GeoGamer"}
+                      : bb
+                        ? "La Bombe"
+                        : "GeoGamer"}
           <i className="gv-card-mode">
-            {cd
+            {bb
+              ? "table"
+              : cd
               ? "1 contre 1"
               : bt || px || pq
               ? "versus"
@@ -1756,7 +1771,13 @@ function VersusCard({ versus }) {
           <b>
             {count}/{max}
           </b>
-          <em>{cd ? `premier à ${rounds}` : `${rounds} ${qz ? "épreuves" : "manches"}`}</em>
+          <em>
+            {bb
+              ? `${rounds} vie${rounds > 1 ? "s" : ""}`
+              : cd
+                ? `premier à ${rounds}`
+                : `${rounds} ${qz ? "épreuves" : "manches"}`}
+          </em>
         </span>
 
         <span className={`gv-card-state ${status.tone}`}>
@@ -1785,7 +1806,9 @@ function VersusCard({ versus }) {
                   ? `/imposteur/${versus.code}`
                   : cd
                     ? `/cartes/duel/${versus.code}`
-                    : `/geo/versus/${versus.code}`
+                    : bb
+                      ? `/bombe/${versus.code}`
+                      : `/geo/versus/${versus.code}`
       }
       className={`${cls} clickable`}
     >

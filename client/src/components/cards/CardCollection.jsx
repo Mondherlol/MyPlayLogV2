@@ -56,6 +56,10 @@ export default function CardCollection({
   onFav = null,
   // Chez un ami : les cartes que je cherche, et proposer un échange.
   wants = null,
+  // Chez un ami : où lire un de ses classeurs (sinon, les miens), et un
+  // classeur à ouvrir depuis l'extérieur ({ id, k } — k change à chaque clic).
+  binderUrl = null,
+  focusBinder = null,
   onRequest = null,
   // Chez soi : l'atelier (forger une carte en creux, recycler).
   onForge = null,
@@ -88,6 +92,17 @@ export default function CardCollection({
     );
   }, [focusRecent]);
 
+  // Un classeur choisi depuis la vitrine : on l'ouvre et on y descend.
+  useEffect(() => {
+    if (!focusBinder) return;
+    setView(focusBinder.id);
+    setInspect(null);
+    setOnlyWanted(false);
+    requestAnimationFrame(() =>
+      binderRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
+  }, [focusBinder]);
+
   const current = binders.find((b) => b.id === view) || null;
   // Un classeur supprimé ailleurs (ou pas encore chargé) : retour à « Toutes ».
   useEffect(() => {
@@ -101,12 +116,14 @@ export default function CardCollection({
   useEffect(() => {
     if (!currentId || !token) return;
     let alive = true;
-    apiFetch(`/cards/binders/${currentId}`, { token })
+    apiFetch(binderUrl ? binderUrl(currentId) : `/cards/binders/${currentId}`, { token })
       .then((d) => alive && setBinderCards((m) => ({ ...m, [currentId]: d.cards })))
       .catch(() => {});
     return () => {
       alive = false;
     };
+    // `binderUrl` est recréée à chaque rendu : elle ne relance pas le chargement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, currentTotal, token]);
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
@@ -323,7 +340,7 @@ export default function CardCollection({
 
       {/* ---------- Le classeur ---------- */}
       <section className="cd-binder" ref={binderRef}>
-        {editable && (
+        {(editable || binders.length > 0) && (
           <BinderShelf
             view={view}
             onView={(v) => {
@@ -333,7 +350,7 @@ export default function CardCollection({
             total={cards.length}
             favs={favCount}
             binders={binders}
-            onCreate={() => setEditor({ binder: null })}
+            onCreate={editable ? () => setEditor({ binder: null }) : null}
           />
         )}
 
@@ -351,18 +368,20 @@ export default function CardCollection({
                 {current.total > 0 && current.owned === current.total && <span className="bd-done">Complet</span>}
               </div>
             </div>
-            <div className="bd-head-actions">
-              <button className="bd-act clickable" onClick={() => setAdding(true)} title="Ajouter des cartes">
-                <Plus />
-                <span>Ajouter</span>
-              </button>
-              <button className="bd-act icon clickable" onClick={() => setEditor({ binder: current })} title="Modifier">
-                <Pencil />
-              </button>
-              <button className="bd-act icon clickable" onClick={() => removeBinder(current)} title="Supprimer">
-                <Trash2 />
-              </button>
-            </div>
+            {editable && (
+              <div className="bd-head-actions">
+                <button className="bd-act clickable" onClick={() => setAdding(true)} title="Ajouter des cartes">
+                  <Plus />
+                  <span>Ajouter</span>
+                </button>
+                <button className="bd-act icon clickable" onClick={() => setEditor({ binder: current })} title="Modifier">
+                  <Pencil />
+                </button>
+                <button className="bd-act icon clickable" onClick={() => removeBinder(current)} title="Supprimer">
+                  <Trash2 />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -420,10 +439,12 @@ export default function CardCollection({
         ) : shown.length === 0 ? (
           current ? (
             <div className="bd-empty">
-              <button className="bd-empty-add clickable" onClick={() => setAdding(true)}>
-                <Plus />
-                <span>Ajouter des cartes</span>
-              </button>
+              {editable && (
+                <button className="bd-empty-add clickable" onClick={() => setAdding(true)}>
+                  <Plus />
+                  <span>Ajouter des cartes</span>
+                </button>
+              )}
             </div>
           ) : view === "fav" ? (
             <div className="bd-empty">

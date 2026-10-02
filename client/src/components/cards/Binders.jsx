@@ -63,10 +63,12 @@ export function BinderShelf({ view, onView, total, favs, binders, onCreate }) {
           onClick={() => onView(b.id)}
         />
       ))}
-      <button className="bd-tab bd-tab-new clickable" onClick={onCreate} title="Nouveau classeur">
-        <Plus className="bd-tab-ico" />
-        <span className="bd-tab-name">Classeur</span>
-      </button>
+      {onCreate && (
+        <button className="bd-tab bd-tab-new clickable" onClick={onCreate} title="Nouveau classeur">
+          <Plus className="bd-tab-ico" />
+          <span className="bd-tab-name">Classeur</span>
+        </button>
+      )}
     </div>
   );
 }

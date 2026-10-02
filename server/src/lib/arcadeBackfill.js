@@ -1,7 +1,7 @@
 import BlindTest from "../models/BlindTest.js";
 import PointEntry from "../models/PointEntry.js";
 import User from "../models/User.js";
-import { grantPoints } from "./points.js";
+import { grantPoints, arcadePoints } from "./points.js";
 
 // ======================================================================
 //  Rattrapage des points : créditer les blind tests joués AVANT l'arcade.
@@ -45,6 +45,10 @@ export async function planArcadeBackfill() {
     const u = userBy.get(String(row._id));
     if (!u) continue; // compte supprimé, parties orphelines
     const already = grantedBy.get(String(row._id)) || 0;
+    // Ce qui lui revient se compte au taux ACTUEL du blind test : sans ça,
+    // chaque partie créditée au taux réduit passerait pour un manque, et le
+    // rattrapage reverserait la différence à 1 pour 1.
+    const owed = arcadePoints("blindtest", row.total);
     rows.push({
       userId: row._id,
       username: u.username,
@@ -52,7 +56,7 @@ export async function planArcadeBackfill() {
       games: row.games,
       scoredTotal: row.total,
       already,
-      missing: row.total - already,
+      missing: owed - already,
     });
   }
   rows.sort((a, b) => b.missing - a.missing);

@@ -894,7 +894,7 @@ function Recap({ recap, onReplay, onHome, user }) {
         <b className="pq-recap-avg">{avg}</b>
         <span className="pq-recap-unit">de moyenne</span>
         <span className="pq-recap-pts">
-          <Coins size={14} /> +{recap.average} points d'arcade
+          <Coins size={14} /> +{recap.pointsEarned ?? recap.average} points d'arcade
         </span>
       </div>
 

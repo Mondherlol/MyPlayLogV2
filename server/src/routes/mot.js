@@ -13,7 +13,7 @@ import { emitTo } from "../lib/realtime.js";
 import { deliverCard, deliverCardToConversation } from "./chat.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
-import { grantPoints } from "../lib/points.js";
+import { grantPoints, arcadePoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
@@ -258,18 +258,23 @@ function publicAnecdote(day) {
 //
 // Le temps compté est celui écoulé depuis le PREMIER essai du joueur, jamais
 // depuis minuit : ouvrir le jeu au petit-déjeuner ou juste avant de se coucher
-// ne doit rien changer. Et il pèse peu (120 points au maximum) — on récompense
+// ne doit rien changer. Et il pèse peu (300 points au maximum) — on récompense
 // la déduction, pas la frénésie.
-const SCORE_MAX = 1000;
-const TRIES_DECAY = 22; // essais pour diviser le score par e
-const TIME_MALUS_MAX = 120;
-const SCORE_FLOOR = 100;
+//
+// Une partie se compte en dizaines de minutes et en centaines d'essais : la
+// décroissance est donc lente (100 essais ≈ 1 500, 200 essais ≈ 1 000) et le
+// plancher reste à la hauteur d'une partie de blind test — trouver le mot doit
+// toujours valoir le détour, même au forceps.
+const SCORE_MAX = 3000;
+const TRIES_DECAY = 150; // essais pour diviser le score par e
+const TIME_MALUS_MAX = 300;
+const SCORE_FLOOR = 1000;
 
 function scoreFor(tries, timeMs) {
   const t = Math.max(1, Number(tries) || 1);
   let pts = SCORE_MAX * Math.exp(-(t - 1) / TRIES_DECAY);
   const minutes = Math.max(0, Number(timeMs) || 0) / 60000;
-  pts -= Math.min(TIME_MALUS_MAX, minutes * 4);
+  pts -= Math.min(TIME_MALUS_MAX, minutes * 5);
   return Math.max(SCORE_FLOOR, Math.round(pts));
 }
 
@@ -295,6 +300,8 @@ function playState(play, day, { reveal = false } = {}) {
     solved,
     gaveUp: !!play?.gaveUp,
     score: play?.score || 0,
+    // Ce que la victoire a versé au porte-monnaie (le score passé au taux).
+    pointsEarned: arcadePoints("mot", play?.score || 0),
     timeMs: play?.timeMs ?? null,
     guesses: play ? publicGuesses(play) : [],
     // Le mot n'est révélé qu'une fois la partie finie (trouvé ou abandonné), ou
@@ -497,7 +504,7 @@ router.post("/guess", requireAuth, async (req, res) => {
         { $set: { pointsGranted: true } }
       );
       if (claim.modifiedCount) {
-        balance = await grantPoints(req.userId, score, "mot", {
+        balance = await grantPoints(req.userId, arcadePoints("mot", score), "mot", {
           motPlayId: String(play._id),
           date,
           tries,
@@ -529,6 +536,7 @@ router.post("/guess", requireAuth, async (req, res) => {
       ...(win
         ? {
             score,
+            pointsEarned: arcadePoints("mot", score),
             timeMs,
             points: balance,
             anecdote: publicAnecdote(day),
@@ -1307,7 +1315,7 @@ async function settleWin(session, day) {
     );
     if (!claim.modifiedCount) continue;
     // eslint-disable-next-line no-await-in-loop
-    await grantPoints(uid, session.score, "mot", {
+    await grantPoints(uid, arcadePoints("mot", session.score), "mot", {
       motPlayId: String(play._id),
       date: session.date,
       tries: session.tries,

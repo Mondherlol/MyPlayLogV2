@@ -10,7 +10,7 @@ import { climaxFor } from "../lib/ostClimax.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
-import { grantPoints } from "../lib/points.js";
+import { grantPoints, arcadePoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 
 // Blind test musical : on fait écouter un extrait d'OST tiré au sort et le
@@ -883,11 +883,12 @@ router.post("/finish", requireAuth, async (req, res) => {
     });
     sessions.delete(sessionId);
 
-    // Le score se transforme en points DÉPENSABLES à l'arcade (1 pour 1). Le
-    // score du classement, lui, ne bouge pas : dépenser ses points ne fait pas
+    // Le score se transforme en points DÉPENSABLES à l'arcade, au taux du jeu
+    // (cf. ARCADE_RATE). Le score du classement, lui, ne bouge pas : dépenser ses points ne fait pas
     // reculer au leaderboard. Best-effort — une partie reste valide même si le
     // crédit échoue (le grand livre le dirait).
-    const balance = await grantPoints(req.userId, score, "blindtest", {
+    const earned = arcadePoints("blindtest", score);
+    const balance = await grantPoints(req.userId, earned, "blindtest", {
       blindTestId: String(doc._id),
       correct: correctCount,
       total: rounds.length,
@@ -922,7 +923,7 @@ router.post("/finish", requireAuth, async (req, res) => {
       durationSec: dur,
       // Arcade : points crédités par cette partie + nouveau solde (null si le
       // crédit n'a pas pu se faire — le scoreboard masque alors la mention).
-      pointsEarned: balance != null ? score : null,
+      pointsEarned: balance != null ? earned : null,
       points: balance,
       challenge: session.challengedUser
         ? {

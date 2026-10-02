@@ -1156,3 +1156,135 @@ export function playTradeDone() {
 export function playBattleTier() {
   sample("tier", { gain: 0.8 });
 }
+
+// ======================================================================
+//  La Bombe (pages/Bomb.jsx)
+// ======================================================================
+// Écouté et trié (2026-10-02) : l'allumette et la sirène étaient
+// « horribles », le tic-tac est revenu à la demande (« faut le remettre »).
+// La Bombe garde des prises DÉJÀ VALIDÉES aux combats de cartes (Kenney :
+// cartes distribuées / retournées, le « hors sujet », les jetons) et trois à
+// elle, dans `public/sfx/bomb/` : une explosion courte (Mixkit « Short
+// explosion »). Le tic-tac enregistré (Mixkit « Tick tock clock timer ») a été
+// jugé trop gros : il est synthétisé, plus bas, comme une petite horloge.
+const bombBank = new Map();
+let bombLoading = null;
+
+export function primeBombSounds() {
+  primeBattleSounds();
+  if (bombLoading) return bombLoading;
+  const ac = audio();
+  if (!ac) return null;
+  bombLoading = Promise.all(
+    ["boom"].map((name) =>
+      fetch(`/sfx/bomb/${name}.mp3`)
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+        .then((b) => ac.decodeAudioData(b))
+        .then((buf) => bombBank.set(name, buf))
+        .catch(() => {})
+    )
+  );
+  return bombLoading;
+}
+
+function bombSample(name, gain = 1) {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    const buf = ac && bombBank.get(name);
+    if (buf) shot(ac, buf, { at: ac.currentTime, gain, rate: 0.98 + Math.random() * 0.04 });
+    else primeBombSounds();
+  } catch {
+    /* le son n'est jamais bloquant */
+  }
+}
+
+export function playBombBoom() {
+  bombSample("boom", 0.9);
+}
+
+// Le tic-tac de la mèche : une petite horloge de bois, discrète — un claquement
+// de bruit très court et serré, doublé d'une note brève ; le « tac » un cran
+// plus grave que le « tic ». Un peu plus présent quand c'est MOI qui tiens la
+// bombe. Il ne dit rien de la mèche elle-même (elle est au serveur).
+let tickFlip = false;
+export function playBombTick(mine = false) {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    tickFlip = !tickFlip;
+    const t = ac.currentTime + 0.005;
+    const v = mine ? 1 : 0.5;
+    const f = tickFlip ? 1 : 0.78;
+    noise(ac, { start: t, dur: 0.025, gain: 0.07 * v, freq: 3400 * f, q: 7 });
+    note(ac, { freq: 1900 * f, start: t, dur: 0.045, gain: 0.035 * v, type: "sine" });
+  } catch {
+    /* le son n'est jamais bloquant */
+  }
+}
+// Une fausse réponse : le « non » des combats.
+export function playBombMiss() {
+  sample("error", { gain: 0.5 });
+}
+// Une bonne réponse, la bombe passe : un petit arpège qui monte (do-mi-sol-do),
+// le « gagné » des jeux d'arcade. Plein quand c'est moi, plus court et plus bas
+// quand c'est un autre — on l'entend réussir sans que ça sonne comme sa victoire.
+export function playBombPass(mine = false) {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    const notes = mine ? [1046.5, 1318.5, 1568, 2093] : [784, 987.8, 1174.7];
+    const g = mine ? 0.12 : 0.06;
+    notes.forEach((freq, i) =>
+      note(ac, { freq, start: t + i * 0.065, dur: i === notes.length - 1 ? 0.38 : 0.16, gain: g, type: "triangle" })
+    );
+    // Une pointe de brillance sur la dernière note.
+    if (mine) note(ac, { freq: 4186, start: t + 0.2, dur: 0.25, gain: 0.025, type: "sine" });
+  } catch {
+    /* le son n'est jamais bloquant */
+  }
+}
+export function playBombLife() {
+  sample("chips", { gain: 0.9 });
+  sample("chip", { gain: 0.7, delay: 0.12 });
+}
+// C'est à moi : une carte qu'on retourne.
+export function playBombTurn() {
+  sample("flip", { gain: 0.8 });
+}
+// Le décompte avant la partie : un bip doux par seconde (3, 2, 1), puis un
+// accord plus aigu quand la bombe s'allume.
+export function playBombCount(n = 1) {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.005;
+    if (n > 0) {
+      note(ac, { freq: 587, start: t, dur: 0.18, gain: 0.11 });
+    } else {
+      note(ac, { freq: 880, start: t, dur: 0.32, gain: 0.11 });
+      note(ac, { freq: 1175, start: t + 0.04, dur: 0.3, gain: 0.07 });
+    }
+  } catch {
+    /* le son n'est jamais bloquant */
+  }
+}
+
+// La fin de partie : PAS le jingle des combats de cartes (le retour : « ça
+// ressemble au même jingle »). Gagné : une pluie de jetons. Perdu : une
+// dernière détonation, étouffée, et le « non ».
+export function playBombWin() {
+  sample("chips", { gain: 0.9 });
+  sample("chips", { gain: 0.8, delay: 0.14, rate: 1.08 });
+  sample("chip", { gain: 0.8, delay: 0.3, rate: 1.15 });
+  sample("chip", { gain: 0.7, delay: 0.42, rate: 1.25 });
+  sample("chips", { gain: 0.9, delay: 0.55, rate: 1.2 });
+}
+export function playBombLose() {
+  bombSample("boom", 0.45);
+  sample("error", { gain: 0.45, delay: 0.35 });
+}

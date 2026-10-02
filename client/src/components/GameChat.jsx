@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { MessageCircle, LogIn, LogOut, Send, ChevronDown } from "lucide-react";
+import { MessageCircle, LogIn, LogOut, Send, ChevronDown, Bomb, Crown, Siren, X } from "lucide-react";
 import { useChat } from "../context/ChatContext";
 import { apiFetch } from "../lib/api";
 import { renderMessage } from "./ListComments";
@@ -38,11 +38,15 @@ const GROUP_MS = 3 * 60 * 1000;
 const MAX_LEN = 300;
 const timeFmt = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-export default function GameChat({ token, code, event, endpoint, players = [], meId }) {
+// `docked` : la colonne de droite de La Bombe — toujours ouverte, posée dans
+// la page (pas de portail, pas d'onglet), comme le chat de BombParty. Le jeu
+// décide lui-même quand l'afficher (grand écran) ou retomber sur le tiroir.
+// `onClose` (avec `docked`) : une croix dans l'en-tête, pour replier la colonne.
+export default function GameChat({ token, code, event, endpoint, players = [], meId, docked = false, onClose = null }) {
   const { subscribe } = useChat();
   const [messages, setMessages] = useState([]);
   const [open, setOpen] = useState(
-    () => typeof window === "undefined" || window.innerWidth >= 1100
+    () => docked || typeof window === "undefined" || window.innerWidth >= 1100
   );
   const [unread, setUnread] = useState(0);
   const [text, setText] = useState("");
@@ -149,8 +153,19 @@ export default function GameChat({ token, code, event, endpoint, players = [], m
   // ancêtre porteur d'un `transform` ou d'un `filter` re-ancre tout `position:
   // fixed` sur lui-même. Le tiroir se retrouverait alors collé au coin d'un
   // plateau qui bouge au lieu du coin de l'écran.
-  return createPortal(
-    <section className={`gc-dock ${open ? "open" : ""}`}>
+  const panel = (
+    <section className={`gc-dock ${open ? "open" : ""} ${docked ? "gc-side" : ""}`}>
+      {docked ? (
+        <header className="gc-side-head">
+          <MessageCircle size={15} />
+          <span>Chat</span>
+          {onClose && (
+            <button className="gc-side-x clickable" onClick={onClose} aria-label="Fermer le chat">
+              <X size={16} />
+            </button>
+          )}
+        </header>
+      ) : (
       <button
         className="gc-tab clickable"
         onClick={() => setOpen((v) => !v)}
@@ -164,6 +179,7 @@ export default function GameChat({ token, code, event, endpoint, players = [], m
           unread > 0 && <em className="gc-tab-badge">{unread > 99 ? "99+" : unread}</em>
         )}
       </button>
+      )}
 
       {open && (
         <>
@@ -239,12 +255,23 @@ export default function GameChat({ token, code, event, endpoint, players = [], m
           </form>
         </>
       )}
-    </section>,
-    document.body
+    </section>
   );
+  return docked ? panel : createPortal(panel, document.body);
 }
 
 function Row({ m, grouped, mine, hue, names }) {
+  if (m.system && m.text) {
+    // Une annonce du jeu (La Bombe) : écrite par le serveur, affichée telle
+    // quelle.
+    const Icon = m.system === "boom" ? Bomb : m.system === "win" ? Crown : m.system === "cheat" ? Siren : LogIn;
+    return (
+      <p className={`gc-sys ${m.system}`}>
+        <Icon size={11} />
+        {m.text}
+      </p>
+    );
+  }
   if (m.system) {
     const Icon = m.system === "leave" ? LogOut : LogIn;
     return (

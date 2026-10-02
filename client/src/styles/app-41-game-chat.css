@@ -169,6 +169,9 @@
   background: hsl(var(--hue, 200) 70% 55% / 0.18);
 }
 
+/* Les émojis du texte (twemojiHtml pose la classe « emoji ») : à la taille
+   de la ligne — sans ça, l'image s'étale sur toute la bulle. */
+.gc-msg-bubble img.emoji,
 .gc-msg-bubble img.twemoji {
   width: 1.15em;
   height: 1.15em;

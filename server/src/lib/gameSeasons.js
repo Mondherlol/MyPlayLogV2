@@ -184,10 +184,8 @@ const FIRST_RUN_DELAY = 60 * 1000;
 
 async function runQuietly() {
   try {
-    const s = await syncGameSeasons({ log: (l) => console.log(l) });
-    console.log(
-      `🎯 Saisons : ${s.kept} à venir (${s.created} nouvelles, ${s.updated} déplacées, ${s.pruned} retirées)`
-    );
+    // Silencieux : la synchro tourne en fond, seules les erreurs se signalent.
+    await syncGameSeasons();
   } catch (err) {
     console.error("game seasons sync error:", err.message);
   }

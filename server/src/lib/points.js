@@ -8,6 +8,30 @@ import PointEntry from "../models/PointEntry.js";
 // fidèle du solde. Pour brancher une nouvelle façon de gagner des points, il
 // suffit d'appeler grantPoints() depuis la route concernée.
 
+// Taux de change score → points d'arcade, par jeu. Chaque mini-jeu garde son
+// propre barème (classements, records, cartes du fil) ; seul ce qui tombe dans
+// le porte-monnaie passe par ce taux. Repère : une bonne partie de cinq minutes
+// rapporte ~800-1 200 points, deux boosters à peu près (500 pièce) — au taux 1
+// d'origine, cinq parties de Pixel Rush en payaient une vingtaine.
+export const ARCADE_RATE = {
+  blindtest: 0.4, // ~2 000-4 000 par partie
+  pixel: 0.4,
+  geo: 0.4, // ~2 500, 5 000 au mieux
+  btversus: 0.4,
+  pxversus: 0.4,
+  geoversus: 0.4,
+  quiz: 1.8, // ~450, ~700 au mieux
+  quizversus: 1.8,
+  perroquet: 13, // une moyenne sur 100
+  perroquetversus: 13,
+  imposteur: 5, // 60-100 par manche, 3 manches par défaut
+  mot: 0.6, // 1 000-3 000, une fois par jour
+};
+
+export function arcadePoints(source, score) {
+  return Math.round((Number(score) || 0) * (ARCADE_RATE[source] ?? 1));
+}
+
 // Crédite un joueur. Best-effort par défaut : un gain de points ne doit jamais
 // faire échouer l'action qui l'a produit (finir un blind test, par exemple).
 // Retourne le nouveau solde, ou null si l'écriture a échoué.

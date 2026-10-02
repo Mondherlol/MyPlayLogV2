@@ -161,7 +161,7 @@ function tolerance(len) {
  * rend `max + 1` sans finir. C'est ce qui rend tenable le parcours de dizaines
  * de milliers de titres à chaque recherche vide.
  */
-function distance(a, b, max) {
+export function distance(a, b, max) {
   const n = a.length;
   const m = b.length;
   if (Math.abs(n - m) > max) return max + 1;

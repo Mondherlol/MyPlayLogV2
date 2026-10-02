@@ -15,7 +15,7 @@ import User from "../models/User.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
-import { grantPoints } from "../lib/points.js";
+import { grantPoints, arcadePoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 // Règles communes aux mini-jeux « devine le jeu » (cf. routes/blindtest.js).
 import {
@@ -656,9 +656,10 @@ router.post("/finish", requireAuth, async (req, res) => {
       console.error("geo markSeen error:", e.message)
     );
 
-    // Le score devient des points dépensables à l'arcade (1 pour 1), comme les
-    // deux autres jeux. Best-effort : la partie reste valide si le crédit rate.
-    const balance = await grantPoints(req.userId, score, "geo", {
+    // Le score devient des points dépensables à l'arcade, au taux du jeu
+    // (cf. ARCADE_RATE). Best-effort : la partie reste valide si le crédit rate.
+    const earned = arcadePoints("geo", score);
+    const balance = await grantPoints(req.userId, earned, "geo", {
       geoGameId: String(doc._id),
       correct: correctCount,
       total: rounds.length,
@@ -690,7 +691,7 @@ router.post("/finish", requireAuth, async (req, res) => {
       correctCount,
       roundCount: rounds.length,
       durationSec: dur,
-      pointsEarned: balance != null ? score : null,
+      pointsEarned: balance != null ? earned : null,
       points: balance,
       challenge: session.challengedUser
         ? {

@@ -4,7 +4,7 @@ import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { emitTo, onlineAmong } from "../lib/realtime.js";
 import { recordActivity } from "../lib/activity.js";
-import { grantPoints } from "../lib/points.js";
+import { grantPoints, arcadePoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { deliverCard, deliverCardToConversation } from "./chat.js";
 import { person, sameGame } from "./blindtest.js";
@@ -334,7 +334,7 @@ async function finishGame(room) {
   }));
   for (const r of ranking) {
     const bonus = r.rank === 1 ? Math.round(r.score * WINNER_BONUS) : 0;
-    grantPoints(r.id, r.score + bonus, "pxversus", {
+    grantPoints(r.id, arcadePoints("pxversus", r.score + bonus), "pxversus", {
       versusId: String(room._id),
       rank: r.rank,
       bonus,
