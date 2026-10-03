@@ -76,8 +76,7 @@ export default function Landing() {
         </h1>
 
         <p className="lp-sub">
-          Le journal de tes jeux vidéo. C'est encore une alpha : ça bouge tous
-          les jours, et c'est déjà utilisable.
+          Le journal de tes jeux vidéo. C'est encore une alpha, merci de participer &lt;3
         </p>
 
         <div className="lp-cta">

@@ -67,8 +67,16 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(70% 55% at 50% 72%, rgba(140, 162, 205, 0.1), transparent 70%),
-    radial-gradient(60% 40% at 50% -10%, rgba(140, 162, 205, 0.07), transparent 70%);
+    radial-gradient(
+      70% 55% at 50% 72%,
+      rgba(140, 162, 205, 0.1),
+      transparent 70%
+    ),
+    radial-gradient(
+      60% 40% at 50% -10%,
+      rgba(140, 162, 205, 0.07),
+      transparent 70%
+    );
 }
 .onb-bg::before {
   content: "";
@@ -84,7 +92,11 @@
   /* Le motif dérive très lentement : assez pour que l'écran soit vivant, trop
      peu pour qu'on puisse dire ce qui bouge. */
   animation: onb-drift 120s linear infinite;
-  -webkit-mask-image: radial-gradient(80% 70% at 50% 50%, transparent 25%, #000 100%);
+  -webkit-mask-image: radial-gradient(
+    80% 70% at 50% 50%,
+    transparent 25%,
+    #000 100%
+  );
   mask-image: radial-gradient(80% 70% at 50% 50%, transparent 25%, #000 100%);
 }
 @keyframes onb-drift {
@@ -338,7 +350,9 @@
   border: 1px solid var(--onb-line);
   background: var(--onb-glass);
   overflow: hidden;
-  transition: width 0.32s cubic-bezier(0.2, 0.9, 0.25, 1), border-color 0.2s ease;
+  transition:
+    width 0.32s cubic-bezier(0.2, 0.9, 0.25, 1),
+    border-color 0.2s ease;
 }
 .onb-search.is-open {
   width: min(360px, calc(100vw - 2 * var(--onb-pad)));
@@ -381,8 +395,20 @@
   user-select: none;
   outline: none;
   /* Les bords s'éteignent : la roue continue au-delà de l'écran. */
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 14%,
+    #000 86%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 14%,
+    #000 86%,
+    transparent
+  );
 }
 .onb-wheel:active {
   cursor: grabbing;
@@ -527,7 +553,9 @@
   background: rgba(16, 18, 24, 0.82);
   backdrop-filter: blur(8px);
   color: var(--onb-text);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 .onb-nav-arrow:hover {
   border-color: var(--acc);
@@ -817,7 +845,10 @@
   background: #1c1f27;
   color: var(--onb-text);
   font-family: var(--font-display);
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
 }
 .onb-scale-opt:hover {
   border-color: #f2b70b;
@@ -894,7 +925,9 @@
   height: 4px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.2);
-  transition: background 0.3s ease, width 0.3s ease;
+  transition:
+    background 0.3s ease,
+    width 0.3s ease;
 }
 .onb-rate-dots i.is-on {
   width: 26px;
@@ -930,7 +963,9 @@
   border-radius: 50%;
   background: none;
   color: var(--onb-soft);
-  transition: color 0.15s ease, background 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
 }
 .onb-vol-btn:hover {
   color: var(--onb-amber);
@@ -953,7 +988,11 @@
 .onb-vol-range::-webkit-slider-runnable-track {
   height: 5px;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--onb-amber) var(--v), rgba(255, 255, 255, 0.14) var(--v));
+  background: linear-gradient(
+    90deg,
+    var(--onb-amber) var(--v),
+    rgba(255, 255, 255, 0.14) var(--v)
+  );
 }
 .onb-vol-range::-moz-range-track {
   height: 5px;
@@ -974,7 +1013,9 @@
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 0 0 4px rgba(242, 183, 11, 0.28);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
 }
 .onb-vol-range::-moz-range-thumb {
   width: 14px;
@@ -1022,7 +1063,9 @@
   flex: none;
   border-radius: 14px;
   border: 1px solid transparent;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 .onb-trow:hover {
   background: rgba(255, 255, 255, 0.04);
@@ -1105,7 +1148,10 @@
   border: 1px solid var(--onb-line);
   background: rgba(255, 255, 255, 0.05);
   color: var(--onb-text);
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease;
 }
 .onb-trow-play:hover {
   border-color: var(--onb-amber);
@@ -1190,7 +1236,9 @@
   overflow: hidden;
   background: #1c1f27;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.2s ease;
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    box-shadow 0.2s ease;
 }
 .onb-chr-face img {
   width: 100%;
@@ -1291,13 +1339,17 @@
   height: var(--av);
   padding: 4px;
   border-radius: 50%;
-  background: conic-gradient(from 0deg, #eaa908, #ffe28a, #eaa908, #7a5a08, #eaa908);
+  background: conic-gradient(
+    from 0deg,
+    #eaa908,
+    #ffe28a,
+    #eaa908,
+    #7a5a08,
+    #eaa908
+  );
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   animation: onb-in 0.5s ease both;
   transition: opacity 0.2s ease;
-}
-.onb-avatar-ring.is-busy {
-  opacity: 0.6;
 }
 .onb-avatar-img {
   position: relative;
@@ -1319,11 +1371,48 @@
   height: 100%;
   object-fit: cover;
 }
-.onb-avatar-img span {
+.onb-avatar-img > span:not(.onb-avatar-spin) {
   font-family: var(--font-display);
   font-size: 3.4rem;
   font-weight: 700;
   color: var(--onb-amber);
+}
+.onb-avatar-spin {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+.onb-avatar-spin svg {
+  animation: onb-avatar-spin 0.9s linear infinite;
+}
+@keyframes onb-avatar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* La croix, à cheval sur l'anneau en haut à droite. */
+.onb-avatar-clear {
+  position: absolute;
+  top: 6%;
+  right: 6%;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px solid var(--onb-bg);
+  background: #2a2d38;
+  color: #fff;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.onb-avatar-clear:hover {
+  background: #ff5470;
 }
 
 .onb-bubbles {
@@ -1342,9 +1431,15 @@
   background: var(--onb-glass);
   display: grid;
   place-items: center;
-  transition: transform 0.18s ease, border-color 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease;
 }
+/* Posée, pas rangée : en élément de grille, une image plus haute que large
+   imposait sa hauteur et débordait du cercle par le bas. */
 .onb-bubble img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   border-radius: 50%;
@@ -1416,14 +1511,20 @@
   color: #fff;
   overflow: hidden;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
-  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 0.2s ease;
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    box-shadow 0.2s ease;
 }
 .onb-imp::after {
   /* Un reflet diagonal : c'est lui qui fait « objet » plutôt que « bouton ». */
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 45%);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.16),
+    transparent 45%
+  );
   pointer-events: none;
 }
 .onb-imp:hover:not(:disabled) {
@@ -1530,7 +1631,16 @@
   pointer-events: none;
   background: var(--onb-amber);
   /* Une étoile à quatre branches, dessinée par le masque. */
-  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  clip-path: polygon(
+    50% 0,
+    62% 38%,
+    100% 50%,
+    62% 62%,
+    50% 100%,
+    38% 62%,
+    0 50%,
+    38% 38%
+  );
   opacity: 0;
   animation: onb-twinkle 2.4s ease-in-out infinite;
   animation-delay: var(--delay, 0s);
@@ -1595,7 +1705,12 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 65%
+  );
   transform: translateX(-100%);
   animation: onb-shine 2.8s ease-in-out 0.5s infinite;
 }
@@ -1729,7 +1844,9 @@
   /* Les cases vides de l'étagère des favoris : un cœur en attente. */
   border: 1.5px dashed rgba(255, 92, 141, 0.3);
   color: rgba(255, 92, 141, 0.6);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 .onb-pcard-slot:hover {
   background: rgba(255, 92, 141, 0.08);
@@ -1802,7 +1919,10 @@
     onb-act-in 0.5s cubic-bezier(0.2, 1.3, 0.3, 1) both,
     onb-float 5s ease-in-out infinite;
   animation-delay: var(--d, 0ms), calc(var(--d, 0ms) + 0.5s);
-  transition: border-color 0.15s ease, background 0.15s ease, scale 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    scale 0.15s ease;
 }
 .onb-act:hover {
   border-color: var(--tone);
@@ -1832,7 +1952,9 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--tone) 18%, transparent);
   color: var(--tone);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 /* Au survol, la case du « + » se remplit : c'est elle qui dit « bouton ». */
 .onb-act:hover .onb-act-icon {
@@ -1915,7 +2037,9 @@
   font-weight: 700;
   letter-spacing: -0.01em;
   box-shadow: 0 12px 32px var(--acc-glow);
-  transition: box-shadow 0.25s ease, transform 0.12s ease;
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.12s ease;
 }
 .onb-go-fill {
   position: absolute;
@@ -1975,7 +2099,10 @@
   border-radius: 12px;
   overflow: hidden;
   background: var(--surface-2);
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .favpick-item:hover {
   transform: translateY(-2px);
@@ -2078,7 +2205,9 @@
   border: 1.5px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
 }
 .taste-item:hover:not(:disabled) {
   border-color: var(--orange);

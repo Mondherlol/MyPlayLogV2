@@ -85,4 +85,9 @@
 @import "./styles/app-67-bomb.css";
 /* Le canevas de dessin (La Bombe, et le futur jeu de dessin à deviner). */
 @import "./styles/app-68-draw.css";
+/* La refonte de l'arcade (une colonne : jouer, boutique, classements). */
+@import "./styles/app-69-arcade-v2.css";
+/* La Party (jeu de plateau à la Mario Party). */
+@import "./styles/app-70-party.css";
+@import "./styles/app-71-feed-extras.css";
 @import "./styles/app-99-mobile-perf.css";

@@ -179,6 +179,7 @@ const FAMILIES = [
       "pxversus",
       "pqversus",
       "impversus",
+      "bombe",
       "geoversus",
       "quiz",
       "quizversus",

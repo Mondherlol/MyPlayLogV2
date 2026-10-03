@@ -70,7 +70,8 @@ import {
   Library,
   Bot as BotIc,
 } from "lucide-react";
-import { Globe2, MapPin, Thermometer, Target, Crown, Users, Zap } from "lucide-react";
+import { Globe2, MapPin, Thermometer, Target, Crown, Users, Zap, Bomb, ChevronDown } from "lucide-react";
+import { boardOf, boardSlot } from "../lib/boards";
 import { rarityColor, rarityLabel } from "../lib/rarity";
 import { typeLabel } from "../lib/quizGame";
 import RewardArt from "./RewardArt";
@@ -196,7 +197,8 @@ export function FeedCard(props) {
     item.type === "pxversus" ||
     item.type === "pqversus" ||
     item.type === "impversus" ||
-    item.type === "quizversus"
+    item.type === "quizversus" ||
+    item.type === "bombe"
   )
     return <VersusEvent {...props} />;
   if (item.type === "perroquet" || item.type === "perroquetgroup")
@@ -1025,6 +1027,7 @@ function ListAddEvent({ item }) {
   // retombe alors sur l'ancien affichage (premières pistes de la playlist).
   const added = item.added || [];
   const named = added.length === 1 ? added[0].name : null;
+  const board = item.list.board ? boardOf(item.list.board) : null;
   return (
     <article className="hf-card hf-list">
       <EventHead
@@ -1036,7 +1039,12 @@ function ListAddEvent({ item }) {
           </span>
         }
       >
-        {named ? (
+        {board ? (
+          <>
+            a rempli {item.count > 1 ? `${item.count} cases` : "une case"} de sa{" "}
+            <span className="hf-added-title">{board.title.replace(/^Ma /, "")}</span>
+          </>
+        ) : named ? (
           <>
             a ajouté <span className="hf-added-title">{named}</span> à sa{" "}
             {isPlaylist ? "playlist" : "liste"}
@@ -1047,9 +1055,72 @@ function ListAddEvent({ item }) {
           </>
         )}
       </EventHead>
-      {added.length > 0 && <AddedItems list={item.list} added={added} />}
+      {added.length > 0 &&
+        (isPlaylist || added.some((a) => a.videoId || a.url) ? (
+          // Des pistes : elles s'écoutent depuis la carte, on garde les lignes.
+          <AddedItems list={item.list} added={added} />
+        ) : (
+          <AddedStrip list={item.list} added={added} count={item.count} />
+        ))}
       <ListMini list={item.list} showTracks={added.length === 0} />
     </article>
+  );
+}
+
+// Les jeux (ou persos) ajoutés, en jaquettes côte à côte. Sur une carte de
+// joueur, chaque jaquette porte sa case (« Meilleure histoire »…) et, pour les
+// cases à personnage, son médaillon.
+function AddedStrip({ list, added, count }) {
+  const board = list.board;
+  const more = Math.max(0, (count || added.length) - added.length);
+  return (
+    <div className={`hf-strip ${board ? "board" : ""}`}>
+      {added.map((it) => {
+        const slot = board ? boardSlot(board, it.slot) : null;
+        const SlotIcon = slot?.Icon;
+        const inner = (
+          <>
+            {slot && (
+              <span className="hf-strip-slot" title={slot.label}>
+                {SlotIcon && <SlotIcon size={11} />}
+                <span>{slot.label}</span>
+              </span>
+            )}
+            <span className="hf-strip-art">
+              {it.image ? <img src={it.image} alt="" loading="lazy" draggable="false" /> : <Gamepad2 size={20} />}
+              {it.charImage && (
+                <img className="hf-strip-char" src={it.charImage} alt="" loading="lazy" draggable="false" />
+              )}
+            </span>
+            <span className="hf-strip-name">{it.name}</span>
+          </>
+        );
+        return it.kind === "game" && it.refId ? (
+          <Link
+            key={it.refId}
+            to={`/game/${it.refId}`}
+            className="hf-strip-tile clickable"
+            title={it.name}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {inner}
+          </Link>
+        ) : (
+          <span key={it.refId} className="hf-strip-tile" title={it.name}>
+            {inner}
+          </span>
+        );
+      })}
+      {more > 0 && (
+        <Link
+          to={`/lists/${list.id}`}
+          className="hf-strip-tile hf-strip-more clickable"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="hf-strip-art">+{more}</span>
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -2287,6 +2358,11 @@ function BlindTestEvent({ item, onOpenBlindTest }) {
 // qu'on découvre des jeux, par ce que les amis ont tiré.
 function CardPackEvent({ item }) {
   const [inspect, setInspect] = useState(null);
+  // `all` : toutes les cartes de l'ouverture (le fil n'en montre que cinq).
+  const all = item.all?.length > item.cards.length ? item.all : null;
+  const [showAll, setShowAll] = useState(false);
+  // L'inspecteur parcourt la liste d'où l'on vient (les cinq, ou toutes).
+  const [inspectList, setInspectList] = useState(item.cards);
   const best = item.cards[0];
   const meta = CARD_RARITIES[best.rarity] || CARD_RARITIES.common;
   const stop = (e) => e.stopPropagation();
@@ -2309,6 +2385,7 @@ function CardPackEvent({ item }) {
             className="hf-cp-card clickable"
             onClick={(e) => {
               stop(e);
+              setInspectList(item.cards);
               setInspect(i);
             }}
             title={c.name}
@@ -2317,6 +2394,27 @@ function CardPackEvent({ item }) {
             {c.isNew && <span className="hf-cp-new">NEW</span>}
           </button>
         ))}
+        {/* La sixième case : la carte suivante, floutée, et le compte de ce
+            qui reste — un clic ouvre toute l'ouverture. */}
+        {all && (
+          <button
+            type="button"
+            className="hf-cp-card hf-cp-more clickable"
+            onClick={(e) => {
+              stop(e);
+              setShowAll(true);
+            }}
+            title="Voir toutes les cartes"
+          >
+            <span className="hf-cp-more-blur" aria-hidden="true">
+              <TcgCard card={all[item.cards.length]} tilt={false} lite />
+            </span>
+            <span className="hf-cp-more-txt">
+              <b>+{all.length - item.cards.length}</b>
+              <em>cartes</em>
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="hf-cp-foot">
@@ -2333,11 +2431,49 @@ function CardPackEvent({ item }) {
         </Link>
       </div>
 
+      {showAll &&
+        createPortal(
+          <div
+            className="modal-overlay hf-cpall-overlay"
+            onClick={stop}
+            onMouseDown={(e) => e.target === e.currentTarget && setShowAll(false)}
+          >
+            <div className="hf-cpall">
+              <div className="hf-cpall-head">
+                <h3>
+                  {item.user.username} · {all.length} cartes
+                </h3>
+                <button className="modal-close clickable" onClick={() => setShowAll(false)} aria-label="Fermer">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="hf-cpall-grid">
+                {all.map((c, i) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="hf-cp-card clickable"
+                    onClick={() => {
+                      setInspectList(all);
+                      setInspect(i);
+                    }}
+                    title={c.name}
+                  >
+                    <TcgCard card={c} tilt={false} lite />
+                    {c.isNew && <span className="hf-cp-new">NEW</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
       {inspect != null && (
         <div onClick={stop} onTouchStart={stop} onTouchEnd={stop}>
           <Suspense fallback={null}>
             <CardInspector
-              list={item.cards}
+              list={inspectList}
               index={inspect}
               onIndex={setInspect}
               onClose={() => setInspect(null)}
@@ -2363,7 +2499,20 @@ function CardBattleEvent({ item }) {
   const [me, him] = item.score || [0, 0];
   const foe = item.foe;
   const series = !duel && item.games > 1;
-  const action = duel ? (
+  const duelRun = duel && item.games > 1;
+  const action = duelRun ? (
+    <>
+      {item.wins > 0 ? (
+        <>
+          a battu {foe ? <b>{foe.username}</b> : "un ami"} {item.wins > 1 ? `${item.wins} fois` : ""} en duel de cartes
+        </>
+      ) : (
+        <>
+          a enchaîné {item.games} duels de cartes{foe ? <> contre <b>{foe.username}</b></> : ""}
+        </>
+      )}
+    </>
+  ) : duel ? (
     item.result === "draw" ? (
       <>
         a fait match nul en duel de cartes{foe ? ` contre ${foe.username}` : ""}
@@ -2382,7 +2531,11 @@ function CardBattleEvent({ item }) {
   ) : (
     <>a perdu un combat de cartes</>
   );
-  const badge = series ? (
+  const badge = duelRun ? (
+    <span className="hf-cb-tally">
+      <b>{item.wins}</b> – <b>{item.losses}</b> en {item.games} duels
+    </span>
+  ) : series ? (
     <span className="hf-cb-tally">
       <b>{item.wins}</b> V · <b>{item.losses}</b> D
     </span>
@@ -2694,7 +2847,12 @@ function PixelRushEvent({ item, onOpenPixel }) {
 }
 
 // Plusieurs parties d'affilée du même joueur → une seule carte.
+// Au-delà de deux parties, la liste se replie : « Voir les N autres ».
+const RUNS_SHOWN = 2;
 function PixelRushGroupEvent({ item, onOpenPixel }) {
+  const [open, setOpen] = useState(false);
+  const hidden = Math.max(0, item.games.length - RUNS_SHOWN);
+  const games = open ? item.games : item.games.slice(0, RUNS_SHOWN);
   return (
     <article className="hf-card hf-blindtest hf-pixel hf-btg">
       <EventHead user={item.user} date={item.date}>
@@ -2713,7 +2871,7 @@ function PixelRushGroupEvent({ item, onOpenPixel }) {
       </div>
 
       <ul className="hf-btg-list">
-        {item.games.map((g) => {
+        {games.map((g) => {
           const pct = g.total ? Math.round((g.correct / g.total) * 100) : 0;
           const best = g.score === item.bestScore;
           return (
@@ -2740,6 +2898,19 @@ function PixelRushGroupEvent({ item, onOpenPixel }) {
           );
         })}
       </ul>
+      {hidden > 0 && (
+        <button
+          type="button"
+          className={`hf-btg-more clickable ${open ? "open" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
+          }}
+        >
+          {open ? "Replier" : `Voir les ${hidden} autre${hidden > 1 ? "s" : ""}`}
+          <ChevronDown size={15} />
+        </button>
+      )}
     </article>
   );
 }
@@ -3727,7 +3898,10 @@ function VersusEvent({ item }) {
   const qz = item.type === "quizversus";
   const pq = item.type === "pqversus";
   const im = item.type === "impversus";
-  const game = bt
+  const bb = item.type === "bombe";
+  const game = bb
+    ? "La Bombe"
+    : bt
     ? "Blind Test"
     : px
       ? "Pixel Rush"
@@ -3738,7 +3912,9 @@ function VersusEvent({ item }) {
           : im
             ? "Imposteur"
             : "GeoGamer";
-  const GameIcon = bt
+  const GameIcon = bb
+    ? Bomb
+    : bt
     ? Music2
     : px
       ? Grid2x2
@@ -3756,10 +3932,13 @@ function VersusEvent({ item }) {
   // il s'oppose à un autre mode réglable. Ailleurs il est soit implicite (blind
   // test, Pixel Rush), soit décidé épreuve par épreuve (Grand Quiz) — l'annoncer
   // sur la carte induirait en erreur.
-  const buzzer = !bt && !px && !qz && !pq && !im && item.mode === "buzzer";
+  const buzzer = !bt && !px && !qz && !pq && !im && !bb && item.mode === "buzzer";
   // L'écart avec le deuxième : c'est le chiffre qui fait parler (« il l'a eu
   // pour 40 points »), bien plus que le total.
-  const gap = table.length > 1 ? champ.score - table[1].score : 0;
+  const gap = !bb && table.length > 1 ? champ.score - table[1].score : 0;
+  // La Bombe se joue aussi contre des bots : la carte est signée par le
+  // meilleur humain, qui n'a pas forcément gagné.
+  const won = !bb || champ?.username === item.user?.username;
 
   return (
     <article className="hf-card hf-blindtest hf-geo hf-gv">
@@ -3767,8 +3946,14 @@ function VersusEvent({ item }) {
         <Swords size={13} className="hf-inline-ic" />{" "}
         {/* L'Imposteur n'est pas un « versus » : on n'y bat personne à un
             barème, on démasque (ou on s'échappe). Le verbe change avec lui. */}
-        {im ? "a gagné une partie de l'Imposteur" : `a gagné un versus ${game}`}
-        {beaten.length > 0 && (
+        {bb
+          ? won
+            ? "a gagné une partie de La Bombe"
+            : "a joué à La Bombe"
+          : im
+            ? "a gagné une partie de l'Imposteur"
+            : `a gagné un versus ${game}`}
+        {won && beaten.length > 0 && (
           <>
             {" "}
             contre{" "}
@@ -3785,14 +3970,16 @@ function VersusEvent({ item }) {
 
       <div className="hf-gv-meta">
         <span className={`hf-gv-mode ${buzzer ? "buzzer" : ""}`}>
-          {bt || px || im ? (
+          {bt || px || im || bb ? (
             <GameIcon size={12} />
           ) : buzzer ? (
             <Zap size={12} />
           ) : (
             <Users size={12} />
           )}
-          {bt
+          {bb
+            ? "La Bombe"
+            : bt
             ? "Blind test"
             : px
               ? "Pixel Rush"
@@ -3803,7 +3990,15 @@ function VersusEvent({ item }) {
                   : "Classique"}
         </span>
         <span className="hf-bt-stat">
-          <GameIcon size={13} /> {item.total} manches
+          {bb ? (
+            <>
+              <Users size={13} /> {item.total || table.length} joueurs
+            </>
+          ) : (
+            <>
+              <GameIcon size={13} /> {item.total} manches
+            </>
+          )}
         </span>
         {gap > 0 && (
           <span className="hf-gv-gap">
@@ -3823,19 +4018,28 @@ function VersusEvent({ item }) {
             ) : (
               <span className="hf-gv-face">{(p.username || "?")[0].toUpperCase()}</span>
             )}
-            <Link to={`/u/${p.username}`} className="hf-gv-name clickable">
-              {p.username}
-            </Link>
-            <span className="hf-gv-score">{p.score}</span>
+            {p.bot ? (
+              <span className="hf-gv-name">
+                {p.username} <BotIc size={12} />
+              </span>
+            ) : (
+              <Link to={`/u/${p.username}`} className="hf-gv-name clickable">
+                {p.username}
+              </Link>
+            )}
+            <span className="hf-gv-score">
+              {p.score}
+              {bb && <em> rép.</em>}
+            </span>
           </li>
         ))}
       </ol>
 
       <Link
-        to={bt ? "/blindtest" : px ? "/pixel" : im ? "/imposteur" : "/geo"}
+        to={bb ? "/bombe" : bt ? "/blindtest" : px ? "/pixel" : im ? "/imposteur" : "/geo"}
         className="hf-mot-cta clickable"
       >
-        {im ? "Ouvrir un salon" : "Lancer un versus"}
+        {bb ? "Ouvrir une table" : im ? "Ouvrir un salon" : "Lancer un versus"}
       </Link>
     </article>
   );

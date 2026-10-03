@@ -892,7 +892,7 @@ function Prompt({ p, k, hint }) {
   // ils devenaient un rectangle blanc. Seuls les studios gardent leur logo.
   const logo = p.kind === "studio" ? p.logo : null;
   return (
-    <div className="bbm-face" key={k} data-prompt={p.key}>
+    <div className={`bbm-face ${hint ? "has-hint" : ""}`} key={k} data-prompt={p.key}>
       <span className="bbm-cap-txt">{p.caption}</span>
       {p.kind === "syllable" ? (
         <b className="bbm-syl">{p.label}</b>

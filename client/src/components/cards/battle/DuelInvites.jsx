@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Bomb, Swords } from "lucide-react";
+import { Bomb, Dices, Swords } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { useChat } from "../../../context/ChatContext";
 import { apiFetch } from "../../../lib/api";
@@ -36,12 +36,19 @@ export default function DuelInvites() {
   useEffect(() => {
     if (!subscribe || !user) return undefined;
     return subscribe((event, data) => {
-      if ((event !== "cardduel" && event !== "cardteam" && event !== "bombe") || !data?.code) return;
-      // La Bombe passe par la même fenêtre : une table qui t'attend.
-      if (event === "bombe") {
-        if (data.kind !== "invite" || window.location.pathname === `/bombe/${data.code}`) return;
-        const id = `b:${data.code}`;
-        setList((l) => [{ id, code: data.code, bomb: true, by: data.by, at: Date.now() }, ...l.filter((x) => x.id !== id)].slice(0, 3));
+      if ((event !== "cardduel" && event !== "cardteam" && event !== "bombe" && event !== "party") || !data?.code)
+        return;
+      // La Bombe et La Party passent par la même fenêtre : une table qui t'attend.
+      if (event === "bombe" || event === "party") {
+        const base = event;
+        if (data.kind !== "invite" || window.location.pathname === `/${base}/${data.code}`) return;
+        const id = `${base}:${data.code}`;
+        setList((l) =>
+          [
+            { id, code: data.code, bomb: base === "bombe", party: base === "party", by: data.by, at: Date.now() },
+            ...l.filter((x) => x.id !== id),
+          ].slice(0, 3)
+        );
         playMessageSound();
         clearTimeout(timers.current.get(id));
         timers.current.set(
@@ -80,18 +87,18 @@ export default function DuelInvites() {
         <div key={x.id} className="dinv" role="alertdialog" aria-label={`${x.by?.username} ${x.team ? "t'invite en 2 contre 2" : "te défie en duel"}`}>
           <span className="dinv-art">
             <FriendFace u={x.by} size={46} />
-            <i className="dinv-badge">{x.bomb ? <Bomb /> : <Swords />}</i>
+            <i className="dinv-badge">{x.bomb ? <Bomb /> : x.party ? <Dices /> : <Swords />}</i>
           </span>
           <span className="dinv-txt">
             <b>{x.by?.username}</b>
-            <span>{x.bomb ? "t'invite à La Bombe" : x.team ? "t'invite en 2 contre 2" : "te défie en duel"}</span>
+            <span>{x.bomb ? "t'invite à La Bombe" : x.party ? "t'invite à La Party" : x.team ? "t'invite en 2 contre 2" : "te défie en duel"}</span>
           </span>
           <span className="dinv-actions">
             <button
               className="dinv-btn ghost clickable"
               onClick={() => {
                 drop(x.id);
-                if (!x.team && !x.bomb) apiFetch(`/cards/duel/${x.code}/decline`, { method: "POST", token }).catch(() => {});
+                if (!x.team && !x.bomb && !x.party) apiFetch(`/cards/duel/${x.code}/decline`, { method: "POST", token }).catch(() => {});
               }}
             >
               Refuser
@@ -103,6 +110,8 @@ export default function DuelInvites() {
                 navigate(
                   x.bomb
                     ? `/bombe/${x.code}`
+                    : x.party
+                    ? `/party/${x.code}`
                     : x.team
                     ? `/cartes/equipe/${x.code}${x.seat != null ? `?place=${x.seat}` : "?rejoindre"}`
                     : `/cartes/duel/${x.code}?rejoindre`

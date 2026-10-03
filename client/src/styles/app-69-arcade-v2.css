@@ -1,0 +1,1796 @@
+/* ======================================================================
+   Arcade — troisième version (pages/Arcade.jsx, octobre 2026, préfixe .ax)
+   ======================================================================
+   En-tête (titre · cagnotte · curseurs · Boutique), le Mot du jour à la une,
+   puis DÉFIS, ENTRE POTES et les CLASSEMENTS. Plat : pas de dégradé ni de
+   lueur, des aplats dans la couleur de chaque jeu (--g-1, posée par les règles
+   .arc-game.g-* d'origine) et des ombres « autocollant » décalées au survol.
+   Titres en Lilita capitales, l'or #f2b70b pour ce qui compte. Suit le thème
+   clair / sombre du site. */
+
+.ax {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1.1rem 1.25rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* ---------- En-tête ---------- */
+.ax-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.ax-title {
+  margin: 0;
+  font: 400 clamp(2.2rem, 5vw, 3rem) / 1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.ax-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ax-wallet-wrap {
+  position: relative;
+}
+.ax-wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  height: 44px;
+  padding: 0 0.75rem 0 5px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.ax-wallet:hover,
+.ax-wallet.on {
+  border-color: #f2b70b;
+}
+.ax-coin {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #f2b70b;
+  color: #161618;
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ax-wallet:hover .ax-coin {
+  transform: rotateY(180deg);
+}
+.ax-wallet b {
+  font: 400 1.3rem/1 "Lilita One", var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.ax-caret {
+  color: var(--text-soft);
+  transition: transform 0.2s ease;
+}
+.ax-wallet.on .ax-caret {
+  transform: rotate(180deg);
+}
+.ax-round {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ax-round:hover {
+  border-color: #f2b70b;
+  color: #f2b70b;
+  transform: rotate(-12deg);
+}
+.ax-shop-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 44px;
+  padding: 0 1.05rem;
+  border: 0;
+  border-radius: 999px;
+  background: #f2b70b;
+  color: #161618;
+  font: 400 1.05rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #c48f00;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.ax-shop-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 #c48f00;
+}
+.ax-shop-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #c48f00;
+}
+
+/* L'historique des points, déroulé sous la cagnotte. */
+.ax-hist {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: min(380px, 92vw);
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 0.4rem;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.ax-hist-empty {
+  margin: 0;
+  padding: 0.7rem;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+.ax-hist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ax-hist-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 9px;
+  font-size: 0.84rem;
+}
+.ax-hist-row:nth-child(odd) {
+  background: var(--surface-2);
+}
+.ax-hist-src {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ax-hist-date {
+  color: var(--text-soft);
+  font-size: 0.74rem;
+}
+.ax-hist-amt {
+  min-width: 4ch;
+  text-align: right;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ax-hist-amt.up {
+  color: #2fbf6f;
+}
+.ax-hist-amt.down {
+  color: #ff5470;
+}
+
+/* ======================================================================
+   Rayons « boîte mystère » — communs au bandeau du mot et aux cartes
+   ======================================================================
+   Un soleil de rayons blancs très légers et une tache claire au centre, posés
+   sur l'aplat de couleur. Ils tournent lentement au survol seulement. */
+.ax-rays {
+  position: absolute;
+  left: 50%;
+  top: var(--ray-y, 42%);
+  z-index: 0;
+  width: 260%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.28), transparent 26%),
+    repeating-conic-gradient(rgba(255, 255, 255, 0.1) 0 9deg, transparent 9deg 18deg);
+}
+/* Le bandeau du mot : les rayons seuls, sans la tache claire au centre. */
+.ax-mot .ax-rays {
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.08) 0 9deg, transparent 9deg 18deg);
+  pointer-events: none;
+}
+.ax-card:hover .ax-rays,
+.ax-mot:hover .ax-rays {
+  animation: axSpin 14s linear infinite;
+}
+@keyframes axSpin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* Titres « jaquette » : blanc, épais, contour sombre et ombre portée. */
+.ax-mot-title,
+.ax-card-name {
+  color: #fff;
+  font-family: "Lilita One", var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  -webkit-text-stroke: 6px rgba(20, 12, 40, 0.45);
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 rgba(20, 12, 40, 0.4);
+}
+
+/* ======================================================================
+   Le Mot du jour : un bandeau coloré, compact
+   ====================================================================== */
+.ax-mot {
+  --mdj-glacial: #3d8bd9;
+  --mdj-frais: #1fa392;
+  --mdj-tiede: #e0a106;
+  --mdj-chaud: #f0761c;
+  --mdj-bouillant: #e13c3c;
+  --mot-bg: #2f7de1;
+  --ray-y: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1rem 1.25rem 1rem 1rem;
+  border-radius: 22px;
+  background: var(--mot-bg);
+  color: #fff;
+  text-decoration: none;
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--mot-bg) 60%, #000);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+}
+.ax-mot .ax-rays {
+  left: 55px;
+  width: 3200px;
+}
+.ax-mot:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 0 color-mix(in srgb, var(--mot-bg) 60%, #000);
+}
+.ax-mot.st-hot {
+  --mot-bg: var(--mdj-heat);
+}
+.ax-mot.st-won {
+  --mot-bg: #e0a000;
+}
+.ax-mot.st-lost {
+  --mot-bg: #5a5d68;
+}
+.ax-mot > :not(.ax-rays, .ax-confetti) {
+  position: relative;
+  z-index: 1;
+}
+
+/* L'icône : deux tuiles de lettres, celle de derrière (un « M ») penche d'un
+   côté, celle de devant de l'autre et porte l'état du jour. */
+.ax-motic {
+  position: relative;
+  flex: none;
+  width: 72px;
+  height: 72px;
+}
+.ax-motic > span {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 78%;
+  height: 78%;
+  border-radius: 14px;
+  font: 400 2.1rem/1 "Lilita One", var(--font-display);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ax-motic .back {
+  top: 0;
+  left: 0;
+  background: rgba(255, 255, 255, 0.35);
+  color: #fff;
+  transform: rotate(-10deg);
+}
+.ax-motic .front {
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  color: var(--mot-bg);
+  box-shadow: 0 4px 0 rgba(20, 12, 40, 0.3);
+  transform: rotate(8deg);
+}
+.ax-motic .front em {
+  font-style: normal;
+  font-size: 1.7rem;
+}
+.ax-mot:hover .ax-motic .back {
+  transform: rotate(-18deg) translate(-3px, -2px);
+}
+.ax-mot:hover .ax-motic .front {
+  transform: rotate(0deg) scale(1.06);
+}
+
+.ax-mot-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  container-type: inline-size;
+}
+.ax-mot-title {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+.ax-mot-line {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+}
+.ax-mot-heat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font: 400 1.5rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.ax-mot-heat b {
+  padding: 0.2rem 0.55rem;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--mot-bg);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.ax-mot-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.9rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(20, 12, 40, 0.45);
+}
+.ax-mot-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.ax-avs {
+  display: inline-flex;
+}
+.ax-avs img,
+.ax-avs i {
+  width: 22px;
+  height: 22px;
+  margin-left: -7px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--mot-bg);
+}
+.ax-avs > :first-child {
+  margin-left: 0;
+}
+.ax-avs i {
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #161618;
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+/* Le mot, en petites tuiles blanches ; le plus long tient sur une ligne. */
+.ax-word {
+  --tile: min(34px, (100cqw - (var(--n) - 1) * 5px) / var(--n));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  perspective: 600px;
+}
+.ax-word-grp {
+  display: flex;
+  gap: 5px;
+}
+.ax-word-l {
+  display: grid;
+  place-items: center;
+  width: var(--tile);
+  height: calc(var(--tile) * 1.12);
+  border-radius: min(8px, calc(var(--tile) * 0.24));
+  background: #fff;
+  color: #161618;
+  font: 400 calc(var(--tile) * 0.66) / 1 "Lilita One", var(--font-display);
+  box-shadow: 0 3px 0 rgba(20, 12, 40, 0.35);
+  animation: axFlip 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+@keyframes axFlip {
+  from {
+    transform: rotateX(90deg);
+    opacity: 0;
+  }
+}
+.st-lost .ax-word-l {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+.ax-word.mystery .ax-word-l {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  animation: axHop 2.8s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.18s);
+}
+@keyframes axHop {
+  0%,
+  70%,
+  100% {
+    transform: none;
+  }
+  80% {
+    transform: translateY(-6px) rotate(-5deg);
+  }
+  90% {
+    transform: translateY(0) rotate(2deg);
+  }
+}
+
+/* La jauge de chaleur : du glacial au bouillant, la pastille à ma
+   température. Le fond du bandeau prend déjà la couleur du palier atteint. */
+.ax-gauge {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 260px;
+  max-width: 430px;
+  align-self: center;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+/* L'humeur du moment, à gauche de la barre : 🥶 → 🤯 (🥳 une fois trouvé). */
+.ax-gauge-mood {
+  flex: none;
+  margin-bottom: 8px;
+  font-size: 2rem;
+  line-height: 1;
+  filter: drop-shadow(0 3px 0 rgba(20, 12, 40, 0.3));
+  animation: axPop 0.45s cubic-bezier(0.34, 1.7, 0.64, 1) both;
+}
+@keyframes axPop {
+  from {
+    transform: scale(0.3) rotate(-20deg);
+  }
+}
+.ax-gauge-meter {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding-top: 34px;
+}
+.ax-gauge-track {
+  position: relative;
+  display: block;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(20, 12, 40, 0.3);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.ax-gauge-track .fill {
+  position: absolute;
+  inset: 0;
+  /* Le dégradé couvre TOUTE la piste ; on n'en découvre que jusqu'à ma
+     température — le bout de la barre a donc la bonne couleur. */
+  clip-path: inset(0 calc(100% - var(--t)) 0 0 round 999px);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #6fb0e4,
+    #45c0af 25%,
+    #ffd24a 50%,
+    #ff8f36 75%,
+    #ff5757
+  );
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.15);
+  animation: axFill 1s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+}
+@keyframes axFill {
+  from {
+    clip-path: inset(0 100% 0 0 round 999px);
+  }
+}
+.ax-gauge-dot {
+  position: absolute;
+  top: 0;
+  left: clamp(18px, var(--t), calc(100% - 18px));
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 5px;
+  border-radius: 999px;
+  background: #fff;
+  color: #161618;
+  box-shadow: 0 3px 0 rgba(20, 12, 40, 0.3);
+  translate: -50% 0;
+  white-space: nowrap;
+}
+.ax-gauge-dot::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  rotate: 45deg;
+  translate: -50% 0;
+}
+.ax-gauge.fresh .ax-gauge-dot {
+  padding: 3px 5px;
+}
+.ax-gauge-dot em {
+  font-style: normal;
+  font-size: 1rem;
+  line-height: 1;
+}
+.ax-gauge-dot b {
+  font: 400 0.95rem/1 "Lilita One", var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.ax-gauge-ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.ax-mot-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  align-self: center;
+}
+.ax-mot-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  text-shadow: 0 1px 2px rgba(20, 12, 40, 0.45);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.ax-mot-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 190px;
+  padding: 0.85rem 1.6rem;
+  border-radius: 999px;
+  background: #fff;
+  color: #161618;
+  font: 400 1.35rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+  box-shadow: 0 5px 0 rgba(20, 12, 40, 0.35);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.ax-mot:hover .ax-mot-cta {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 7px 0 rgba(20, 12, 40, 0.35);
+}
+.ax-mot-cta svg {
+  transition: transform 0.2s ease;
+}
+.ax-mot:hover .ax-mot-cta svg {
+  transform: translateX(3px);
+}
+
+/* Les confettis de la victoire : tombent une fois, au chargement. */
+.ax-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.ax-confetti i {
+  position: absolute;
+  top: -14px;
+  left: var(--x);
+  width: 7px;
+  height: 11px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: axFall 2s cubic-bezier(0.3, 0.6, 0.5, 1) var(--d) forwards;
+}
+@keyframes axFall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(170px) rotate(var(--r));
+  }
+}
+
+/* ======================================================================
+   Sections et cartes de jeu
+   ====================================================================== */
+.ax-h {
+  margin: 0 0 0.8rem;
+  font: 400 1.35rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.ax-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 14px;
+}
+
+/* Une couleur vive par jeu (les voisins ne se ressemblent pas). */
+.ax .arc-game.g-pixel {
+  --g-1: #7e60ff;
+}
+.ax .arc-game.g-geo {
+  --g-1: #1f9d63;
+}
+.ax .arc-game.g-quiz {
+  --g-1: #4f5ee8;
+}
+.ax .arc-game.g-blindtest {
+  --g-1: #e84393;
+}
+.ax .arc-game.g-perroquet {
+  --g-1: #f0761c;
+}
+.ax .arc-game.g-battle {
+  --g-1: #0ea5b7;
+}
+.ax .arc-game.g-imposteur {
+  --g-1: #8b3fd9;
+}
+.ax .arc-game.g-bombe {
+  --g-1: #e23b3b;
+}
+.ax .arc-game.g-party {
+  --g-1: #2f7de1;
+}
+
+.ax .arc-game.ax-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  aspect-ratio: 3 / 4;
+  padding: 0 0.6rem 0.8rem;
+  border: 0;
+  border-radius: 20px;
+  background: var(--g-1);
+  color: #fff;
+  text-align: center;
+  text-decoration: none;
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--g-1) 55%, #000);
+  transition:
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
+}
+/* Le bas s'assombrit dans la teinte du jeu : le titre s'y lit toujours. */
+.ax .arc-game.ax-card::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 0;
+  z-index: 0;
+  background: linear-gradient(to top, color-mix(in srgb, var(--g-1) 50%, #0c0820) 15%, transparent);
+  pointer-events: none;
+}
+.ax .arc-game.ax-card:hover {
+  transform: translateY(-6px) rotate(-1.2deg);
+  box-shadow: 0 11px 0 color-mix(in srgb, var(--g-1) 55%, #000);
+}
+.ax .arc-game.ax-card:nth-child(even):hover {
+  transform: translateY(-6px) rotate(1.2deg);
+}
+.ax-card > .ax-card-name,
+.ax-card > .ax-card-stat {
+  position: relative;
+  z-index: 1;
+}
+.ax-card-art {
+  position: absolute;
+  z-index: 1;
+  top: 17%;
+  left: 0;
+  right: 0;
+  height: 50%;
+  display: grid;
+  place-items: center;
+}
+.ax-card-art .arc-game-art {
+  transform: scale(1.15);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ax .arc-game.ax-card:hover .ax-card-art .arc-game-art {
+  transform: scale(1.3);
+}
+.ax-card-name {
+  font-size: 1.3rem;
+  line-height: 0.98;
+  overflow-wrap: anywhere;
+}
+.ax-card-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(12, 8, 32, 0.4);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.ax-card-stat svg {
+  color: #f2b70b;
+}
+.ax-card-stat b {
+  font-variant-numeric: tabular-nums;
+}
+/* « Comment ça se joue » : une chip par façon de jouer, côte à côte, chacune
+   avec son icône de perso. */
+.ax-badge {
+  position: absolute;
+  top: 9px;
+  left: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.ax-badge > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(12, 8, 32, 0.45);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+/* « Nouveau » / « Bientôt » : une pastille au-dessus du titre. */
+.ax-kick {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: #f2b70b;
+  color: #161618;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.ax-kick.soon {
+  background: #fff;
+  color: #3a3d46;
+}
+
+/* Bientôt : la carte grisée, immobile. */
+.ax .arc-game.ax-card.soon {
+  --g-1: #6b6f7a;
+  cursor: default;
+  filter: grayscale(1);
+}
+.ax .arc-game.ax-card.soon:hover {
+  transform: none;
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--g-1) 55%, #000);
+}
+.ax .arc-game.ax-card.soon:hover .ax-rays {
+  animation: none;
+}
+
+/* ---------- Une grande icône blanche centrée (Game Icons) : le perroquet, le
+   dé isométrique de La Party ---------- */
+.ax-art-icon {
+  display: grid;
+  place-items: center;
+  font-size: 72px;
+  color: #fff;
+}
+.ax-art-icon svg {
+  filter: drop-shadow(0 4px 0 rgba(12, 8, 32, 0.35));
+}
+
+/* ---------- Le Grand Quiz : on buzze, A fausse (rouge), B juste (vert) ---------- */
+.ax-quiz .arc-art-quiz-pick {
+  top: 4px;
+  border: 2px solid #fff;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+/* Les jaquettes ne bougent plus : seule la réponse se colore. */
+.arc-game:hover .ax-quiz .arc-art-quiz-pick.a {
+  transform: rotate(-4deg);
+}
+.arc-game:hover .ax-quiz .arc-art-quiz-pick.b {
+  transform: rotate(4deg);
+}
+.ax-quiz .arc-art-quiz-pick::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.2s 0.12s;
+}
+.ax-quiz .arc-art-quiz-pick.bad::after {
+  background: rgba(20, 20, 28, 0.35);
+}
+.ax-quiz .arc-art-quiz-pick.bad img {
+  transition: filter 0.2s 0.12s;
+}
+.arc-game:hover .ax-quiz .arc-art-quiz-pick.bad img {
+  filter: grayscale(1) brightness(0.8);
+}
+.ax-quiz .arc-art-quiz-pick.good::after {
+  background: rgba(53, 196, 111, 0.35);
+}
+.ax-quiz .arc-art-quiz-pick em {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s 0.12s;
+}
+.ax-quiz .arc-art-quiz-pick em svg {
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35));
+}
+.arc-game:hover .ax-quiz .arc-art-quiz-pick::after,
+.arc-game:hover .ax-quiz .arc-art-quiz-pick em {
+  opacity: 1;
+}
+.arc-game:hover .ax-quiz .arc-art-quiz-pick.good {
+  border-color: #35c46f;
+}
+
+/* Le buzzer : un dôme rouge bombé sur un socle noir. Au survol il s'enfonce
+   presque entièrement dans son socle — vraiment appuyé. */
+.ax-buzz {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: -4px;
+  width: 46px;
+  height: 30px;
+  translate: -50% 0;
+}
+.ax-buzz .base {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 13px;
+  border-radius: 50% / 60%;
+  background: #23252d;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.18),
+    0 3px 0 #0e0f13;
+}
+.ax-buzz .dome {
+  position: absolute;
+  z-index: 1;
+  left: 7px;
+  right: 7px;
+  bottom: 6px;
+  height: 22px;
+  border-radius: 50% 50% 40% 40% / 75% 75% 25% 25%;
+  background: radial-gradient(circle at 35% 30%, #ff8a8a 0 12%, #ef3b3b 38%, #c41f1f 100%);
+  box-shadow: 0 5px 0 #8e1414;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.arc-game:hover .ax-buzz .dome {
+  transform: translateY(5px) scaleY(0.72);
+  box-shadow: 0 1px 0 #8e1414;
+}
+
+/* ---------- Pixel Rush : une jaquette qui se précise par paliers ---------- */
+.ax-art-px {
+  display: grid;
+  place-items: center;
+}
+.ax-px {
+  position: relative;
+  width: 58px;
+  height: 78px;
+  overflow: hidden;
+  border-radius: 9px;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 6px 0 rgba(12, 8, 32, 0.35);
+}
+.ax-px-l {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.ax-px-l canvas,
+.ax-px-l .px-canvas,
+img.ax-px-l {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  display: block;
+}
+.ax-px-l.l1,
+.ax-px-l.l2,
+.ax-px-l.l3 {
+  opacity: 0;
+}
+/* Au survol : trois paliers d'affilée, d'un coup sec chacun. */
+.arc-game:hover .ax-px-l.l1 {
+  animation: axShow 0.01s 0.12s forwards;
+}
+.arc-game:hover .ax-px-l.l2 {
+  animation: axShow 0.01s 0.26s forwards;
+}
+.arc-game:hover .ax-px-l.l3 {
+  animation: axShow 0.01s 0.4s forwards;
+}
+@keyframes axShow {
+  to {
+    opacity: 1;
+  }
+}
+/* Le « ? » : une pastille blanche posée sur la jaquette, qui s'efface quand
+   l'image se précise. */
+.ax-px-q {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f2b70b;
+  color: #161618;
+  font: 400 1.35rem/1 "Lilita One", var(--font-display);
+  box-shadow: 0 3px 0 rgba(12, 8, 32, 0.35);
+  translate: -50% -50%;
+  animation: axBob 2.2s ease-in-out infinite;
+  transition:
+    transform 0.25s ease,
+    opacity 0.2s ease;
+}
+.arc-game:hover .ax-px-q {
+  transform: scale(0);
+  opacity: 0;
+}
+@keyframes axBob {
+  50% {
+    translate: -50% calc(-50% - 4px);
+  }
+}
+
+/* ---------- GeoGamer : une carte dépliée, une punaise qui tombe ---------- */
+.ax-art-map {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.ax-map {
+  display: flex;
+  filter: drop-shadow(0 5px 0 rgba(12, 8, 32, 0.35));
+}
+.ax-map i {
+  width: 27px;
+  height: 66px;
+  background-image: var(--geo-globe, url("/geo/globe-pano.webp"));
+  background-size: auto 100%;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+}
+.ax-map i:nth-child(1) {
+  background-position: 0 0;
+  transform: skewY(-8deg);
+  border-radius: 4px 0 0 4px;
+}
+.ax-map i:nth-child(2) {
+  background-position: -27px 0;
+  transform: skewY(8deg);
+  filter: brightness(0.75);
+}
+.ax-map i:nth-child(3) {
+  background-position: -54px 0;
+  transform: skewY(-8deg);
+  border-radius: 0 4px 4px 0;
+}
+.ax-pin {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  z-index: 2;
+  color: #fff;
+  translate: -50% 0;
+  filter: drop-shadow(0 3px 0 rgba(12, 8, 32, 0.4));
+  transition: transform 0.4s cubic-bezier(0.34, 1.7, 0.64, 1);
+}
+.ax-pin svg {
+  fill: #e23b3b;
+}
+.arc-game:hover .ax-pin {
+  transform: translateY(10px);
+}
+.ax-pin-ring {
+  position: absolute;
+  left: 50%;
+  top: 52px;
+  width: 26px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  opacity: 0;
+  translate: -50% 0;
+}
+.arc-game:hover .ax-pin-ring {
+  animation: axRing 0.9s ease-out 0.3s infinite;
+}
+@keyframes axRing {
+  from {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+/* ---------- L'Imposteur : l'éventail recentré, le masque au milieu ---------- */
+.ax-card-art .arc-art-imp-card {
+  top: 16px;
+  width: 42px;
+  height: 56px;
+}
+.ax-card-art .arc-art-imp-card.a {
+  left: -6px;
+}
+.ax-card-art .arc-art-imp-card.b {
+  left: 27px;
+}
+.ax-card-art .arc-art-imp-card.c {
+  right: -6px;
+}
+.ax-card-art .arc-art-imp-mask {
+  right: auto;
+  left: 50%;
+  bottom: -9px;
+  translate: -50% 0;
+}
+
+/* ---------- Le Blind Test : un vinyle ---------- */
+/* L'ombre est portée par le conteneur (qui ne tourne pas), pas par le disque. */
+.ax-art-vinyl {
+  position: relative;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 6px 0 rgba(12, 8, 32, 0.35));
+}
+.ax-vinyl {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle, #141418 0 1.5px, #1f1f25 1.5px 3px),
+    #18181c;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+  /* Toujours la même animation, en pause hors survol : en sortant, le disque
+     garde l'angle où il s'est arrêté au lieu de revenir d'un coup en haut. */
+  animation: axSpin 1.8s linear infinite paused;
+}
+.arc-game:hover .ax-vinyl {
+  animation-play-state: running;
+}
+/* Le reflet de la lumière sur les sillons : deux pans clairs opposés. */
+.ax-vinyl-sheen {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: 88px;
+  height: 88px;
+  translate: -50% -50%;
+  pointer-events: none;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 30deg,
+    transparent 0 20deg,
+    rgba(255, 255, 255, 0.14) 40deg,
+    transparent 60deg 200deg,
+    rgba(255, 255, 255, 0.1) 220deg,
+    transparent 240deg
+  );
+}
+.ax-vinyl-label {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 50%;
+  height: 50%;
+  overflow: hidden;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--g-1) 70%, #000);
+  box-shadow:
+    0 0 0 2px #0c0c0f,
+    inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+.ax-vinyl-label img {
+  width: 82%;
+  max-height: 46%;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+.ax-vinyl-label b {
+  max-width: 84%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #fff;
+  font: 400 0.5rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.ax-vinyl-hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #0c0c0f;
+  translate: -50% -50%;
+}
+
+/* ---------- Les jeux mystère ---------- */
+.ax .arc-game.g-mystery {
+  --g-1: #3a3d4b;
+  cursor: default;
+}
+.ax .arc-game.g-mystery .ax-card-name {
+  letter-spacing: 0.12em;
+}
+/* Pas encore sorti : la boîte est grise, comme tout ce qui est « Bientôt ». */
+.ax-art-box {
+  display: grid;
+  place-items: center;
+  --box: #8a8e9a;
+  --box-dk: #646873;
+}
+.ax-box {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 14px;
+  background: var(--box);
+  box-shadow:
+    inset 0 -6px 0 var(--box-dk),
+    0 5px 0 rgba(12, 8, 32, 0.35);
+  rotate: -8deg;
+  animation: axBoxIdle 3.2s ease-in-out infinite;
+}
+.ax-art-box.m2 .ax-box {
+  animation-delay: -1s;
+}
+.ax-art-box.m3 .ax-box {
+  animation-delay: -2s;
+}
+.ax-box b {
+  color: #fff;
+  font: 400 2.4rem/1 "Lilita One", var(--font-display);
+  -webkit-text-stroke: 5px rgba(20, 12, 40, 0.3);
+  paint-order: stroke fill;
+}
+.arc-game.g-mystery:hover .ax-box {
+  animation: axBoxShake 0.5s ease-in-out infinite;
+}
+@keyframes axBoxIdle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+@keyframes axBoxShake {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-9deg) scale(1.05);
+  }
+  75% {
+    transform: rotate(9deg) scale(1.05);
+  }
+}
+
+/* Utilisé par la couronne du podium. */
+@keyframes axFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* ---------- Combat de cartes : deux vraies cartes croisées ---------- */
+.ax-art-duel {
+  position: relative;
+  width: 110px;
+  height: 92px;
+}
+.ax-duel-card {
+  position: absolute;
+  top: 0;
+  width: 62px;
+  transition: transform 0.32s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.ax-duel-card.a {
+  left: 2px;
+  transform: rotate(-12deg);
+}
+.ax-duel-card.b {
+  right: 2px;
+  transform: rotate(12deg);
+}
+.arc-game:hover .ax-duel-card.a {
+  transform: translateX(8px) rotate(-5deg);
+}
+.arc-game:hover .ax-duel-card.b {
+  transform: translateX(-8px) rotate(5deg);
+}
+.ax-duel-vs {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #161618;
+  color: #f2b70b;
+  font: 400 0.85rem/1 "Lilita One", var(--font-display);
+  box-shadow: 0 0 0 2px #f2b70b;
+  transform: translate(-50%, -50%);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.arc-game:hover .ax-duel-vs {
+  transform: translate(-50%, -50%) scale(1.2) rotate(-10deg);
+}
+
+/* ---------- La Bombe : centrée, s'allume et clignote au survol ---------- */
+.ax-art-bomb {
+  display: grid;
+  place-items: center;
+}
+.ax-bomb {
+  position: relative;
+  display: block;
+  width: 96px;
+  height: 96px;
+  translate: 8px -9px; /* la mèche part en haut à droite : on centre le corps */
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ax-bomb.on {
+  animation: axTick 0.5s ease-in-out infinite;
+}
+/* Allumée, la bombe vire au rouge par à-coups : elle clignote. */
+.ax-bomb.on .bba-body {
+  animation: axBlink 0.5s steps(1) infinite;
+}
+@keyframes axBlink {
+  50% {
+    background: #e0283f;
+  }
+}
+@keyframes axTick {
+  0%,
+  100% {
+    transform: rotate(-6deg) scale(1.04);
+  }
+  50% {
+    transform: rotate(6deg) scale(1.08);
+  }
+}
+
+/* ======================================================================
+   La Boutique (modale)
+   ====================================================================== */
+.ax-shop-modal {
+  width: min(640px, 100%);
+}
+.ax-shop-modal .abar-modal-title {
+  flex: 1;
+}
+.ax-shop-modal .abar-modal-title h2 {
+  font: 400 1.6rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.ax-shop-bal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: #f2b70b;
+  color: #161618;
+  font: 400 1rem/1 "Lilita One", var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.ax-shop {
+  display: grid;
+  gap: 12px;
+}
+.ax-shop .arc-crate {
+  border-radius: 20px;
+  min-height: 132px;
+}
+.ax-shop-modal .arc-gacha {
+  margin-top: 14px;
+}
+.ax-shop-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.ax-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 700 0.86rem/1 var(--font-display);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.ax-chip:hover {
+  border-color: #f2b70b;
+  transform: translateY(-1px);
+}
+.ax-chip svg {
+  color: #f2b70b;
+}
+.ax-chip em {
+  font-style: normal;
+  color: var(--text-soft);
+}
+
+/* ======================================================================
+   Classements : podium + liste, un onglet par jeu
+   ====================================================================== */
+.ax-lb {
+  border-radius: 22px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  overflow: hidden;
+}
+.ax-lb-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.8rem;
+  border-bottom: 2px solid var(--border);
+}
+.ax-lb-tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ax-lb-tabs::-webkit-scrollbar {
+  display: none;
+}
+.ax-lb-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.8rem 0.3rem 0.3rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font: 700 0.84rem/1 var(--font-display);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.ax-lb-tab .ic {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--g) 22%, transparent);
+  color: var(--g);
+}
+.ax-lb-tab:hover {
+  color: var(--text);
+}
+.ax-lb-tab.on {
+  background: var(--g);
+  color: #fff;
+}
+.ax-lb-tab.on .ic {
+  background: #fff;
+}
+.ax-lb-modes {
+  flex: none;
+  display: flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.ax-lb-modes button {
+  padding: 0.4rem 0.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-soft);
+  font: 700 0.78rem/1 var(--font-display);
+  cursor: pointer;
+}
+.ax-lb-modes button.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.ax-lb-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.2rem 2rem;
+  padding: 1.2rem 1.4rem 1.4rem;
+  animation: ar2BoardIn 0.3s ease both;
+}
+@keyframes ar2BoardIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.ax-lb-body:not(:has(.ax-lb-list)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Le podium : 2 · 1 · 3, des marches en or, argent et bronze. */
+.ax-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+}
+.ax-pod {
+  --medal: #f2b70b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.ax-pod.p2 {
+  --medal: #b9c0cc;
+}
+.ax-pod.p3 {
+  --medal: #d98a4e;
+}
+.ax-pod-who {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text);
+  text-decoration: none;
+}
+.ax-pod-who .ax-av {
+  box-shadow: 0 0 0 3px var(--medal);
+}
+.ax-pod-crown {
+  position: absolute;
+  top: -20px;
+  color: #f2b70b;
+  animation: axFloat 3s ease-in-out infinite;
+}
+.ax-pod-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 0.86rem;
+}
+.ax-pod-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font: 400 1.05rem/1 "Lilita One", var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.ax-pod-step {
+  display: grid;
+  place-items: start center;
+  width: 100%;
+  padding-top: 0.4rem;
+  border-radius: 12px 12px 4px 4px;
+  background: var(--medal);
+  color: #161618;
+  font: 400 1.8rem/1 "Lilita One", var(--font-display);
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.15);
+}
+.ax-pod.p1 .ax-pod-step {
+  height: 86px;
+}
+.ax-pod.p2 .ax-pod-step {
+  height: 62px;
+}
+.ax-pod.p3 .ax-pod-step {
+  height: 46px;
+}
+.ax-pod.empty {
+  height: 46px;
+  border-radius: 12px 12px 4px 4px;
+  background: var(--surface-2);
+}
+.ax-pod.me .ax-pod-name {
+  color: #f2b70b;
+}
+
+.ax-av {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 800;
+}
+
+/* Les places 4 à 10. */
+.ax-lb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: center;
+}
+.ax-lb-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.4rem 0.7rem 0.4rem 0.45rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.ax-lb-list li.me {
+  background: color-mix(in srgb, #f2b70b 16%, var(--surface-2));
+  box-shadow: inset 0 0 0 1.5px #f2b70b;
+}
+.ax-lb-rank {
+  width: 26px;
+  text-align: center;
+  color: var(--text-soft);
+  font: 400 1.05rem/1 "Lilita One", var(--font-display);
+}
+.ax-lb-user {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.ax-lb-user span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ax-lb-score {
+  font: 400 1rem/1 "Lilita One", var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.ax-lb-fight {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--g) 18%, transparent);
+  color: var(--g);
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.ax-lb-fight:hover {
+  background: var(--g);
+  color: #fff;
+}
+
+.ax-lb-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  color: var(--text-soft);
+}
+.ax-lb-empty svg {
+  color: var(--g);
+}
+.ax-lb-empty p {
+  margin: 0;
+}
+.ax-lb-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  background: var(--g);
+  color: #fff;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+/* ======================================================================
+   Écrans plus étroits
+   ====================================================================== */
+@media (max-width: 900px) {
+  .ax-lb-body {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 1.6rem 0.9rem 1rem;
+  }
+  .ax-lb-head {
+    flex-wrap: wrap;
+  }
+  .ax-lb-tabs {
+    flex-basis: 100%;
+  }
+}
+@media (max-width: 640px) {
+  .ax {
+    padding: 0.8rem 1rem 3rem;
+    gap: 1.5rem;
+  }
+  .ax-head {
+    gap: 0.5rem;
+  }
+  .ax-title {
+    font-size: 1.9rem;
+  }
+  .ax-tools {
+    gap: 6px;
+  }
+  .ax-wallet,
+  .ax-round,
+  .ax-shop-btn {
+    height: 40px;
+  }
+  .ax-wallet {
+    gap: 0.4rem;
+    padding: 0 0.55rem 0 4px;
+  }
+  .ax-coin {
+    width: 30px;
+    height: 30px;
+  }
+  .ax-wallet b {
+    font-size: 1.1rem;
+  }
+  .ax-round {
+    width: 40px;
+  }
+  .ax-shop-btn span {
+    display: none;
+  }
+  .ax-shop-btn {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+  /* Le bandeau du mot : la pastille et le texte, puis l'action en dessous. */
+  .ax-mot {
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    padding: 0.9rem;
+  }
+  .ax-motic {
+    width: 58px;
+    height: 58px;
+    align-self: flex-start;
+  }
+  .ax-mot-title {
+    font-size: 1.4rem;
+  }
+  .ax-gauge {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .ax-mot-side {
+    width: 100%;
+  }
+  .ax-mot-cta {
+    width: 100%;
+  }
+  .ax-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .ax-card-name {
+    font-size: 1.15rem;
+  }
+}

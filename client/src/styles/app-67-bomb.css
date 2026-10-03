@@ -2605,3 +2605,37 @@ button.bbl-hero:hover .bbx.still {
 .bb-pop.bad {
   max-width: 300px;
 }
+
+/* ---- L'indice ne déborde plus du rond ----
+   La ligne de l'indice (jaquette + lettres) refusait de rétrécir : elle
+   élargissait toute la face, et le logo comme les lettres se faisaient rogner
+   par le bord du cercle. Quand un indice est là, la face se resserre (le rond
+   est plus étroit en bas qu'au milieu) et le logo rapetisse pour lui faire
+   de la place. */
+.bbm-face {
+  min-width: 0;
+}
+.bbm-face > * {
+  max-width: 100%;
+}
+.bbm-face.has-hint {
+  max-width: 72%;
+  gap: 10px;
+}
+.bbm-face.has-hint .bbm-logo {
+  max-height: clamp(24px, 7cqmin, 44px);
+}
+.bbm-face.has-hint .bbm-syl {
+  font-size: clamp(1.8rem, 6cqmin, 2.6rem);
+}
+.bbm-face.has-hint .bbm-ico {
+  display: none;
+}
+.bbm-hint {
+  min-width: 0;
+}
+.bbm-hint b {
+  min-width: 0;
+  font-size: clamp(0.7rem, 2cqmin, 0.9rem);
+  letter-spacing: 0.04em;
+}

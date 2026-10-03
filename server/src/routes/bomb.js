@@ -5,6 +5,7 @@ import UserGame from "../models/UserGame.js";
 import { requireAuth } from "../middleware/auth.js";
 import { emitTo, onlineAmong, isOnline } from "../lib/realtime.js";
 import { grantPoints, arcadePoints } from "../lib/points.js";
+import { recordActivity } from "../lib/activity.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { deliverCard, deliverCardToConversation } from "./chat.js";
 import { makeCode } from "../lib/versusRoom.js";
@@ -504,6 +505,27 @@ function finish(room) {
       );
     triggerMissionCheck(r.id);
   }
+  // Le fil : une ligne par humain, une seule carte (dédoublonnée par
+  // versusId, cf. routes/feed.js). L'id de partie n'est PAS le code de la
+  // table : une même table enchaîne plusieurs parties.
+  const gameId = `bombe-${room.code}-${Date.now()}`;
+  const players = ranking.map((r) => ({
+    id: r.id,
+    bot: !!r.bot,
+    username: r.username,
+    avatar: r.avatar || null,
+    score: r.answers || 0,
+    rank: r.place || 99,
+  }));
+  for (const r of ranking) {
+    if (r.bot) continue;
+    recordActivity({
+      actor: r.id,
+      type: "bombe",
+      meta: { versusId: gameId, rank: r.place || 99, points: r.points, total: room.seats.length, players },
+    });
+  }
+
   room.ranking = ranking;
   touch(room);
   toEach(room, "done", { ranking });

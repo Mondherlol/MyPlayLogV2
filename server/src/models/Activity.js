@@ -66,6 +66,8 @@ const activitySchema = new mongoose.Schema(
         // mot du jour.
         "quiz", // a terminé une partie du Grand Quiz (meta = score/épreuves/défi)
         "quizversus", // a disputé un plateau du Grand Quiz (idem, + la table)
+        "bombe", // a joué une partie de La Bombe (une entrée par humain,
+        // dédoublonnée par meta.versusId ; la table compte aussi les bots)
         //
         // ATTENTION : CET ENUM EST UN FILTRE SILENCIEUX. Un type absent d'ici
         // fait échouer `recordActivity` — qui est best-effort et n'affiche donc

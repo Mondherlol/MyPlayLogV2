@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
@@ -34,7 +42,12 @@ import { useLibrary } from "../context/LibraryContext";
 import { usePlayer } from "../context/PlayerContext";
 import { API_BASE, apiFetch, apiUpload } from "../lib/api";
 import { platformBrand } from "../lib/platformIcons";
-import { SCALE_100, SCALE_STARS, setRatingScale, useRatingScale } from "../lib/ratingScale";
+import {
+  SCALE_100,
+  SCALE_STARS,
+  setRatingScale,
+  useRatingScale,
+} from "../lib/ratingScale";
 import { STORES } from "../lib/storeIcons";
 import AddItemsModal from "../components/AddItemsModal";
 import BackloggdImportModal from "../components/BackloggdImportModal";
@@ -108,16 +121,19 @@ const FLUSH_PARALLEL = 3;
 
 async function pool(items, size, worker) {
   const queue = [...items];
-  const runners = Array.from({ length: Math.min(size, queue.length) }, async () => {
-    while (queue.length) {
-      const item = queue.shift();
-      try {
-        await worker(item);
-      } catch {
-        /* best-effort : un jeu qui échoue ne doit pas retenir les autres */
+  const runners = Array.from(
+    { length: Math.min(size, queue.length) },
+    async () => {
+      while (queue.length) {
+        const item = queue.shift();
+        try {
+          await worker(item);
+        } catch {
+          /* best-effort : un jeu qui échoue ne doit pas retenir les autres */
+        }
       }
-    }
-  });
+    },
+  );
   await Promise.all(runners);
 }
 
@@ -135,7 +151,9 @@ async function flushPicks(entries, token, upsertLocal) {
         // la piste et le personnage, que `PUT /library/:id` sait ranger.
         ...(pick.rating != null ? { rating: pick.rating } : {}),
         ...(pick.favoriteOst ? { favoriteOst: pick.favoriteOst } : {}),
-        ...(pick.favoriteCharacter ? { favoriteCharacter: pick.favoriteCharacter } : {}),
+        ...(pick.favoriteCharacter
+          ? { favoriteCharacter: pick.favoriteCharacter }
+          : {}),
       },
     });
     upsertLocal?.(Number(gameId), entry);
@@ -145,7 +163,9 @@ async function flushPicks(entries, token, upsertLocal) {
 // Une note sur 100, lue dans l'échelle de l'utilisateur.
 function formatRating(value, scale) {
   if (value == null) return null;
-  return scale === SCALE_STARS ? `${Number((value / 20).toFixed(1))}★` : `${value}%`;
+  return scale === SCALE_STARS
+    ? `${Number((value / 20).toFixed(1))}★`
+    : `${value}%`;
 }
 
 export default function Onboarding() {
@@ -189,7 +209,7 @@ export default function Onboarding() {
             const games = (d.games || []).filter((g) => g.cover);
             setPicks({ games, awaited: games });
           })
-          .catch(() => setPicks({ games: [], awaited: [] }))
+          .catch(() => setPicks({ games: [], awaited: [] })),
       );
   }, [token]);
 
@@ -209,7 +229,8 @@ export default function Onboarding() {
     return { wishlist, played, favorites };
   }, [library]);
 
-  const pending = () => Object.entries(picked).filter(([id]) => !flushed.current.has(id));
+  const pending = () =>
+    Object.entries(picked).filter(([id]) => !flushed.current.has(id));
 
   async function flush() {
     const rest = pending();
@@ -224,7 +245,10 @@ export default function Onboarding() {
     setBusy(true);
     try {
       await flush();
-      const { user: fresh } = await apiFetch("/users/me/onboarding", { method: "POST", token });
+      const { user: fresh } = await apiFetch("/users/me/onboarding", {
+        method: "POST",
+        token,
+      });
       updateUser(fresh);
     } catch {
       // ⚠️ ON ENTRE QUAND MÊME : le drapeau se reposera au prochain passage,
@@ -241,7 +265,9 @@ export default function Onboarding() {
 
   async function next() {
     if (step === "profile") {
-      return finish(user?.username ? `/u/${encodeURIComponent(user.username)}` : "/app");
+      return finish(
+        user?.username ? `/u/${encodeURIComponent(user.username)}` : "/app",
+      );
     }
     setBusy(true);
     await flush();
@@ -253,7 +279,9 @@ export default function Onboarding() {
   // (note, piste, personnage) : chacun est facultatif, et repasser dessus ne
   // doit pas effacer ce que le précédent avait posé.
   const setExtras = useCallback((id, patch) => {
-    setPicked((prev) => (prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev));
+    setPicked((prev) =>
+      prev[id] ? { ...prev, [id]: { ...prev[id], ...patch } } : prev,
+    );
   }, []);
 
   const conf = PICKS[step] || null;
@@ -265,7 +293,11 @@ export default function Onboarding() {
   const fill = conf ? Math.min(1, total / conf.need) : 1;
 
   const label =
-    step === "profile" ? "Voir mon profil" : remaining ? `Encore ${remaining}` : "Continuer";
+    step === "profile"
+      ? "Voir mon profil"
+      : remaining
+        ? `Encore ${remaining}`
+        : "Continuer";
 
   return (
     <div className="onb" data-accent={conf?.accent || "gold"}>
@@ -280,7 +312,11 @@ export default function Onboarding() {
         <div className="onb-toprow">
           <span />
           {step !== "profile" && (
-            <button className="onb-skip clickable" onClick={() => finish("/app")} disabled={busy}>
+            <button
+              className="onb-skip clickable"
+              onClick={() => finish("/app")}
+              disabled={busy}
+            >
               Passer
             </button>
           )}
@@ -309,7 +345,9 @@ export default function Onboarding() {
             />
           )}
           {step === "import" && <StepImport />}
-          {step === "profile" && <StepProfile user={user} picked={picked} have={have} />}
+          {step === "profile" && (
+            <StepProfile user={user} picked={picked} have={have} />
+          )}
         </div>
       </main>
 
@@ -361,7 +399,9 @@ function Headline({ text, sub }) {
   return (
     <div className="onb-headline">
       <h1>
-        {parts.map((part, i) => (i % 2 ? <em key={i}>{part}</em> : <span key={i}>{part}</span>))}
+        {parts.map((part, i) =>
+          i % 2 ? <em key={i}>{part}</em> : <span key={i}>{part}</span>,
+        )}
       </h1>
       {sub && <p>{sub}</p>}
     </div>
@@ -421,18 +461,29 @@ function StepAvatar() {
   ].filter(([, url]) => url);
 
   const [customs, setCustoms] = useState(() =>
-    current && !providers.some(([, url]) => url === current) ? [current] : []
+    current && !providers.some(([, url]) => url === current) ? [current] : [],
   );
+
+  // L'image choisie s'affiche TOUT DE SUITE, en local : l'envoi (puis la
+  // réduction côté serveur) prend quelques secondes, pendant lesquelles le
+  // cercle restait figé sur l'ancienne photo — on croyait l'écran planté.
+  const [preview, setPreview] = useState(null);
+  useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview]);
 
   const [shown, setShown] = useState(current);
   useEffect(() => {
     if (!current) {
       setShown(null);
+      setPreview(null);
       return undefined;
     }
     let alive = true;
     const img = new Image();
-    img.onload = img.onerror = () => alive && setShown(current);
+    img.onload = img.onerror = () => {
+      if (!alive) return;
+      setShown(current);
+      setPreview(null);
+    };
     img.src = current;
     return () => {
       alive = false;
@@ -461,14 +512,18 @@ function StepAvatar() {
     if (!file) return;
     setBusy(true);
     setError(null);
+    setPreview(URL.createObjectURL(file));
     try {
       const form = new FormData();
       form.append("avatar", file);
       const data = await apiUpload("/users/me/avatar", form, token);
       const url = data.avatar || data.user?.avatar;
-      if (url) setCustoms((list) => (list.includes(url) ? list : [url, ...list]));
+      if (url)
+        setCustoms((list) => (list.includes(url) ? list : [url, ...list]));
+      if (!url || url === current) setPreview(null);
       updateUser(data.user || { avatar: url });
     } catch (e) {
+      setPreview(null);
       setError(e.message || "L'envoi a échoué.");
     } finally {
       setBusy(false);
@@ -481,8 +536,28 @@ function StepAvatar() {
     <div className="onb-avatar">
       <div className={`onb-avatar-ring ${busy ? "is-busy" : ""}`}>
         <div className="onb-avatar-img">
-          {shown ? <img src={shown} alt="" /> : <span>{initial}</span>}
+          {preview || shown ? (
+            <img src={preview || shown} alt="" />
+          ) : (
+            <span>{initial}</span>
+          )}
+          {busy && (
+            <span className="onb-avatar-spin">
+              <Loader2 size={30} />
+            </span>
+          )}
         </div>
+        {/* Retirer la photo — celle de Google, posée d'office, comprise —
+            sans devoir en envoyer une autre. */}
+        {current && !busy && (
+          <button
+            className="onb-avatar-clear clickable"
+            onClick={() => choose(null)}
+            aria-label="Retirer la photo"
+          >
+            <X size={16} strokeWidth={2.6} />
+          </button>
+        )}
       </div>
 
       <div className="onb-bubbles">
@@ -551,7 +626,16 @@ function StepAvatar() {
 //
 // ⚠️ ON RETIRE CE QU'IL A DÉJÀ. Poser sur la roue un jeu déjà dans sa
 // bibliothèque, c'est lui redemander un choix qu'il a déjà fait.
-function PickStage({ conf, picks, picked, onPicked, flushed, library, token, onRate }) {
+function PickStage({
+  conf,
+  picks,
+  picked,
+  onPicked,
+  flushed,
+  library,
+  token,
+  onRate,
+}) {
   const scale = useRatingScale();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -582,7 +666,11 @@ function PickStage({ conf, picks, picked, onPicked, flushed, library, token, onR
   const games = useMemo(() => {
     // Les attendus peuvent manquer (IGDB muet) : la roue retombe alors sur les
     // incontournables plutôt que de s'afficher vide.
-    const base = picks ? (picks[conf.source]?.length ? picks[conf.source] : picks.games) : null;
+    const base = picks
+      ? picks[conf.source]?.length
+        ? picks[conf.source]
+        : picks.games
+      : null;
     const source = results ?? base;
     if (!source) return null;
     return source.filter((g) => g.cover && !library?.[g.id]).slice(0, 40);
@@ -608,7 +696,7 @@ function PickStage({ conf, picks, picked, onPicked, flushed, library, token, onR
       removeLocal?.(Number(id));
       apiFetch(`/library/${id}`, { method: "DELETE", token }).catch(() => {});
     },
-    [flushed, onPicked, removeLocal, token]
+    [flushed, onPicked, removeLocal, token],
   );
 
   const toggle = useCallback(
@@ -617,15 +705,21 @@ function PickStage({ conf, picks, picked, onPicked, flushed, library, token, onR
       if (picked[id]) return remove(id);
       onPicked((prev) => ({
         ...prev,
-        [id]: { status: conf.status, name: game.name, cover: game.cover || null },
+        [id]: {
+          status: conf.status,
+          name: game.name,
+          cover: game.cover || null,
+        },
       }));
       if (conf.rate) onRate(game);
       return undefined;
     },
-    [picked, remove, onPicked, conf.status, conf.rate, onRate]
+    [picked, remove, onPicked, conf.status, conf.rate, onRate],
   );
 
-  const tray = Object.entries(picked).filter(([, pick]) => pick.status === conf.status);
+  const tray = Object.entries(picked).filter(
+    ([, pick]) => pick.status === conf.status,
+  );
 
   return (
     <div className="onb-pick">
@@ -642,7 +736,9 @@ function PickStage({ conf, picks, picked, onPicked, flushed, library, token, onR
               >
                 {pick.cover && <img src={pick.cover} alt="" />}
                 {pick.rating != null && (
-                  <span className="onb-tray-rate">{formatRating(pick.rating, scale)}</span>
+                  <span className="onb-tray-rate">
+                    {formatRating(pick.rating, scale)}
+                  </span>
                 )}
                 <span className="onb-tray-x">
                   <X size={14} strokeWidth={3} />
@@ -655,7 +751,9 @@ function PickStage({ conf, picks, picked, onPicked, flushed, library, token, onR
 
       <div className="onb-pick-wheel">
         {games && !games.length ? (
-          <p className="onb-empty">{loading ? "Recherche…" : "Aucun jeu trouvé"}</p>
+          <p className="onb-empty">
+            {loading ? "Recherche…" : "Aucun jeu trouvé"}
+          </p>
         ) : (
           <GameWheel
             key={results ? "search" : "base"}
@@ -672,7 +770,10 @@ function PickStage({ conf, picks, picked, onPicked, flushed, library, token, onR
           question qu'elle répond. */}
       <div className="onb-findrow">
         {!open && (
-          <button className="onb-find-hint clickable" onClick={() => setOpen(true)}>
+          <button
+            className="onb-find-hint clickable"
+            onClick={() => setOpen(true)}
+          >
             Aucun ? <b>Tape le nom d'un jeu</b>
           </button>
         )}
@@ -726,14 +827,18 @@ function GameWheel({ games, picked, onToggle, rose }) {
     const el = boxRef.current;
     if (!el) return undefined;
     const ro = new ResizeObserver(([entry]) =>
-      setSize({ w: entry.contentRect.width, h: entry.contentRect.height })
+      setSize({ w: entry.contentRect.width, h: entry.contentRect.height }),
     );
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
   const slots = useMemo(() => {
-    if (!games) return Array.from({ length: MIN_SLOTS }, (_, i) => ({ id: `skel${i}`, skel: true }));
+    if (!games)
+      return Array.from({ length: MIN_SLOTS }, (_, i) => ({
+        id: `skel${i}`,
+        skel: true,
+      }));
     if (!games.length) return [];
     const rounds = Math.max(1, Math.ceil(MIN_SLOTS / games.length));
     const out = [];
@@ -764,7 +869,12 @@ function GameWheel({ games, picked, onToggle, rose }) {
     if (!size || !n) return null;
     const narrow = size.w < 700;
     const cw = Math.round(
-      Math.min(150, Math.max(92, size.w * 0.12), size.h * 0.34, narrow ? Infinity : size.h * 0.64 - 70)
+      Math.min(
+        150,
+        Math.max(92, size.w * 0.12),
+        size.h * 0.34,
+        narrow ? Infinity : size.h * 0.64 - 70,
+      ),
     );
     const ch = Math.round((cw * 4) / 3);
     const rad = (step * Math.PI) / 180;
@@ -785,7 +895,8 @@ function GameWheel({ games, picked, onToggle, rose }) {
   const dpp = geo ? 180 / (Math.PI * geo.R) : 0;
 
   const paint = useCallback(() => {
-    if (hubRef.current) hubRef.current.style.transform = `rotate(${rot.current}deg)`;
+    if (hubRef.current)
+      hubRef.current.style.transform = `rotate(${rot.current}deg)`;
     if (!step) return;
     const i = ((Math.round(-rot.current / step) % n) + n) % n;
     setFocus((f) => (f === i ? f : i));
@@ -805,7 +916,7 @@ function GameWheel({ games, picked, onToggle, rose }) {
       };
       raf.current = requestAnimationFrame(tick);
     },
-    [paint]
+    [paint],
   );
 
   const snap = useCallback(() => Math.round(rot.current / step) * step, [step]);
@@ -833,7 +944,9 @@ function GameWheel({ games, picked, onToggle, rose }) {
       return;
     }
     introDone.current = true;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reduce = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     rot.current = reduce ? 0 : step * 2.5;
     paint();
     if (!reduce) animateTo(0, 900);
@@ -848,7 +961,8 @@ function GameWheel({ games, picked, onToggle, rose }) {
     const el = boxRef.current;
     if (!el || !geo) return undefined;
     const onWheel = (e) => {
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      const delta =
+        Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
       if (!delta) return;
       e.preventDefault();
       cancelAnimationFrame(raf.current);
@@ -869,7 +983,12 @@ function GameWheel({ games, picked, onToggle, rose }) {
     if (e.button > 0 || !geo) return;
     cancelAnimationFrame(raf.current);
     vel.current = 0;
-    drag.current = { x: e.clientX, last: e.clientX, t: performance.now(), moved: false };
+    drag.current = {
+      x: e.clientX,
+      last: e.clientX,
+      t: performance.now(),
+      moved: false,
+    };
   }
 
   function onPointerMove(e) {
@@ -910,13 +1029,17 @@ function GameWheel({ games, picked, onToggle, rose }) {
       setTouched(true);
       animateTo(snap() + dir * step, 260);
     },
-    [animateTo, snap, step]
+    [animateTo, snap, step],
   );
 
   function onKeyDown(e) {
     if (e.key === "ArrowLeft") animateTo(snap() + step, 260);
     else if (e.key === "ArrowRight") animateTo(snap() - step, 260);
-    else if ((e.key === "Enter" || e.key === " ") && slots[focus] && !slots[focus].skel) {
+    else if (
+      (e.key === "Enter" || e.key === " ") &&
+      slots[focus] &&
+      !slots[focus].skel
+    ) {
       e.preventDefault();
       onToggle(slots[focus]);
     } else return;
@@ -947,7 +1070,11 @@ function GameWheel({ games, picked, onToggle, rose }) {
       onKeyDown={onKeyDown}
     >
       {geo && (
-        <div className="onb-hub" ref={hubRef} style={{ left: geo.cx, top: geo.cy }}>
+        <div
+          className="onb-hub"
+          ref={hubRef}
+          style={{ left: geo.cx, top: geo.cy }}
+        >
           {slots.map((g, i) => {
             const on = !g.skel && !!picked[String(g.id)];
             return (
@@ -974,7 +1101,11 @@ function GameWheel({ games, picked, onToggle, rose }) {
                   {on && (
                     <span className="onb-wcard-check">
                       {rose ? (
-                        <Heart size={15} fill="currentColor" strokeWidth={2.4} />
+                        <Heart
+                          size={15}
+                          fill="currentColor"
+                          strokeWidth={2.4}
+                        />
                       ) : (
                         <Check size={16} strokeWidth={3.2} />
                       )}
@@ -994,7 +1125,10 @@ function GameWheel({ games, picked, onToggle, rose }) {
           style) : le doigt fait mieux, et il cacherait la roue.
           Le nom puis le bouton, collés sous la jaquette qu'ils désignent. */}
       {geo && focused && !focused.skel && (
-        <div className="onb-focus" style={{ top: geo.top + geo.ch * 0.57 + 14 }}>
+        <div
+          className="onb-focus"
+          style={{ top: geo.top + geo.ch * 0.57 + 14 }}
+        >
           <p className="onb-wheel-name">{focused.name}</p>
           <div className="onb-nav">
             <button
@@ -1008,7 +1142,11 @@ function GameWheel({ games, picked, onToggle, rose }) {
               className={`onb-nav-pick clickable ${pickedFocus ? "is-on" : ""}`}
               onClick={() => onToggle(focused)}
             >
-              {pickedFocus ? (rose ? "Plus envie" : "Finalement non") : "Choisir"}
+              {pickedFocus
+                ? rose
+                  ? "Plus envie"
+                  : "Finalement non"
+                : "Choisir"}
             </button>
             <button
               className="onb-nav-arrow clickable"
@@ -1176,7 +1314,9 @@ function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
     let alive = true;
     setTracks(null);
     setChars(null);
-    apiFetch(`/games/${game.id}/ost?q=${encodeURIComponent(game.name)}`, { token })
+    apiFetch(`/games/${game.id}/ost?q=${encodeURIComponent(game.name)}`, {
+      token,
+    })
       .then((d) => {
         if (!alive) return;
         const list = (d.tracks || [])
@@ -1187,7 +1327,11 @@ function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
       })
       .catch(() => alive && setTracks([]));
     apiFetch(`/games/${game.id}/details`, { token })
-      .then((d) => alive && setChars((d.characters || []).filter((c) => c.image).slice(0, 18)))
+      .then(
+        (d) =>
+          alive &&
+          setChars((d.characters || []).filter((c) => c.image).slice(0, 18)),
+      )
       .catch(() => alive && setChars([]));
     return () => {
       alive = false;
@@ -1200,7 +1344,13 @@ function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const save = (patch) => onSave({ rating: draft, favoriteOst: ost, favoriteCharacter: character, ...patch });
+  const save = (patch) =>
+    onSave({
+      rating: draft,
+      favoriteOst: ost,
+      favoriteCharacter: character,
+      ...patch,
+    });
 
   // ⚠️ UNE QUESTION À LA FOIS. Les trois tenaient dans le même panneau : on
   // ne savait plus ce qui était demandé, et il fallait faire défiler pour
@@ -1235,11 +1385,13 @@ function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
             artwork: tr.artwork || null,
             youtube: !!tr.youtube,
             url: tr.url || null,
-          }
+          },
     );
 
   const pickChar = (c) =>
-    setCharacter((cur) => (sameChar(cur, c) ? null : { name: c.name, image: c.image || null }));
+    setCharacter((cur) =>
+      sameChar(cur, c) ? null : { name: c.name, image: c.image || null },
+    );
 
   const phase = step === "rate" && choosing ? "scale" : step;
   const HEAD = {
@@ -1259,8 +1411,17 @@ function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
     >
       <div className="onb-rate-card">
         <div className="onb-rate-hero">
-          {game.cover && <img className="onb-rate-bg" src={game.cover} alt="" aria-hidden="true" />}
-          {game.cover && <img className="onb-rate-cover" src={game.cover} alt="" />}
+          {game.cover && (
+            <img
+              className="onb-rate-bg"
+              src={game.cover}
+              alt=""
+              aria-hidden="true"
+            />
+          )}
+          {game.cover && (
+            <img className="onb-rate-cover" src={game.cover} alt="" />
+          )}
           <div className="onb-rate-titles">
             <p className="onb-rate-q">
               {HEAD[0]} <em>{HEAD[1]}</em> {HEAD[2]}
@@ -1282,7 +1443,10 @@ function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
           {phase === "scale" && (
             <div className="onb-rate-body">
               <div className="onb-scale">
-                <button className="onb-scale-opt clickable" onClick={() => chooseScale(SCALE_STARS)}>
+                <button
+                  className="onb-scale-opt clickable"
+                  onClick={() => chooseScale(SCALE_STARS)}
+                >
                   <span className="onb-scale-demo is-stars" aria-hidden="true">
                     {[0, 1, 2, 3, 4].map((i) => (
                       <Star
@@ -1296,7 +1460,10 @@ function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
                   </span>
                   <span className="onb-scale-name">En étoiles</span>
                 </button>
-                <button className="onb-scale-opt clickable" onClick={() => chooseScale(SCALE_100)}>
+                <button
+                  className="onb-scale-opt clickable"
+                  onClick={() => chooseScale(SCALE_100)}
+                >
                   <span className="onb-scale-demo is-pct" aria-hidden="true">
                     87<small>%</small>
                   </span>
@@ -1347,9 +1514,15 @@ function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
                       onClick={() => pickTrack(tr)}
                       aria-pressed={on}
                     >
-                      <span className="onb-trow-rank">{on ? <Check size={13} strokeWidth={3.6} /> : i + 1}</span>
+                      <span className="onb-trow-rank">
+                        {on ? <Check size={13} strokeWidth={3.6} /> : i + 1}
+                      </span>
                       <span className="onb-trow-art">
-                        {tr.artwork ? <img src={tr.artwork} alt="" loading="lazy" /> : <Music size={18} />}
+                        {tr.artwork ? (
+                          <img src={tr.artwork} alt="" loading="lazy" />
+                        ) : (
+                          <Music size={18} />
+                        )}
                         {sounding && !buffering && <Bars />}
                       </span>
                       <span className="onb-trow-txt">
@@ -1364,9 +1537,16 @@ function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
                       // fallait revenir cliquer pour en entendre une autre.
                       onClick={() => {
                         startedRef.current = true;
-                        toggleTrack(tr, tracks, { gameId: game.id, gameName: game.name });
+                        toggleTrack(tr, tracks, {
+                          gameId: game.id,
+                          gameName: game.name,
+                        });
                       }}
-                      aria-label={sounding ? `Mettre en pause ${tr.name}` : `Écouter ${tr.name}`}
+                      aria-label={
+                        sounding
+                          ? `Mettre en pause ${tr.name}`
+                          : `Écouter ${tr.name}`
+                      }
                       aria-busy={buffering}
                     >
                       {buffering ? (
@@ -1416,11 +1596,19 @@ function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
             En BAS, posé sur les boutons : c'est une commande, pas du contenu —
             au-dessus de la playlist, il passait pour la première ligne. */}
         {step === "ost" && (
-          <VolumeBar volume={volume} muted={muted} onChange={setVolume} onMute={toggleMute} />
+          <VolumeBar
+            volume={volume}
+            muted={muted}
+            onChange={setVolume}
+            onMute={toggleMute}
+          />
         )}
 
         <div className="onb-rate-actions">
-          <button className="onb-rate-skip clickable" onClick={last ? onClose : go}>
+          <button
+            className="onb-rate-skip clickable"
+            onClick={last ? onClose : go}
+          >
             {last ? "Plus tard" : "Passer"}
           </button>
           {phase !== "scale" && (
@@ -1530,7 +1718,7 @@ function StepImport() {
     popupRef.current = window.open(
       `${API_BASE}/steam/login?token=${encodeURIComponent(token)}`,
       "mpl-steam-onboarding",
-      `width=${w},height=${h},left=${x},top=${y}`
+      `width=${w},height=${h},left=${x},top=${y}`,
     );
     const timer = setInterval(() => {
       if (popupRef.current?.closed) {
@@ -1543,7 +1731,11 @@ function StepImport() {
     }, 700);
   }
 
-  const steamLinked = !!(status?.connected || counts?.steam?.linked || user?.steamConnected);
+  const steamLinked = !!(
+    status?.connected ||
+    counts?.steam?.linked ||
+    user?.steamConnected
+  );
 
   return (
     <div className="onb-import">
@@ -1553,7 +1745,15 @@ function StepImport() {
           name="Steam"
           logo={<SteamIcon size={56} />}
           count={counts?.steam?.count || 0}
-          action={busy ? <Loader2 className="spin" size={15} /> : steamLinked ? "Importer" : "Connecter"}
+          action={
+            busy ? (
+              <Loader2 className="spin" size={15} />
+            ) : steamLinked ? (
+              "Importer"
+            ) : (
+              "Connecter"
+            )
+          }
           onClick={steamLinked ? () => setSteamOpen(true) : linkSteam}
           disabled={busy || status?.configured === false}
         />
@@ -1577,7 +1777,11 @@ function StepImport() {
 
       <div className="onb-soon">
         {SOON.map((s) => (
-          <div key={s.key} className="onb-soon-tile" title={`${s.label} — bientôt`}>
+          <div
+            key={s.key}
+            className="onb-soon-tile"
+            title={`${s.label} — bientôt`}
+          >
             <BrandSvg brand={s.brand} size={22} />
           </div>
         ))}
@@ -1591,16 +1795,27 @@ function StepImport() {
           DEDANS, et le bouton « Continuer » passait par-dessus. */}
       {steamOpen &&
         createPortal(
-          <SteamImportModal onClose={() => setSteamOpen(false)} onDone={imported} />,
-          document.body
+          <SteamImportModal
+            onClose={() => setSteamOpen(false)}
+            onDone={imported}
+          />,
+          document.body,
         )}
       {backloggdOpen &&
         createPortal(
-          <BackloggdImportModal onClose={() => setBackloggdOpen(false)} onDone={imported} />,
-          document.body
+          <BackloggdImportModal
+            onClose={() => setBackloggdOpen(false)}
+            onDone={imported}
+          />,
+          document.body,
         )}
       {/* Celle-ci se rend déjà dans <body> elle-même. */}
-      {stashOpen && <StashImportModal onClose={() => setStashOpen(false)} onDone={imported} />}
+      {stashOpen && (
+        <StashImportModal
+          onClose={() => setStashOpen(false)}
+          onDone={imported}
+        />
+      )}
     </div>
   );
 }
@@ -1621,7 +1836,9 @@ function ImportTile({ kind, name, logo, count, action, onClick, disabled }) {
       <span className="onb-imp-logo">{logo}</span>
       <span className="onb-imp-name">{name}</span>
       <span className="onb-imp-act">
-        {done ? `${count} jeu${count > 1 ? "x" : ""} importé${count > 1 ? "s" : ""}` : action}
+        {done
+          ? `${count} jeu${count > 1 ? "x" : ""} importé${count > 1 ? "s" : ""}`
+          : action}
       </span>
     </button>
   );
@@ -1661,7 +1878,14 @@ const ACTIONS = [
   { key: "cover", Icon: ImageIcon, tone: "#ff9f45", x: "74%", y: "4%", r: 4 },
   { key: "char", Icon: Sparkles, tone: "#b69cff", x: "2%", y: "38%", r: -2 },
   { key: "avatar", Icon: Camera, tone: "#ffd24a", x: "0%", y: "68%", r: 3 },
-  { key: "console", Icon: Gamepad2, tone: "#66c0f4", x: "77%", y: "38%", r: -3 },
+  {
+    key: "console",
+    Icon: Gamepad2,
+    tone: "#66c0f4",
+    x: "77%",
+    y: "38%",
+    r: -3,
+  },
   { key: "studio", Icon: Building2, tone: "#3ddc84", x: "72%", y: "74%", r: 5 },
 ];
 
@@ -1710,7 +1934,9 @@ function BannerArrow({ rootRef, fromRef, toRef }) {
       const x2 = above ? to.x + Math.min(34, to.w * 0.25) : to.x - 10;
       const y2 = above ? to.y + to.h + 10 : to.y + to.h / 2;
       const c1 = `${x1 + Math.max(28, (x2 - x1) * 0.9)} ${y1}`;
-      const c2 = above ? `${x2} ${y2 + Math.max(24, (y1 - y2) * 0.6)}` : `${x2 - 30} ${y2}`;
+      const c2 = above
+        ? `${x2} ${y2 + Math.max(24, (y1 - y2) * 0.6)}`
+        : `${x2 - 30} ${y2}`;
       return setGeo({ d: `M ${x1} ${y1} C ${c1} ${c2} ${x2} ${y2}` });
     };
     measure();
@@ -1733,10 +1959,21 @@ function BannerArrow({ rootRef, fromRef, toRef }) {
           markerHeight="7"
           orient="auto-start-reverse"
         >
-          <path d="M 1 1 L 8 5 L 1 9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M 1 1 L 8 5 L 1 9"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </marker>
       </defs>
-      <path className="onb-arrow-path" d={geo.d} markerEnd={`url(#${marker})`} />
+      <path
+        className="onb-arrow-path"
+        d={geo.d}
+        markerEnd={`url(#${marker})`}
+      />
     </svg>
   );
 }
@@ -1795,7 +2032,10 @@ function StepProfile({ user, picked, have }) {
   }
 
   const isFav = (e) => library?.[e.gameId]?.favorite ?? e.favorite;
-  const favCovers = entries.filter(isFav).map((e) => e.cover).filter(Boolean);
+  const favCovers = entries
+    .filter(isFav)
+    .map((e) => e.cover)
+    .filter(Boolean);
   const pickedCovers = Object.values(picked)
     .sort((a, b) => (a.status === "wishlist") - (b.status === "wishlist"))
     .map((p) => p.cover)
@@ -1804,7 +2044,9 @@ function StepProfile({ user, picked, have }) {
   // Sa vraie bannière si elle existe ; sinon une frise de ses jaquettes, qui
   // fait déjà un décor et montre à quoi la carte ressemblera.
   const ownCover = user?.covers?.[0]?.url || user?.cover || null;
-  const banner = ownCover ? [] : [...new Set([...pickedCovers, ...favCovers])].slice(0, 6);
+  const banner = ownCover
+    ? []
+    : [...new Set([...pickedCovers, ...favCovers])].slice(0, 6);
 
   // Le sélecteur de favoris ne propose que ce qu'on a JOUÉ : une envie n'est
   // pas un coup de cœur. Un compte qui n'a rien joué voit tout.
@@ -1815,7 +2057,10 @@ function StepProfile({ user, picked, have }) {
     fav: {
       label: "Choisis un favori",
       done: have.favorites > 0,
-      sub: have.favorites > 0 ? `${have.favorites} favori${have.favorites > 1 ? "s" : ""}` : null,
+      sub:
+        have.favorites > 0
+          ? `${have.favorites} favori${have.favorites > 1 ? "s" : ""}`
+          : null,
       open: () => setModal("fav"),
     },
     char: {
@@ -1873,7 +2118,10 @@ function StepProfile({ user, picked, have }) {
             <img
               src={ownCover}
               alt=""
-              style={{ objectPosition: user?.covers?.[0]?.pos || user?.coverPos || "center" }}
+              style={{
+                objectPosition:
+                  user?.covers?.[0]?.pos || user?.coverPos || "center",
+              }}
             />
           ) : (
             banner.map((c, i) => <img key={i} src={c} alt="" />)
@@ -1883,7 +2131,11 @@ function StepProfile({ user, picked, have }) {
 
         <div className="onb-pcard-body">
           <div className={`onb-pcard-avatar ${uploading ? "is-busy" : ""}`}>
-            {user?.avatar ? <img src={user.avatar} alt="" /> : <span>{initial}</span>}
+            {user?.avatar ? (
+              <img src={user.avatar} alt="" />
+            ) : (
+              <span>{initial}</span>
+            )}
           </div>
           <strong className="onb-pcard-name">{user?.username}</strong>
 
@@ -1898,11 +2150,17 @@ function StepProfile({ user, picked, have }) {
             </span>
           </div>
 
-          {(user?.tagline || user?.favoriteConsole?.name || user?.favoriteStudio?.name) && (
+          {(user?.tagline ||
+            user?.favoriteConsole?.name ||
+            user?.favoriteStudio?.name) && (
             <div className="onb-pcard-taste">
               {user?.tagline && (
                 <span className="onb-ptag">
-                  {user.taglineImage ? <img src={user.taglineImage} alt="" /> : <Sparkles size={12} />}
+                  {user.taglineImage ? (
+                    <img src={user.taglineImage} alt="" />
+                  ) : (
+                    <Sparkles size={12} />
+                  )}
                   {user.tagline}
                 </span>
               )}
@@ -1934,7 +2192,7 @@ function StepProfile({ user, picked, have }) {
                 >
                   <Heart size={16} />
                 </button>
-              )
+              ),
             )}
           </div>
         </div>
@@ -1963,7 +2221,11 @@ function StepProfile({ user, picked, have }) {
                   L'icône du sujet (cœur, manette…) faisait de la pastille une
                   étiquette : on ne devinait pas qu'elle se cliquait. */}
               <span className="onb-act-icon">
-                {info.done ? <Pencil size={15} strokeWidth={2.4} /> : <Plus size={20} strokeWidth={2.6} />}
+                {info.done ? (
+                  <Pencil size={15} strokeWidth={2.4} />
+                ) : (
+                  <Plus size={20} strokeWidth={2.6} />
+                )}
               </span>
               <span className="onb-act-text">
                 {info.label}

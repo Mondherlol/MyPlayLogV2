@@ -76,7 +76,11 @@ export default function PixelCanvas({
   const offRef = useRef(null);
   const lensOffRef = useRef(null); // canvas de réduction de la loupe, réutilisé
   const imgRef = useRef(null);
-  const [loaded, setLoaded] = useState(false);
+  // L'image chargée elle-même (pas un booléen) : quand `src` change et que la
+  // nouvelle image sort du cache, « faux puis vrai » se fusionnait en « vrai »
+  // sans changement — le canvas gardait l'ANCIENNE image. Un nouvel objet
+  // change toujours l'état, donc on redessine toujours.
+  const [loaded, setLoaded] = useState(null);
   // Position du curseur DANS l'image, en fractions (0→1). `null` = pas de loupe.
   const [lens, setLens] = useState(null);
 
@@ -183,7 +187,7 @@ export default function PixelCanvas({
   }, [lens, cover, blocks]);
 
   useEffect(() => {
-    setLoaded(false);
+    setLoaded(null);
     imgRef.current = null;
     if (!src) return undefined;
     const img = new Image();
@@ -194,7 +198,7 @@ export default function PixelCanvas({
     img.onload = () => {
       if (!alive) return;
       imgRef.current = img;
-      setLoaded(true);
+      setLoaded(img);
     };
     img.src = src;
     return () => {

@@ -34,6 +34,7 @@ const GeoVersus = lazyPage(() => import("./pages/GeoVersus"));
 const BlindTestVersus = lazyPage(() => import("./pages/BlindTestVersus"));
 const PixelVersus = lazyPage(() => import("./pages/PixelVersus"));
 const Bomb = lazyPage(() => import("./pages/Bomb"));
+const Party = lazyPage(() => import("./pages/Party"));
 const Quizz = lazyPage(() => import("./pages/Quizz"));
 const Perroquet = lazyPage(() => import("./pages/Perroquet"));
 const PerroquetVersus = lazyPage(() => import("./pages/PerroquetVersus"));
@@ -335,6 +336,8 @@ export default function App() {
         <Route path="/pixel/versus/:code" element={<PixelVersus />} />
         <Route path="/bombe" element={<Bomb />} />
         <Route path="/bombe/:code" element={<Bomb />} />
+        <Route path="/party" element={<Party />} />
+        <Route path="/party/:code" element={<Party />} />
         <Route path="/geo" element={<GeoGamer />} />
         {/* Le salon de versus : c'est aussi l'adresse des liens d'invitation
             et des cartes envoyées en message privé. */}

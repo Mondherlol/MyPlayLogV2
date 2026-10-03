@@ -7,7 +7,6 @@ import {
   Sparkles,
   PackageOpen,
   MousePointer2,
-  Palette,
   Check,
   X,
   Music2,
@@ -18,17 +17,7 @@ import {
   Crown,
   Swords,
   ArrowRight,
-  History,
-  Joystick,
   ChevronDown,
-  Eye,
-  Gem,
-  Flower2,
-  Ghost,
-  Moon,
-  Leaf,
-  Sunset,
-  Contrast,
   Users,
   VenetianMask,
   Thermometer,
@@ -38,10 +27,16 @@ import {
   Bot,
   Flame,
   Gift,
+  Store,
+  Clock,
+  User,
+  Construction,
+  MapPin,
 } from "lucide-react";
+import { GiParrotHead, GiPerspectiveDiceSixFacesRandom } from "react-icons/gi";
 import { useAuth } from "../context/AuthContext";
 import { useCosmetics } from "../context/CosmeticsContext";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import { useLiveStatus } from "../lib/presence";
 import { applyGeoGlobe } from "../lib/geoGlobe";
 import { makeCache } from "../lib/cache";
@@ -52,52 +47,33 @@ import FriendsCollectionModal from "../components/FriendsCollectionModal";
 import GachaModal from "../components/GachaModal";
 import PixelCanvas from "../components/PixelCanvas";
 import BoosterPack from "../components/cards/BoosterPack";
+import BombArt from "../components/bomb/BombArt";
+import TcgCard from "../components/cards/TcgCard";
 import { CARD_RARITIES } from "../lib/cards";
 
 // ======================================================================
 //  Arcade — la salle de jeux : mini-jeux, classements, cagnotte, curseurs
 // ======================================================================
 // Tout ce qui tourne autour des points vit ici, et nulle part ailleurs :
-// l'accueil ne garde qu'une porte d'entrée. Les mini-jeux se lancent depuis de
-// grosses cartes, chacun a SON classement (pas d'onglet qui les mélange), et
-// la collection de curseurs s'équipe sur place.
+// l'accueil ne garde qu'une porte d'entrée.
+//
+// Troisième version (octobre 2026, styles/app-69-arcade-v2.css, préfixe .ax) :
+//   - en-tête : le titre, et à droite la cagnotte (qui déroule l'historique),
+//     les curseurs et la BOUTIQUE — qui n'occupe plus une section entière mais
+//     s'ouvre en modale ;
+//   - LE MOT DU JOUR en tête, un bandeau qui change selon où on en est
+//     (pas commencé, en cours avec sa température, trouvé, abandonné) ;
+//   - DÉFIS (Pixel Rush, GeoGamer, Grand Quiz, Blind Test…) puis ENTRE POTES,
+//     La Party en dernier ;
+//   - les CLASSEMENTS : un tableau, un onglet par jeu.
 
+// Les jeux à score : leur classement est un onglet, leur record s'affiche sur
+// la tuile. L'ordre est celui des onglets.
 const GAMES = [
   {
-    key: "blindtest",
-    name: "Blind Test",
-    tag: "Quiz musical",
-    pitch: "Un extrait d'OST tiré au sort. Devine le jeu avant la fin du morceau.",
-    Icon: Music2,
-    path: "/blindtest",
-    api: "/blindtest/leaderboard",
-    // Les deux classements partagent le même contrat, seul l'id de défi diffère.
-    idOf: (e) => e.blindTestId,
-  },
-  {
-    key: "pixel",
-    name: "Pixel Rush",
-    tag: "Quiz visuel",
-    pitch: "Des captures noyées sous les pixels. Reconnais le jeu avant qu'elles se précisent.",
-    Icon: Grid2x2,
-    path: "/pixel",
-    api: "/pixel/leaderboard",
-    idOf: (e) => e.gameId,
-  },
-  {
-    key: "geo",
-    name: "GeoGamer",
-    tag: "Exploration",
-    pitch: "Lâché quelque part dans un jeu, tu as 60 secondes pour   trouver où tu es.",
-    Icon: Globe2,
-    path: "/geo",
-    api: "/geo/leaderboard",
-    idOf: (e) => e.geoGameId,
-  },
-  {
     key: "mot",
+    color: "#2f7de1",
     name: "Mot du jour",
-    tag: "Devinette",
     pitch:
       "Un mot, le même pour tout le monde jusqu'à minuit. Propose des mots proches : ça chauffe.",
     Icon: Thermometer,
@@ -108,9 +84,29 @@ const GAMES = [
     idOf: () => null,
   },
   {
+    key: "pixel",
+    color: "#7e60ff",
+    name: "Pixel Rush",
+    pitch: "Des captures noyées sous les pixels. Reconnais le jeu avant qu'elles se précisent.",
+    Icon: Grid2x2,
+    path: "/pixel",
+    api: "/pixel/leaderboard",
+    idOf: (e) => e.gameId,
+  },
+  {
+    key: "geo",
+    color: "#1f9d63",
+    name: "GeoGamer",
+    pitch: "Lâché quelque part dans un jeu, tu as 60 secondes pour trouver où tu es.",
+    Icon: Globe2,
+    path: "/geo",
+    api: "/geo/leaderboard",
+    idOf: (e) => e.geoGameId,
+  },
+  {
     key: "quiz",
+    color: "#4f5ee8",
     name: "Le Grand Quiz",
-    tag: "Culture JV",
     pitch:
       "Huit épreuves tirées au sort : questions, emojis, anagrammes, studios, duels de cartes, piles à trier. Seul ou à six.",
     Icon: Trophy,
@@ -119,9 +115,20 @@ const GAMES = [
     idOf: (e) => e.quizGameId,
   },
   {
+    key: "blindtest",
+    color: "#e84393",
+    name: "Blind Test",
+    pitch: "Un extrait d'OST tiré au sort. Devine le jeu avant la fin du morceau.",
+    Icon: Music2,
+    path: "/blindtest",
+    api: "/blindtest/leaderboard",
+    // Les classements partagent le même contrat, seul l'id de défi diffère.
+    idOf: (e) => e.blindTestId,
+  },
+  {
     key: "perroquet",
+    color: "#f0761c",
     name: "Le Perroquet",
-    tag: "Micro",
     pitch:
       "Un bruit de jeu, et ta voix pour le refaire. Le plus proche marque — comme au bon vieux micro de la console.",
     Icon: Mic2,
@@ -131,8 +138,8 @@ const GAMES = [
   },
   {
     key: "imposteur",
+    color: "#8b3fd9",
     name: "L'Imposteur",
-    tag: "Bluff",
     pitch:
       "Tout le monde a le même jeu, sauf un — qui l'ignore. Un mot chacun, puis on vote. À partir de 3 joueurs.",
     Icon: VenetianMask,
@@ -143,6 +150,37 @@ const GAMES = [
     idOf: () => null,
   },
 ];
+const GAME = Object.fromEntries(GAMES.map((g) => [g.key, g]));
+
+// Les deux rangées de tuiles. Le Mot du jour n'y est pas : il a le bandeau.
+const SOLO = ["pixel", "geo", "quiz", "blindtest", "perroquet"]; // + Combat de cartes
+const GROUP = ["imposteur"]; // + La Bombe, puis La Party en dernier
+
+// Comment se joue chaque jeu : le badge de sa carte, une icône de perso par
+// façon de jouer (seul, en duel, contre le bot, à plusieurs).
+const SOLO_VS = [
+  [User, "Solo"],
+  [Swords, "Versus"],
+];
+const PLAY = {
+  blindtest: SOLO_VS,
+  pixel: SOLO_VS,
+  geo: SOLO_VS,
+  quiz: [[Users, "1 à 6"]],
+  perroquet: SOLO_VS,
+  imposteur: [[Users, "3 et +"]],
+  battle: [
+    [Bot, "Bot"],
+    [Swords, "Duel"],
+    [Users, "2v2"],
+  ],
+  bombe: [[Users, "2 à 8"]],
+  party: [[Users, "2 à 4"]],
+  mystery: [[Lock, "Secret"]],
+};
+
+// Les jeux pas encore ouverts : carte grisée, « Bientôt », pas de lien.
+const SOON = new Set(["perroquet"]);
 
 // Libellés des lignes du grand livre (miroir de POINT_SOURCES,
 // server/src/models/PointEntry.js). Une source inconnue s'affiche telle quelle.
@@ -168,17 +206,6 @@ const SOURCE_LABELS = {
   backfill: "Parties d'avant l'arcade",
 };
 
-// Une icône par thème (par clé de lot) : donne à chaque carte un caractère.
-const THEME_ICONS = {
-  "theme-og": Gem,
-  "theme-sakura": Flower2,
-  "theme-kuromi": Ghost,
-  "theme-midnight": Moon,
-  "theme-matcha": Leaf,
-  "theme-sunset": Sunset,
-  "theme-noir": Contrast,
-};
-
 const MODES = [
   { key: "best", label: "Record", pick: (e) => e.bestScore ?? 0, hint: "Meilleur score en une partie" },
   { key: "total", label: "Total", pick: (e) => e.score ?? 0, hint: "Total cumulé de toutes les parties" },
@@ -187,27 +214,37 @@ const MODES = [
 // La porte d'entrée des caisses de collection, masquée pour l'instant.
 // RIEN N'EST SUPPRIMÉ : le bandeau, la modale et toute la mécanique serveur
 // restent en place — repasser cette constante à `true` les fait réapparaître
-// tels quels. C'est aussi ce drapeau qui évite d'aller interroger
+// (dans la Boutique). C'est aussi ce drapeau qui évite d'aller interroger
 // /collection/gacha pour un bandeau qui ne s'affichera pas.
 const SHOW_GACHA = false;
 
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
 
 // --- Caches stale-while-revalidate (mémoire + localStorage) ---
-// La page était intégralement reconstruite à chaque visite : squelettes des
-// classements, et surtout les jaquettes des cartes Blind Test / Pixel Rush qui
-// repartaient de zéro (re-téléchargées, re-pixelisées) alors qu'elles ne
-// changent quasiment jamais. On réaffiche donc la dernière version connue
-// instantanément, puis on revalide en fond — le solde et l'inventaire se
-// recalent sans que rien ne clignote.
-// Clés préfixées par l'id du compte : changer d'utilisateur ne montre jamais
-// l'inventaire du précédent.
+// On réaffiche la dernière version connue instantanément, puis on revalide en
+// fond — le solde, l'inventaire et le bandeau du mot se recalent sans que rien
+// ne clignote. Clés préfixées par l'id du compte : changer d'utilisateur ne
+// montre jamais l'inventaire du précédent.
 const arcadeCache = makeCache("mpl_arcade_", 10 * 60 * 1000);
 const boardCache = makeCache("mpl_arcboard_", 5 * 60 * 1000);
+const motCache = makeCache("mpl_arcmot_", 10 * 60 * 1000);
+
+// Une modale de l'arcade : Échap ferme, la page derrière ne défile plus.
+function useModal(onClose) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+}
 
 export default function Arcade() {
   const { token, user, updateUser, hasFeature } = useAuth();
-  const { setCosmetic, previewTheme, endPreview } = useCosmetics();
+  const { setCosmetic } = useCosmetics();
 
   // « Traîne à l'arcade » : c'est le hall, donc l'endroit où l'on se croise
   // avant de lancer quoi que ce soit. C'est justement là qu'un ami qui passe
@@ -221,8 +258,7 @@ export default function Arcade() {
 
   // /arcade : solde, caisses, inventaire — amorcé depuis le cache s'il existe.
   const [data, setData] = useState(() => (meId && arcadeCache.get(meId)?.data) || null);
-  // Classement par jeu. Une clé absente = « pas encore chargé » (squelette) ;
-  // le cache la remplit d'emblée, donc plus de squelette au retour sur la page.
+  // Classement par jeu. Une clé absente = « pas encore chargé » (squelette).
   const [boards, setBoards] = useState(() => {
     const b = {};
     if (!meId) return b;
@@ -235,25 +271,15 @@ export default function Arcade() {
   const [history, setHistory] = useState(null);
   const [showHist, setShowHist] = useState(false);
   const [openingBox, setOpeningBox] = useState(null);
+  const [showShop, setShowShop] = useState(false);
   const [showCursors, setShowCursors] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
   const [gacha, setGacha] = useState(null); // état du dôme (bandeau + modale)
   const [showGacha, setShowGacha] = useState(false);
   const [equipping, setEquipping] = useState(null);
-  const [preview, setPreview] = useState(null); // thème essayé en direct (non équipé)
   const [err, setErr] = useState("");
 
-  // Un aperçu de thème ne doit jamais « fuir » hors de la page : on le coupe en
-  // quittant l'arcade. Ref pour lire l'état courant dans le cleanup.
-  const previewRef = useRef(preview);
-  previewRef.current = preview;
-  useEffect(() => () => {
-    if (previewRef.current) endPreview();
-  }, [endPreview]);
-
-  // Toute écriture de `data` passe par ici : l'état ET le cache restent alignés,
-  // sinon un ajustement local (ouverture de caisse, équipement) serait perdu au
-  // retour sur la page, qui réafficherait la version d'avant.
+  // Toute écriture de `data` passe par ici : l'état ET le cache restent alignés.
   const commitData = useCallback(
     (next) =>
       setData((prev) => {
@@ -270,19 +296,16 @@ export default function Arcade() {
     let alive = true;
     // L'image du globe choisie par l'admin (var CSS --geo-globe).
     applyGeoGlobe(token);
-    // Revalidation systématique, sans vider l'affichage : le cache reste à
-    // l'écran tant que la réponse n'est pas là.
     apiFetch("/arcade", { token })
       .then((d) => {
         if (!alive) return;
         setErr("");
         commitData(d);
       })
-      // Une revalidation ratée ne doit pas effacer un affichage valide : on ne
-      // remonte l'erreur que si on n'avait rien à montrer.
+      // Une revalidation ratée ne doit pas effacer un affichage valide.
       .catch((e) => alive && !arcadeCache.get(meId) && setErr(e.message));
-    // Les deux classements en parallèle : ils sont affichés côte à côte, pas
-    // l'un derrière l'autre — inutile de les charger à la demande.
+    // Tous les classements en parallèle : les records s'affichent sur les
+    // tuiles, inutile de les charger à la demande.
     for (const g of GAMES) {
       apiFetch(g.api, { token })
         .then((d) => {
@@ -298,10 +321,7 @@ export default function Arcade() {
     };
   }, [token, meId, commitData]);
 
-  // L'état des caisses de collection : combien de boîtiers j'ai, combien il en
-  // reste, ce que coûte une caisse. Chargé à part du reste de l'arcade — c'est
-  // le rayon vidéo qui le sait, pas les caisses de curseurs — et seulement si
-  // la section est ouverte (le drapeau d'admin, voir lib/features.js).
+  // L'état des caisses de collection — seulement si la section est ouverte.
   const gachaOn = SHOW_GACHA && hasFeature("collection");
   const loadGacha = useCallback(() => {
     if (!token || !gachaOn) return;
@@ -312,6 +332,15 @@ export default function Arcade() {
       });
   }, [token, gachaOn]);
   useEffect(loadGacha, [loadGacha]);
+
+  // L'historique se ferme d'un clic ailleurs, comme n'importe quel menu.
+  const walletRef = useRef(null);
+  useEffect(() => {
+    if (!showHist) return;
+    const onDown = (e) => walletRef.current && !walletRef.current.contains(e.target) && setShowHist(false);
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [showHist]);
 
   function toggleHistory() {
     setShowHist((v) => !v);
@@ -355,11 +384,8 @@ export default function Arcade() {
       });
       commitData((prev) => (prev ? { ...prev, equipped: d.equipped } : prev));
       updateUser({ equipped: d.equipped });
-      // Effet immédiat : le curseur / thème change sous les yeux, sans recharger.
+      // Effet immédiat : le curseur change sous les yeux, sans recharger.
       setCosmetic(reward.type, isOn ? null : reward);
-      // On équipe ce qu'on prévisualisait → l'aperçu n'a plus lieu d'être (le
-      // thème est désormais réel), on ferme juste la barre sans re-basculer.
-      if (preview && preview.key === reward.key) setPreview(null);
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -367,283 +393,190 @@ export default function Arcade() {
     }
   }
 
-  // Aperçu en direct d'un thème : on applique sa palette à tout le site sans
-  // rien enregistrer. Re-cliquer coupe l'aperçu.
-  function togglePreview(reward) {
-    if (preview && preview.key === reward.key) {
-      endPreview();
-      setPreview(null);
-    } else {
-      previewTheme(reward);
-      setPreview(reward);
-    }
-  }
-  function stopPreview() {
-    endPreview();
-    setPreview(null);
-  }
-
   const points = data?.points ?? user?.points ?? 0;
   const covers = data?.covers || [];
-  // La caisse à proposer DANS la modale des curseurs : celle qui en distribue.
-  // `cases[0]` ne suffit plus depuis qu'il existe aussi une caisse de thèmes.
-  const cursorCrate =
-    (data?.cases || []).find((c) => (c.rewards || []).some((r) => r.type === "cursor")) ||
-    null;
+  const tileCover = (i) => (covers.length ? covers[i % covers.length] : null);
 
-  // Inventaire par famille (les plus rares en tête, puis les plus récents).
+  // Les caisses encore utiles : celles qui distribuent des curseurs (les
+  // thèmes ne se gagnent plus).
+  const crates = (data?.cases || []).filter((c) => (c.rewards || []).some((r) => r.type === "cursor"));
   const byRarity = (a, b) =>
     rarityRank(b.rarity) - rarityRank(a.rarity) ||
     new Date(b.obtainedAt || 0) - new Date(a.obtainedAt || 0);
   const cursors = (data?.inventory || []).filter((r) => r.type === "cursor").sort(byRarity);
-  const themes = (data?.inventory || []).filter((r) => r.type === "theme").sort(byRarity);
+  const cursorTotal = new Set(
+    crates.flatMap((c) => (c.rewards || []).filter((r) => r.type === "cursor").map((r) => r.key))
+  ).size;
 
-  // Progression : combien de lots tirables existent par famille (toutes caisses
-  // confondues), pour afficher « 3 / 8 ».
-  const catalog = { cursor: new Set(), theme: new Set() };
-  for (const c of data?.cases || [])
-    for (const r of c.rewards || [])
-      if (catalog[r.type]) catalog[r.type].add(r.key);
-
-  const equipProps = {
-    equippedOf: (r) => data?.equipped?.[r.type] === r.key,
-    equipping,
-    onEquip: toggleEquip,
+  const mineOf = (key) => (boards[key] || []).find((e) => e.isMe);
+  const scoreTile = (key, i) => {
+    const g = GAME[key];
+    const mine = mineOf(key);
+    return (
+      <Tile
+        key={key}
+        k={key}
+        to={g.path}
+        soon={SOON.has(key)}
+        name={g.name}
+        pitch={g.pitch}
+        art={<GameArt game={g} cover={tileCover(i)} cover2={tileCover(i + 1)} />}
+        stat={
+          mine ? (
+            <>
+              <Trophy size={13} /> <b>{fmt(mine.bestScore)}</b>
+            </>
+          ) : null
+        }
+      />
+    );
   };
 
   return (
-    <div className="arc-page">
-      <div className="arc-main">
-        {/* ---------- Bannière : titre, cagnotte, historique ---------- */}
-        <header className="arc-banner">
-          <span className="arc-banner-glow" aria-hidden="true" />
-          <span className="arc-banner-scan" aria-hidden="true" />
-
-          <div className="arc-banner-top">
-            <div className="arc-banner-id">
-              <span className="arc-kicker">
-                <Joystick size={13} /> Salle de jeux
+    <div className="ax">
+      {/* ---------- En-tête : titre · cagnotte · curseurs · boutique ---------- */}
+      <header className="ax-head">
+        <h1 className="ax-title">Arcade</h1>
+        <div className="ax-tools">
+          <div className="ax-wallet-wrap" ref={walletRef}>
+            <button
+              className={`ax-wallet clickable ${showHist ? "on" : ""}`}
+              onClick={toggleHistory}
+              title="Historique des points"
+              aria-expanded={showHist}
+            >
+              <span className="ax-coin">
+                <Coins size={16} />
               </span>
-              <h1 className="arc-title">Arcade</h1>
-              <p className="arc-sub">
-                Joue, marque des points, dépense-les en curseurs.
-              </p>
-            </div>
-
-            <div className="arc-wallet">
-              <span className="arc-wallet-coin">
-                <Coins size={22} />
-              </span>
-              <span className="arc-wallet-num">{fmt(points)}</span>
-              <span className="arc-wallet-label">points</span>
-              <button
-                className={`arc-wallet-hist clickable ${showHist ? "on" : ""}`}
-                onClick={toggleHistory}
-              >
-                <History size={13} /> Historique
-                <ChevronDown size={13} className="arc-wallet-caret" />
-              </button>
-            </div>
-          </div>
-
-          {showHist && (
-            <div className="arc-hist">
-              {history === null ? (
-                <div className="arc-state" style={{ minHeight: 80 }}>
-                  <Loader2 size={18} className="spin" />
-                </div>
-              ) : history.length === 0 ? (
-                <p className="arc-hist-empty">
-                  Aucun mouvement pour l'instant — lance une partie&nbsp;!
-                </p>
-              ) : (
-                <ul className="arc-hist-list">
-                  {history.map((h) => (
-                    <li className="arc-hist-row" key={h.id}>
-                      <span className="arc-hist-src">
-                        {SOURCE_LABELS[h.source] || h.source}
-                      </span>
-                      <span className="arc-hist-date">
-                        {new Date(h.date).toLocaleDateString("fr-FR", {
-                          day: "2-digit",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                      <span className={`arc-hist-amt ${h.amount >= 0 ? "up" : "down"}`}>
-                        {h.amount >= 0 ? `+${fmt(h.amount)}` : fmt(h.amount)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </header>
-
-        {err && <p className="arc-err">{err}</p>}
-
-        {/* ---------- Les mini-jeux ---------- */}
-        {/* Une jaquette différente par carte (à défaut, la même tourne). */}
-        <div className="arc-games">
-          {GAMES.map((g, i) => (
-            <GameCard
-              key={g.key}
-              game={g}
-              mine={(boards[g.key] || []).find((e) => e.isMe)}
-              cover={covers.length ? covers[i % covers.length] : null}
-              // Le Grand Quiz en montre DEUX (le choix A ou B) : la suivante
-              // de la liste, pour ne pas afficher deux fois la même jaquette.
-              cover2={covers.length ? covers[(i + 1) % covers.length] : null}
-            />
-          ))}
-          {/* Le combat de cartes prend la place du « jeu mystère ». */}
-          <BattleCard
-            token={token}
-            cover={covers.length ? covers[GAMES.length % covers.length] : null}
-            cover2={covers.length ? covers[(GAMES.length + 1) % covers.length] : null}
-          />
-          <BombCard />
-        </div>
-
-        {/* ---------- La caisse de collection ----------
-            AU-DESSUS DES CAISSES DE CURSEURS, et c'est délibéré : celles-là
-            donnent un cosmétique, celle-ci donne un OBJET qu'on range sur une
-            étagère. C'est la plus grosse dépense de la salle et la seule qui se
-            collectionne — elle prend donc le haut de l'affiche. */}
-        {gachaOn && gacha?.total > 0 && (
-          <GachaBanner
-            gacha={gacha}
-            points={points}
-            onOpen={() => setShowGacha(true)}
-          />
-        )}
-
-        {/* ---------- Les caisses (et la porte des cartes) ---------- */}
-        {/* Les cartes sont ouvertes à tous : la porte est toujours là. */}
-        <div className="arc-crates">
-          <CardsDoor points={points} />
-          {(data?.cases || []).map((c) => (
-            <Crate
-              key={c.id}
-              crate={c}
-              points={points}
-              onOpen={() => setOpeningBox(c)}
-            />
-          ))}
-        </div>
-
-        {/* ---------- Collection ----------
-            Les curseurs ne sont plus ici mais dans leur modale (bouton du
-            rail droit) : la liste peut être longue et on ne la consulte que
-            pour équiper. Les thèmes restent en page, eux se choisissent à
-            l'œil et ont besoin de leurs grands aperçus. */}
-        {!data ? (
-          <div className="arc-state">
-            <Loader2 size={22} className="spin" />
-          </div>
-        ) : (
-          <ThemesGroup
-            items={themes}
-            total={catalog.theme.size}
-            equippedKey={data?.equipped?.theme || null}
-            previewKey={preview?.key || null}
-            equipping={equipping}
-            onEquip={toggleEquip}
-            onPreview={togglePreview}
-          />
-        )}
-      </div>
-
-      {/* ---------- Rail droit : collection + classements ---------- */}
-      <aside className="arc-rail">
-        {/* La porte d'entrée de la collection de curseurs, au-dessus des
-            classements. */}
-        <button
-          className="arc-rail-cursors clickable"
-          onClick={() => setShowCursors(true)}
-        >
-          <span className="arc-rail-cursors-ic">
-            <MousePointer2 size={17} />
-          </span>
-          <span className="arc-rail-cursors-txt">
-            Mes curseurs
-            {catalog.cursor.size > 0 && (
-              <em>
-                {cursors.length} / {catalog.cursor.size}
-              </em>
+              <b>{fmt(points)}</b>
+              <ChevronDown size={15} className="ax-caret" />
+            </button>
+            {showHist && (
+              <div className="ax-hist">
+                {history === null ? (
+                  <div className="arc-state" style={{ minHeight: 80 }}>
+                    <Loader2 size={18} className="spin" />
+                  </div>
+                ) : history.length === 0 ? (
+                  <p className="ax-hist-empty">Aucun mouvement pour l'instant.</p>
+                ) : (
+                  <ul className="ax-hist-list">
+                    {history.map((h) => (
+                      <li className="ax-hist-row" key={h.id}>
+                        <span className="ax-hist-src">{SOURCE_LABELS[h.source] || h.source}</span>
+                        <span className="ax-hist-date">
+                          {new Date(h.date).toLocaleDateString("fr-FR", {
+                            day: "2-digit",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        <span className={`ax-hist-amt ${h.amount >= 0 ? "up" : "down"}`}>
+                          {h.amount >= 0 ? `+${fmt(h.amount)}` : fmt(h.amount)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
-          </span>
-          <ArrowRight size={16} className="arc-rail-cursors-arrow" />
-        </button>
-
-        {/* Et juste dessous, celles des autres : une collection se regarde en
-            comparant. Même gabarit de bouton, ton plus discret — la sienne
-            reste la porte principale. */}
-        <button
-          className="arc-rail-cursors friends clickable"
-          onClick={() => setShowFriends(true)}
-        >
-          <span className="arc-rail-cursors-ic">
-            <Users size={17} />
-          </span>
-          <span className="arc-rail-cursors-txt">
-            Les collections
-            <em>Ce que les joueurs suivis ont débloqué</em>
-          </span>
-          <ArrowRight size={16} className="arc-rail-cursors-arrow" />
-        </button>
-
-        <h2 className="arc-rail-title">
-          <Crown size={16} /> Classements
-        </h2>
-        {GAMES.map((g) => (
-          <Leaderboard key={g.key} game={g} entries={boards[g.key]} />
-        ))}
-      </aside>
-
-      {/* Barre d'aperçu : flotte tant qu'on essaie un thème sans l'équiper. */}
-      {preview && (
-        <div className="arc-preview-bar" role="dialog" aria-label="Aperçu d'un thème">
-          <span className="arc-preview-eye">
-            <Eye size={16} />
-          </span>
-          <span className="arc-preview-txt">
-            Aperçu&nbsp;: <b>{preview.name}</b>
-          </span>
+          </div>
           <button
-            className="arc-preview-equip clickable"
-            onClick={() => toggleEquip(preview)}
-            disabled={equipping === preview.key || data?.equipped?.theme === preview.key}
+            className="ax-round clickable"
+            onClick={() => setShowCursors(true)}
+            title="Mes curseurs"
+            aria-label="Mes curseurs"
           >
-            {equipping === preview.key ? (
-              <Loader2 size={14} className="spin" />
-            ) : data?.equipped?.theme === preview.key ? (
-              <>
-                <Check size={14} /> Équipé
-              </>
-            ) : (
-              <>
-                <Check size={14} /> Équiper
-              </>
-            )}
+            <MousePointer2 size={18} />
           </button>
-          <button className="arc-preview-stop clickable" onClick={stopPreview}>
-            Terminer
+          <button className="ax-shop-btn clickable" onClick={() => setShowShop(true)} title="Boutique">
+            <Store size={18} />
+            <span>Boutique</span>
           </button>
         </div>
+      </header>
+
+      {err && <p className="arc-err">{err}</p>}
+
+      {/* ---------- Le Mot du jour, à la une ---------- */}
+      <MotHero token={token} meId={meId} />
+
+      {/* ---------- Les défis ---------- */}
+      <section className="ax-sec">
+        <h2 className="ax-h">Défis</h2>
+        <div className="ax-grid">
+          {SOLO.map((k, i) => scoreTile(k, i))}
+          <BattleTile token={token} />
+        </div>
+      </section>
+
+      {/* ---------- Entre potes — La Party ferme la marche ---------- */}
+      <section className="ax-sec">
+        <h2 className="ax-h">Entre potes</h2>
+        <div className="ax-grid">
+          {GROUP.map((k, i) => scoreTile(k, SOLO.length + 3 + i))}
+          <BombTile />
+          <Tile
+            k="party"
+            to="/party"
+            name="La Party"
+            soon
+            art={
+              <span className="arc-game-art ax-art-icon" aria-hidden="true">
+                <GiPerspectiveDiceSixFacesRandom />
+              </span>
+            }
+          />
+          <MysteryTile n={1} />
+          <MysteryTile n={2} />
+          <MysteryTile n={3} />
+        </div>
+      </section>
+
+      {/* ---------- Les classements : un tableau, un onglet par jeu ---------- */}
+      <section className="ax-sec">
+        <h2 className="ax-h">Classements</h2>
+        <Boards boards={boards} />
+      </section>
+
+      {showShop && (
+        <ShopModal
+          points={points}
+          crates={crates}
+          cursorsLabel={cursorTotal > 0 ? `${cursors.length}/${cursorTotal}` : null}
+          gacha={gachaOn && gacha?.total > 0 ? gacha : null}
+          onOpenCrate={(c) => {
+            setShowShop(false);
+            setOpeningBox(c);
+          }}
+          onCursors={() => {
+            setShowShop(false);
+            setShowCursors(true);
+          }}
+          onFriends={() => {
+            setShowShop(false);
+            setShowFriends(true);
+          }}
+          onGacha={() => {
+            setShowShop(false);
+            setShowGacha(true);
+          }}
+          onClose={() => setShowShop(false)}
+        />
       )}
 
       {showCursors && (
         <CursorsModal
           items={cursors}
-          total={catalog.cursor.size}
+          total={cursorTotal}
           points={points}
-          crate={cursorCrate}
+          crate={crates[0] || null}
           onOpenCrate={(c) => setOpeningBox(c)}
           onClose={() => setShowCursors(false)}
-          {...equipProps}
+          equippedOf={(r) => data?.equipped?.[r.type] === r.key}
+          equipping={equipping}
+          onEquip={toggleEquip}
         />
       )}
 
@@ -664,9 +597,6 @@ export default function Arcade() {
         <GachaModal
           token={token}
           onClose={() => setShowGacha(false)}
-          // Le solde et le dôme se recalent sans refetch : la modale sait déjà
-          // tout ce qu'il faut, et voir le compteur du bandeau avancer derrière
-          // la modale fait partie du plaisir.
           onDrawn={(res) => {
             updateUser({ points: res.points });
             commitData((d) => (d ? { ...d, points: res.points } : d));
@@ -690,51 +620,382 @@ export default function Arcade() {
   );
 }
 
-// ---------- La carte d'un mini-jeu ----------
-// L'art n'est pas une icône décorative mais une VRAIE jaquette de la
-// bibliothèque, traitée dans l'idiome du jeu : pixelisée sur une pile de
-// cartes de quiz pour Pixel Rush, glissée dans une pochette d'où sort le
-// vinyle pour le Blind Test. On saisit la règle avant même de cliquer.
-function GameCard({ game, mine, cover, cover2 }) {
+// ======================================================================
+//  Le Mot du jour, à la une
+// ======================================================================
+// Le bandeau raconte MA journée sur le mot, dans une couleur qui change avec
+// elle : bleu tant que rien n'est joué (des cases « ? » qui attendent), la
+// couleur de la température en cours de partie, or une fois trouvé (le mot en
+// tuiles qui se retournent, et des confettis), gris après un abandon. La
+// pastille octogonale résume l'état ; toujours : le compte à rebours jusqu'au
+// prochain mot et les amis qui l'ont déjà trouvé.
+//
+// Les émojis de palier sont ceux de la page du jeu (pages/MotDuJour.jsx).
+const BANDS = {
+  glacial: { emoji: "🧊", label: "Glacial" },
+  frais: { emoji: "❄️", label: "Frais" },
+  tiede: { emoji: "🌡️", label: "Tiède" },
+  chaud: { emoji: "🔥", label: "Chaud" },
+  bouillant: { emoji: "🌋", label: "Bouillant" },
+};
+// La tête qu'on fait à chaque palier : à gauche de la jauge.
+const MOODS = {
+  glacial: "🥶",
+  frais: "😬",
+  tiede: "🙂",
+  chaud: "🥵",
+  bouillant: "🤯",
+};
+function bandOf(temp) {
+  if (temp >= 90) return "bouillant";
+  if (temp >= 75) return "chaud";
+  if (temp >= 50) return "tiede";
+  if (temp >= 25) return "frais";
+  return "glacial";
+}
+
+function fmtLeft(ms) {
+  const min = Math.max(1, Math.ceil(ms / 60000));
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h} h ${String(m).padStart(2, "0")}` : `${h} h`;
+}
+
+// Ce que le bandeau garde de /mot/today et /mot/board : pas la liste des
+// essais (des centaines), juste de quoi raconter la journée.
+function motSummary(d, b) {
+  const entries = b?.entries || [];
+  const seen = new Set();
+  const friends = [];
+  for (const e of entries) {
+    if (e.isMe) continue;
+    for (const u of e.team || [e.user]) {
+      if (!u || seen.has(u.id)) continue;
+      seen.add(u.id);
+      friends.push({ id: u.id, username: u.username, avatar: u.avatar || null });
+    }
+  }
+  const rank = entries.findIndex((e) => e.isMe);
+  return {
+    until: Date.now() + (d.msUntilNext || 0),
+    tries: d.tries || 0,
+    solved: !!d.solved,
+    gaveUp: !!d.gaveUp,
+    word: d.word || null,
+    pointsEarned: d.pointsEarned || 0,
+    best: d.guesses?.length ? Math.round(d.guesses[0].temp) : null,
+    players: d.stats?.players || 0,
+    friends,
+    rank: rank >= 0 ? rank + 1 : null,
+  };
+}
+
+function MotHero({ token, meId }) {
+  const [s, setS] = useState(() => (meId && motCache.get(meId)?.data) || null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!token || !meId) return;
+    let alive = true;
+    Promise.all([
+      apiFetch("/mot/today", { token }),
+      apiFetch("/mot/board", { token }).catch(() => null),
+    ])
+      .then(([d, b]) => {
+        if (!alive) return;
+        const v = motSummary(d, b);
+        motCache.set(meId, v);
+        setS(v);
+      })
+      .catch(() => {
+        /* dictionnaire absent, réseau : le bandeau reste en « à jouer » */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token, meId]);
+
+  // Le compte à rebours avance tout seul, à la minute près.
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Minuit passé (ou cache de la veille) : un nouveau mot attend, l'état
+  // connu ne vaut plus rien.
+  const live = s && now < s.until ? s : null;
+  const st = !live ? "fresh" : live.solved ? "won" : live.gaveUp ? "lost" : live.tries > 0 ? "hot" : "fresh";
+  const band = st === "hot" && live.best != null ? bandOf(live.best) : "glacial";
+  const left = live ? live.until - now : null;
+  const friends = live?.friends || [];
+  const cta = { fresh: "Jouer", hot: "Continuer", won: "Le tableau", lost: "Le tableau" }[st];
+  const essais = live ? `${fmt(live.tries)} essai${live.tries > 1 ? "s" : ""}` : "";
+  // Où j'en suis sur l'échelle de chaleur : 0 tant que rien n'est joué, mon
+  // meilleur essai en cours de partie, le sommet une fois trouvé.
+  const heat = st === "won" ? 100 : st === "hot" ? Math.max(3, Math.min(100, live.best ?? 0)) : 0;
+
   return (
-    <Link to={game.path} className={`arc-game g-${game.key} clickable`}>
-      <span className="arc-game-glow" aria-hidden="true" />
-      {/* L'art à gauche, le titre et le pitch à sa droite : la carte se lit
-          d'un coup d'œil, l'ancien libellé (« Quiz musical »…) faisait
-          doublon avec la description. */}
-      <span className="arc-game-top">
-        <GameArt game={game} cover={cover} cover2={cover2} />
-        <span className="arc-game-head">
-          <span className="arc-game-name">{game.name}</span>
-          <span className="arc-game-pitch">{game.pitch}</span>
-        </span>
-      </span>
-      <span className="arc-game-foot">
-        <span className="arc-game-stat">
-          {mine ? (
-            <>
-              <Trophy size={13} /> Record <b>{fmt(mine.bestScore)}</b>
-            </>
+    <Link to="/mot" className={`ax-mot st-${st} b-${band} clickable`}>
+      <span className="ax-rays" aria-hidden="true" />
+      {st === "won" && <Confetti />}
+
+      {/* L'icône : deux tuiles de lettres posées l'une sur l'autre, celle de
+          devant résume la journée d'un coup d'œil. */}
+      <span className="ax-motic" aria-hidden="true">
+        <span className="back">M</span>
+        <span className="front">
+          {st === "won" ? (
+            <Trophy size={28} strokeWidth={2.6} />
+          ) : st === "hot" ? (
+            <em>{BANDS[band].emoji}</em>
+          ) : st === "lost" ? (
+            <X size={30} strokeWidth={3} />
           ) : (
-            <>
-              <Sparkles size={13} /> Jamais joué
-            </>
+            <b>?</b>
           )}
         </span>
-        <span className="arc-game-cta">
-          Jouer <ArrowRight size={16} className="arc-game-arrow" />
+      </span>
+
+      <span className="ax-mot-body">
+        <span className="ax-mot-title">Mot du jour</span>
+        <span className="ax-mot-line">
+          {st === "won" || st === "lost" ? (
+            <WordTiles word={live.word || "?"} />
+          ) : st === "hot" ? (
+            <span className="ax-mot-heat">
+              {BANDS[band].label} <b>{live.best ?? 0}°</b>
+            </span>
+          ) : (
+            <WordTiles word="?????" mystery />
+          )}
         </span>
+        <span className="ax-mot-meta">
+          {st === "won" ? (
+            <>
+              <span>{essais}</span>
+              {live.pointsEarned > 0 && (
+                <span>
+                  <Coins size={13} /> +{fmt(live.pointsEarned)}
+                </span>
+              )}
+              {live.rank && friends.length > 0 && (
+                <span>
+                  <Crown size={13} /> {live.rank === 1 ? "1er" : `${live.rank}e`} du cercle
+                </span>
+              )}
+            </>
+          ) : st === "lost" ? (
+            <span>Abandonné après {essais}</span>
+          ) : st === "hot" ? (
+            <span>{essais}</span>
+          ) : live?.players ? (
+            <span>
+              <Users size={13} /> {fmt(live.players)} joueur{live.players > 1 ? "s" : ""} aujourd'hui
+            </span>
+          ) : null}
+          {friends.length > 0 && st !== "won" && (
+            <span>
+              <span className="ax-avs">
+                {friends.slice(0, 4).map((f) =>
+                  f.avatar ? (
+                    <img key={f.id} src={f.avatar} alt="" title={f.username} loading="lazy" />
+                  ) : (
+                    <i key={f.id} title={f.username}>
+                      {f.username[0].toUpperCase()}
+                    </i>
+                  )
+                )}
+              </span>
+              {friends.length === 1 ? `${friends[0].username} l'a trouvé` : `${friends.length} amis l'ont trouvé`}
+            </span>
+          )}
+        </span>
+      </span>
+
+      {st !== "lost" && (
+        <span className={`ax-gauge ${st}`} style={{ "--t": `${heat}%` }} aria-label={`${heat}°`}>
+          <span className="ax-gauge-mood" key={st === "won" ? "won" : band}>
+            {st === "won" ? "🥳" : MOODS[st === "fresh" ? "glacial" : band]}
+          </span>
+          <span className="ax-gauge-meter">
+          <span className="ax-gauge-track">
+            <i className="fill" />
+          </span>
+          <span className="ax-gauge-dot">
+            <em>{st === "fresh" ? "🧊" : st === "won" ? "🌋" : BANDS[band].emoji}</em>
+            {st !== "fresh" && <b>{heat}°</b>}
+          </span>
+          <span className="ax-gauge-ends">
+            <span>Glacial</span>
+            <span>Bouillant</span>
+          </span>
+          </span>
+        </span>
+      )}
+
+      {/* L'appel à l'action, seul et centré ; le temps qui reste dessous. */}
+      <span className="ax-mot-side">
+        <span className="ax-mot-cta">
+          {cta} <ArrowRight size={18} strokeWidth={2.8} />
+        </span>
+        {left > 0 && (
+          <span className="ax-mot-clock">
+            <Clock size={12} /> {st === "won" || st === "lost" ? "Prochain mot dans" : "Encore"} {fmtLeft(left)}
+          </span>
+        )}
       </span>
     </Link>
   );
 }
 
-// ---------- La carte « Combat de cartes » ----------
-// Un duel contre le bot plutôt qu'un score à battre : pas de classement, mais
-// le niveau du bot et la série en cours. L'art : deux vraies jaquettes de la
-// bibliothèque, en cartes qui se croisent comme deux lames, et qui
-// s'entrechoquent au survol.
-function BattleCard({ token, cover, cover2 }) {
+// Le mot en tuiles de lettres, qui se retournent l'une après l'autre. Un mot
+// composé passe à la ligne ENTRE ses mots, jamais au milieu ; les tuiles
+// rétrécissent pour que le plus long tienne sur une ligne (--n, voir le CSS).
+function WordTiles({ word, mystery }) {
+  const parts = word.toUpperCase().split(/[\s-]+/).filter(Boolean);
+  const n = Math.max(5, ...parts.map((p) => [...p].length));
+  let i = 0;
+  return (
+    <span
+      className={`ax-word ${mystery ? "mystery" : ""}`}
+      style={{ "--n": n }}
+      aria-label={mystery ? "Mot à trouver" : word}
+    >
+      {parts.map((p, j) => (
+        <span key={j} className="ax-word-grp">
+          {[...p].map((c) => (
+            <span key={i} className="ax-word-l" style={{ "--i": i++ }}>
+              {c}
+            </span>
+          ))}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// Une poignée de confettis plats qui tombent une fois, à l'arrivée.
+const CONFETTI = ["#f2b70b", "#ff5470", "#2fa8f5", "#3ddc84", "#7e60ff"];
+function Confetti() {
+  return (
+    <span className="ax-confetti" aria-hidden="true">
+      {Array.from({ length: 18 }, (_, i) => (
+        <i
+          key={i}
+          style={{
+            "--x": `${(i * 37) % 100}%`,
+            "--d": `${(i % 6) * 0.12}s`,
+            "--r": `${(i % 2 ? 1 : -1) * (180 + i * 25)}deg`,
+            background: CONFETTI[i % CONFETTI.length],
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
+// ======================================================================
+//  Les cartes de jeu
+// ======================================================================
+// Des cartes portrait façon jaquette d'arcade : un aplat vif dans la couleur
+// du jeu, des rayons qui tournent au survol, l'art d'origine au centre et le
+// titre en grosses lettres blanches en bas. Pas de paragraphe : le pitch reste
+// en infobulle. Les classes .arc-game g-* gardent les animations de survol de
+// chaque art.
+function Tile({ k, to, name, pitch, art, stat, cta = "Jouer", fresh, soon, mystery, hover }) {
+  const inner = (
+    <>
+      <span className="ax-rays" aria-hidden="true" />
+      <span className="ax-card-art">{art}</span>
+      <span className="ax-badge">
+        {PLAY[k].map(([Icon, label]) => (
+          <span key={label}>
+            <Icon size={11} strokeWidth={2.6} />
+            {label}
+          </span>
+        ))}
+      </span>
+      {soon || mystery ? (
+        <span className="ax-kick soon">
+          <Construction size={12} strokeWidth={2.6} /> Bientôt
+        </span>
+      ) : (
+        fresh && <span className="ax-kick">Nouveau</span>
+      )}
+      <span className="ax-card-name">{name}</span>
+      {stat && !soon && !mystery && <span className="ax-card-stat">{stat}</span>}
+    </>
+  );
+  // Pas encore jouable : la carte est là, grisée, mais ne mène nulle part.
+  if (soon || mystery)
+    return (
+      <span
+        className={`arc-game g-${k} ax-card ${soon ? "soon" : "mystery"}`}
+        title={mystery ? "Un nouveau jeu arrive…" : `${name} — bientôt`}
+        aria-disabled="true"
+      >
+        {inner}
+      </span>
+    );
+  return (
+    <Link
+      to={to}
+      className={`arc-game g-${k} ax-card clickable`}
+      title={pitch}
+      aria-label={`${name} — ${cta}`}
+      {...hover}
+    >
+      {inner}
+    </Link>
+  );
+}
+
+// Les jeux à venir : une boîte mystère, rien d'autre. Chacune dans sa couleur.
+function MysteryTile({ n }) {
+  return (
+    <Tile
+      k="mystery"
+      name="???"
+      mystery
+      art={
+        <span className={`arc-game-art ax-art-box m${n}`} aria-hidden="true">
+          <span className="ax-box">
+            <b>?</b>
+          </span>
+        </span>
+      }
+    />
+  );
+}
+
+// La Bombe : mèche éteinte au repos, elle s'allume (et la bombe clignote)
+// quand la souris passe dessus.
+function BombTile() {
+  const [lit, setLit] = useState(false);
+  return (
+    <Tile
+      k="bombe"
+      to="/bombe"
+      name="La Bombe"
+      fresh
+      pitch="Un studio, une console, des lettres : tape un jeu qui colle et passe la bombe avant qu'elle explose."
+      hover={{ onMouseEnter: () => setLit(true), onMouseLeave: () => setLit(false) }}
+      art={
+        <span className="arc-game-art ax-art-bomb" aria-hidden="true">
+          <span className={`ax-bomb ${lit ? "on" : ""}`}>
+            <BombArt lit={lit} />
+          </span>
+        </span>
+      }
+    />
+  );
+}
+
+// Le Combat de cartes : un duel contre le bot plutôt qu'un score à battre —
+// pas de record, mais le niveau du bot, la série en cours, le booster à
+// récupérer. L'art : deux vraies jaquettes qui se croisent comme deux lames.
+function BattleTile({ token }) {
   const [info, setInfo] = useState(null);
   useEffect(() => {
     if (!token) return;
@@ -743,102 +1004,104 @@ function BattleCard({ token, cover, cover2 }) {
       .then(
         (d) =>
           alive &&
-          setInfo({ ...d.stats, live: !!d.live && !d.live.end, locked: (d.cards ?? 0) < (d.minCards || 15), min: d.minCards || 15 })
+          setInfo({
+            ...d.stats,
+            live: !!d.live && !d.live.end,
+            locked: (d.cards ?? 0) < (d.minCards || 15),
+            min: d.minCards || 15,
+            showcase: d.showcase || [],
+          })
       )
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, [token]);
+  const stat = info?.locked ? (
+    <>
+      <Lock size={13} /> Dès <b>{info.min}</b> cartes
+    </>
+  ) : info?.claimable > 0 ? (
+    <span className="arc-battle-gift">
+      <Gift size={13} /> Booster à récupérer
+    </span>
+  ) : info?.streak > 0 ? (
+    <>
+      <Flame size={13} /> Série <b>{fmt(info.streak)}</b>
+    </>
+  ) : info ? (
+    <>
+      <Bot size={13} /> Bot niv. <b>{info.level}</b>
+    </>
+  ) : null;
   return (
-    <Link to="/cartes/combat" className="arc-game g-battle clickable">
-      <span className="arc-game-glow" aria-hidden="true" />
-      <span className="arc-game-top">
-        <span className="arc-game-art arc-art-battle" aria-hidden="true">
-          <span className="arc-battle-card a">
-            {cover && <img src={cover.cover} alt="" loading="lazy" draggable="false" />}
+    <Tile
+      k="battle"
+      to="/cartes/combat"
+      name="Combat de cartes"
+      pitch="Un défi tombe, tu poses ta carte face cachée, on retourne. Bats le bot avec ton classeur."
+      cta={info?.live ? "Reprendre" : "Jouer"}
+      stat={stat}
+      art={
+        // Les deux plus belles cartes du classeur, des VRAIES cartes du jeu ;
+        // sans classeur, deux dos de cartes.
+        <span className="arc-game-art ax-art-duel" aria-hidden="true">
+          <span className="ax-duel-card a">
+            <TcgCard card={info?.showcase?.[0] || null} size={62} tilt={false} lite />
           </span>
-          <span className="arc-battle-card b">
-            {cover2 && <img src={cover2.cover} alt="" loading="lazy" draggable="false" />}
+          <span className="ax-duel-card b">
+            <TcgCard card={info?.showcase?.[1] || null} size={62} tilt={false} lite />
           </span>
-          <span className="arc-battle-vs">
-            <Swords size={15} strokeWidth={2.6} />
-          </span>
+          <span className="ax-duel-vs">VS</span>
         </span>
-        <span className="arc-game-head">
-          <span className="arc-game-name">Combat de cartes</span>
-          <span className="arc-game-pitch">
-            Un défi tombe, tu poses ta carte face cachée, on retourne. Bats le bot avec ton classeur.
-          </span>
-        </span>
-      </span>
-      <span className="arc-game-foot">
-        <span className="arc-game-stat">
-          {info?.locked ? (
-            <>
-              <Lock size={13} /> À partir de <b>{info.min}</b> cartes
-            </>
-          ) : info?.claimable > 0 ? (
-            <span className="arc-battle-gift">
-              <Gift size={13} /> Booster à récupérer
-            </span>
-          ) : info?.streak > 0 ? (
-            <>
-              <Flame size={13} /> Série <b>{fmt(info.streak)}</b>
-            </>
-          ) : info ? (
-            <>
-              <Bot size={13} /> Bot niv. <b>{info.level}</b>
-            </>
-          ) : (
-            <>
-              <Sparkles size={13} /> Nouveau
-            </>
-          )}
-        </span>
-        <span className="arc-game-cta">
-          {info?.live ? "Reprendre" : "Jouer"} <ArrowRight size={16} className="arc-game-arrow" />
-        </span>
-      </span>
-    </Link>
+      }
+    />
   );
 }
 
-// ---------- La carte « La Bombe » ----------
-// Pas de classement : c'est un jeu de table, on y vient à plusieurs. L'art est
-// la règle elle-même — la bombe dont la mèche grésille, avec le défi écrit
-// dessus (ici des lettres, à la BombParty).
-function BombCard() {
-  return (
-    <Link to="/bombe" className="arc-game g-bombe clickable">
-      <span className="arc-game-glow" aria-hidden="true" />
-      <span className="arc-game-top">
-        <span className="arc-game-art arc-art-bombe" aria-hidden="true">
-          <span className="arc-bombe">
-            <span className="arc-bombe-arm">
-              <i className="arc-bombe-fuse" />
-              <i className="arc-bombe-cap" />
-              <i className="arc-bombe-spark" />
-            </span>
-            <b className="arc-bombe-body">ONS</b>
+// ======================================================================
+//  La Boutique (modale)
+// ======================================================================
+// Les boosters de cartes, les caisses de curseurs, et les portes vers « Mes
+// curseurs » et les collections des amis. Ouvrir une caisse ferme la boutique :
+// l'ouverture prend tout l'écran.
+function ShopModal({ points, crates, cursorsLabel, gacha, onOpenCrate, onCursors, onFriends, onGacha, onClose }) {
+  useModal(onClose);
+  return createPortal(
+    <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="abar-modal ax-shop-modal">
+        <div className="abar-modal-head">
+          <div className="abar-modal-title">
+            <h2>Boutique</h2>
+          </div>
+          <span className="ax-shop-bal">
+            <Coins size={14} /> {fmt(points)}
           </span>
-        </span>
-        <span className="arc-game-head">
-          <span className="arc-game-name">La Bombe</span>
-          <span className="arc-game-pitch">
-            Un studio, une console, des lettres : tape un jeu qui colle et passe la bombe avant qu'elle explose.
-          </span>
-        </span>
-      </span>
-      <span className="arc-game-foot">
-        <span className="arc-game-stat">
-          <Users size={13} /> Jusqu'à <b>8</b> joueurs
-        </span>
-        <span className="arc-game-cta">
-          Jouer <ArrowRight size={16} className="arc-game-arrow" />
-        </span>
-      </span>
-    </Link>
+          <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="abar-modal-body">
+          <div className="ax-shop">
+            <CardsDoor points={points} />
+            {crates.map((c) => (
+              <Crate key={c.id} crate={c} points={points} onOpen={() => onOpenCrate(c)} />
+            ))}
+          </div>
+          {gacha && <GachaBanner gacha={gacha} points={points} onOpen={onGacha} />}
+          <div className="ax-shop-links">
+            <button className="ax-chip clickable" onClick={onCursors}>
+              <MousePointer2 size={15} /> Mes curseurs
+              {cursorsLabel && <em>{cursorsLabel}</em>}
+            </button>
+            <button className="ax-chip clickable" onClick={onFriends}>
+              <Users size={15} /> Les collections
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -851,21 +1114,19 @@ function GameArt({ game, cover, cover2 }) {
   // panorama fixe, le même pour tout le monde. D'où ce branchement avant le
   // garde-fou ci-dessous — la carte a son globe même sur un compte vide.
   if (game.key === "geo") {
-    // Un hublot ouvert sur un monde : la bande d'horizon d'un vrai panorama
-    // défile derrière la lentille, cerclée de méridiens qui tournent à la même
-    // cadence. Comme une équirectangulaire boucle horizontalement, la faire
-    // glisser EST une rotation — aucune 3D nécessaire pour une vignette.
+    // Une carte dépliée en trois volets (le panorama du jeu comme papier), et
+    // la punaise qui tombe dessus au survol : « trouve où tu es ».
     return (
-      <span className="arc-game-art" aria-hidden="true">
-        <span className="arc-art-globe">
-          <span className="arc-art-world">
-            <span className="arc-art-pano" />
-            <span className="arc-art-shade" />
-          </span>
-          <i className="arc-art-mer a" />
-          <i className="arc-art-mer b" />
-          <i className="arc-art-eq" />
+      <span className="arc-game-art ax-art-map" aria-hidden="true">
+        <span className="ax-map">
+          <i />
+          <i />
+          <i />
         </span>
+        <span className="ax-pin">
+          <MapPin size={34} strokeWidth={2.2} />
+        </span>
+        <span className="ax-pin-ring" />
       </span>
     );
   }
@@ -898,15 +1159,8 @@ function GameArt({ game, cover, cover2 }) {
   // celle-ci montre ce avec quoi on va JOUER.
   if (game.key === "perroquet") {
     return (
-      <span className="arc-game-art" aria-hidden="true">
-        <span className="arc-art-pq">
-          <i className="arc-art-pq-wave a" />
-          <i className="arc-art-pq-wave b" />
-          <span className="arc-art-pq-mic">
-            <i className="arc-art-pq-grill" />
-            <i className="arc-art-pq-stem" />
-          </span>
-        </span>
+      <span className="arc-game-art ax-art-icon" aria-hidden="true">
+        <GiParrotHead />
       </span>
     );
   }
@@ -960,17 +1214,22 @@ function GameArt({ game, cover, cover2 }) {
     }
     return (
       <span className="arc-game-art" aria-hidden="true">
-        <span className="arc-art-quiz">
-          <span className="arc-art-quiz-pick a">
+        {/* Au survol, on buzze : A s'éteint (grisée), B s'allume en vert. */}
+        <span className="arc-art-quiz ax-quiz">
+          <span className="arc-art-quiz-pick a bad">
             <img src={cover.cover} alt="" loading="lazy" draggable="false" />
             <b>A</b>
           </span>
           <span className="arc-art-quiz-pick b good">
             <img src={cover2.cover} alt="" loading="lazy" draggable="false" />
             <b>B</b>
+            <em>
+              <Check size={18} strokeWidth={3.4} />
+            </em>
           </span>
-          <span className="arc-art-quiz-buzz">
-            <i />
+          <span className="ax-buzz">
+            <i className="dome" />
+            <i className="base" />
           </span>
         </span>
       </span>
@@ -985,178 +1244,73 @@ function GameArt({ game, cover, cover2 }) {
     );
   }
   if (game.key === "pixel") {
-    // Une manche en miniature : jaquette pixelisée + « ? », et la carte se
-    // retourne au survol pour donner la réponse — le même geste que sur
-    // l'écran d'accueil du jeu. Tout en CSS (:hover), rien en JS.
+    // Une jaquette pixelisée, un « ? » devant. Au survol, elle se précise par
+    // paliers (de gros blocs, puis plus fins, puis nette) — comme une manche
+    // du jeu en accéléré.
+    const px = (blocks) => (
+      <PixelCanvas src={cover.cover} blocks={blocks} reveal={false} label="" w={ART_CV_W} h={ART_CV_H} />
+    );
     return (
-      <span className="arc-game-art" aria-hidden="true">
-        <span className="arc-art-deck" />
-        <span className="arc-art-flip">
-          <span className="arc-art-face back">
-            <PixelCanvas
-              src={cover.cover}
-              blocks={9}
-              reveal={false}
-              label=""
-              w={ART_CV_W}
-              h={ART_CV_H}
-            />
-            <b>?</b>
-          </span>
-          <span className="arc-art-face front">
-            <img src={cover.cover} alt="" loading="lazy" draggable="false" />
-          </span>
+      <span className="arc-game-art ax-art-px" aria-hidden="true">
+        <span className="ax-px">
+          <span className="ax-px-l l0">{px(7)}</span>
+          <span className="ax-px-l l1">{px(14)}</span>
+          <span className="ax-px-l l2">{px(30)}</span>
+          <img className="ax-px-l l3" src={cover.cover} alt="" loading="lazy" draggable="false" />
         </span>
+        <b className="ax-px-q">?</b>
       </span>
     );
   }
+  return <DiscArt cover={cover} />;
+}
+
+// ---------- Le Blind Test : un vinyle, le logo du jeu sur l'étiquette ----------
+// Le logo détouré vient de GET /games/backdrops (Steam) ; sans logo, le nom du
+// jeu est imprimé à sa place. Le disque tourne au survol.
+const logoCache = new Map(); // gameId -> url | null
+function DiscArt({ cover }) {
+  const id = cover?.gameId ? String(cover.gameId) : null;
+  const [logo, setLogo] = useState(() => (id ? logoCache.get(id) : undefined));
+  useEffect(() => {
+    if (!id || logoCache.has(id)) {
+      setLogo(id ? logoCache.get(id) : null);
+      return;
+    }
+    let alive = true;
+    apiFetch(`/games/backdrops?ids=${id}`)
+      .then((d) => {
+        const path = d?.logos?.[id];
+        logoCache.set(id, path ? `${API_BASE}${path}` : null);
+      })
+      .catch(() => logoCache.set(id, null))
+      .finally(() => alive && setLogo(logoCache.get(id)));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
   return (
-    <span className="arc-game-art" aria-hidden="true">
-      <span className="arc-art-disc" />
-      <span className="arc-art-cover">
-        <img src={cover.cover} alt="" loading="lazy" draggable="false" />
+    <span className="arc-game-art ax-art-vinyl" aria-hidden="true">
+      {/* Le reflet est HORS du disque : la lumière ne tourne pas avec lui. */}
+      <i className="ax-vinyl-sheen" />
+      <span className="ax-vinyl">
+        <span className="ax-vinyl-label">
+          {logo ? (
+            <img src={logo} alt="" draggable="false" onError={() => setLogo(null)} />
+          ) : (
+            <b>{cover?.name || "OST"}</b>
+          )}
+          <i className="ax-vinyl-hole" />
+        </span>
       </span>
     </span>
-  );
-}
-
-// ---------- Aperçu miniature d'un thème : un mini-écran de l'app ----------
-// Tout est dérivé de la palette (swatch + vars) : barre latérale, cartes, et
-// le bouton d'accent. C'est LUI qui rend les cartes de thème jolies.
-function ThemePreview({ data }) {
-  const s = data?.swatch || {};
-  const v = data?.vars || {};
-  const bg = s.bg || v["--bg"] || "#111";
-  const surface = s.surface || v["--surface"] || bg;
-  const accent = s.accent || v["--orange"] || "#f2b70b";
-  const accent2 = s.accent2 || accent;
-  const text = s.text || v["--text"] || "#fff";
-  const side = s.side || v["--side-bg"] || surface;
-  const sideText = s.sideText || v["--side-text"] || text;
-  const accentGrad = `linear-gradient(120deg, ${accent2}, ${accent})`;
-  return (
-    <div className="tp" style={{ background: bg }} aria-hidden="true">
-      <div className="tp-side" style={{ background: side }}>
-        {[0, 1, 2, 3].map((i) => (
-          <span
-            key={i}
-            className="tp-nav"
-            style={{ background: i === 0 ? accent : sideText, opacity: i === 0 ? 1 : 0.4 }}
-          />
-        ))}
-      </div>
-      <div className="tp-main">
-        <span className="tp-hello" style={{ background: accentGrad }} />
-        <div className="tp-card" style={{ background: surface }}>
-          <span className="tp-line" style={{ background: text, opacity: 0.7 }} />
-          <span className="tp-line short" style={{ background: text, opacity: 0.4 }} />
-          <span className="tp-btn" style={{ background: accentGrad }} />
-        </div>
-        <div className="tp-card" style={{ background: surface }}>
-          <span className="tp-line" style={{ background: text, opacity: 0.55 }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------- Une carte de thème (aperçu + icône + Aperçu/Équiper) ----------
-function ThemeCard({ reward, equippedKey, previewKey, equipping, onEquip, onPreview }) {
-  const on = equippedKey === reward.key;
-  const previewing = previewKey === reward.key;
-  const Icon = THEME_ICONS[reward.key] || Palette;
-  return (
-    <article
-      className={`arc-theme ${on ? "equipped" : ""} ${previewing ? "previewing" : ""}`}
-      style={{ "--arc-rarity": rarityColor(reward.rarity) }}
-    >
-      <div className="arc-theme-art">
-        <ThemePreview data={reward.data} />
-        <span className="arc-theme-icon">
-          <Icon size={15} />
-        </span>
-        {reward.count > 1 && <span className="arc-theme-count">×{reward.count}</span>}
-      </div>
-      <div className="arc-theme-info">
-        <span className="arc-theme-rarity">{rarityLabel(reward.rarity)}</span>
-        <h3 className="arc-theme-name">{reward.name}</h3>
-      </div>
-      <div className="arc-theme-actions">
-        <button
-          className={`arc-theme-btn ghost clickable ${previewing ? "on" : ""}`}
-          onClick={() => onPreview(reward)}
-          title="Voir le site avec ce thème"
-        >
-          <Eye size={14} /> {previewing ? "Arrêter" : "Aperçu"}
-        </button>
-        <button
-          className={`arc-theme-btn clickable ${on ? "on" : ""}`}
-          onClick={() => onEquip(reward)}
-          disabled={equipping === reward.key}
-        >
-          {equipping === reward.key ? (
-            <Loader2 size={14} className="spin" />
-          ) : on ? (
-            <>
-              <Check size={14} /> Équipé
-            </>
-          ) : (
-            "Équiper"
-          )}
-        </button>
-      </div>
-    </article>
-  );
-}
-
-// ---------- Le groupe « Mes thèmes » ----------
-function ThemesGroup({ items, total, equippedKey, previewKey, equipping, onEquip, onPreview }) {
-  if (!total && items.length === 0) return null;
-  return (
-    <section className="arc-collection">
-      <div className="arc-inv-head">
-        <h2 className="arc-h2">
-          <Palette size={17} /> Mes thèmes
-        </h2>
-        {total > 0 && (
-          <span className="arc-inv-progress">
-            {items.length} / {total}
-          </span>
-        )}
-      </div>
-      {items.length === 0 ? (
-        <p className="arc-inv-empty">
-          Aucun thème pour l'instant — ouvre la caisse de thèmes pour en débloquer.
-        </p>
-      ) : (
-        <>
-          <div className="arc-themes-grid">
-            {items.map((r) => (
-              <ThemeCard
-                key={r.key}
-                reward={r}
-                equippedKey={equippedKey}
-                previewKey={previewKey}
-                equipping={equipping}
-                onEquip={onEquip}
-                onPreview={onPreview}
-              />
-            ))}
-          </div>
-          <p className="arc-inv-note">
-            Le thème équipé repeint tout le site (y compris la barre latérale) et
-            impose son mode clair ou sombre. Clique « Aperçu » pour l'essayer avant.
-          </p>
-        </>
-      )}
-    </section>
   );
 }
 
 // ---------- La modale « Mes curseurs » ----------
 // La collection vit dans une modale plutôt qu'en pleine page : elle grandit à
 // chaque caisse et ne se consulte que ponctuellement, pour équiper. Le bouton
-// qui l'ouvre est en tête du rail droit.
+// qui l'ouvre est dans l'en-tête, et dans la Boutique.
 function CursorsModal({
   items,
   total,
@@ -1168,15 +1322,7 @@ function CursorsModal({
   onOpenCrate,
   onClose,
 }) {
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = "";
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
+  useModal(onClose);
 
   const afford = crate ? points >= crate.price : false;
   const missing = crate ? crate.price - points : 0;
@@ -1484,9 +1630,63 @@ function CardsDoor({ points }) {
   );
 }
 
-// ---------- Un classement, propre à un jeu ----------
-function Leaderboard({ game, entries }) {
+// ---------- Les classements : un tableau, un onglet par jeu ----------
+// Le top 3 sur un podium (or, argent, bronze), les places 4 à 10 en liste à
+// côté. Chaque onglet porte la couleur de son jeu.
+function Boards({ boards }) {
+  const [sel, setSel] = useState(GAMES[0].key);
   const [mode, setMode] = useState("best");
+  const game = GAMES.find((g) => g.key === sel) || GAMES[0];
+  return (
+    <div className="ax-lb" style={{ "--g": game.color }}>
+      <div className="ax-lb-head">
+        <div className="ax-lb-tabs" role="tablist" aria-label="Choisir un jeu">
+          {GAMES.map((g) => (
+            <button
+              key={g.key}
+              role="tab"
+              aria-selected={g.key === sel}
+              className={`ax-lb-tab clickable ${g.key === sel ? "on" : ""}`}
+              style={{ "--g": g.color }}
+              onClick={() => setSel(g.key)}
+            >
+              <span className="ic">
+                <g.Icon size={13} strokeWidth={2.4} />
+              </span>
+              {g.name}
+            </button>
+          ))}
+        </div>
+        <div className="ax-lb-modes" role="group" aria-label="Type de classement">
+          {MODES.map((m) => (
+            <button
+              key={m.key}
+              className={`clickable ${mode === m.key ? "on" : ""}`}
+              onClick={() => setMode(m.key)}
+              title={m.hint}
+              aria-pressed={mode === m.key}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <Leaderboard key={game.key} game={game} entries={boards[game.key]} mode={mode} />
+    </div>
+  );
+}
+
+function Avatar({ user, size }) {
+  return user.avatar ? (
+    <img className="ax-av" src={user.avatar} alt="" loading="lazy" draggable="false" style={{ width: size, height: size }} />
+  ) : (
+    <span className="ax-av" style={{ width: size, height: size, fontSize: size * 0.42 }}>
+      {user.username[0].toUpperCase()}
+    </span>
+  );
+}
+
+function Leaderboard({ game, entries, mode }) {
   const active = MODES.find((m) => m.key === mode) || MODES[0];
   const other = MODES.find((m) => m.key !== active.key);
 
@@ -1497,83 +1697,89 @@ function Leaderboard({ game, entries }) {
         other.pick(b) - other.pick(a) ||
         new Date(b.date) - new Date(a.date)
     )
-    .slice(0, 8);
+    .slice(0, 10);
+
+  if (entries === undefined)
+    return (
+      <div className="arc-state" style={{ minHeight: 220 }}>
+        <Loader2 size={20} className="spin" />
+      </div>
+    );
+  if (top.length === 0)
+    return (
+      <div className="ax-lb-empty">
+        <Crown size={30} />
+        <p>Personne n'a encore joué.</p>
+        <Link to={game.path} className="ax-lb-cta clickable">
+          Prendre la 1re place <ArrowRight size={14} />
+        </Link>
+      </div>
+    );
+
+  const title = (e) =>
+    e.games != null
+      ? `Record ${fmt(e.bestScore ?? 0)} · total ${fmt(e.score)} sur ${e.games} partie${e.games > 1 ? "s" : ""}`
+      : undefined;
+  // Le bouton « Défier » : rejouer le même set que lui (pas pour soi-même, ni
+  // pour les jeux sans set à rejouer).
+  const fight = (e) => {
+    const target = game.idOf(e);
+    if (e.isMe || !target) return null;
+    return (
+      <Link
+        to={`${game.path}?challenge=${target}`}
+        className="ax-lb-fight clickable"
+        title={`Défier ${e.user.username} sur le même set`}
+      >
+        <Swords size={13} />
+      </Link>
+    );
+  };
 
   return (
-    <section className={`arc-board g-${game.key}`}>
-      <header className="arc-board-head">
-        <span className="arc-board-ic">
-          <game.Icon size={16} />
-        </span>
-        <h3 className="arc-board-name">{game.name}</h3>
-        <div className="arc-board-tabs" role="group" aria-label="Type de classement">
-          {MODES.map((m) => (
-            <button
-              key={m.key}
-              className={`arc-board-tab clickable ${mode === m.key ? "on" : ""}`}
-              onClick={() => setMode(m.key)}
-              title={m.hint}
-              aria-pressed={mode === m.key}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {entries === undefined ? (
-        <div className="arc-state" style={{ minHeight: 140 }}>
-          <Loader2 size={20} className="spin" />
-        </div>
-      ) : top.length === 0 ? (
-        <div className="arc-board-empty">
-          <Crown size={22} />
-          <p>Personne n'a encore joué.</p>
-          <Link to={game.path} className="arc-board-cta clickable">
-            Prendre la 1re place <ArrowRight size={14} />
-          </Link>
-        </div>
-      ) : (
-        <ol className="arc-board-list">
-          {top.map((e, i) => {
-            const target = game.idOf(e);
-            return (
-              <li key={target || e.user.id} className={`arc-board-row ${e.isMe ? "me" : ""}`}>
-                <span className={`arc-rank r${i + 1}`}>{i + 1}</span>
-                <Link to={`/u/${e.user.username}`} className="arc-board-user clickable">
-                  {e.user.avatar ? (
-                    <img src={e.user.avatar} alt="" loading="lazy" draggable="false" />
-                  ) : (
-                    <span className="arc-board-av">{e.user.username[0].toUpperCase()}</span>
-                  )}
-                  <span className="arc-board-who">{e.user.username}</span>
-                </Link>
-                {!e.isMe && target && (
-                  <Link
-                    to={`${game.path}?challenge=${target}`}
-                    className="arc-board-fight clickable"
-                    title={`Défier ${e.user.username} sur le même set`}
-                  >
-                    <Swords size={13} />
-                  </Link>
+    <div className="ax-lb-body">
+      <div className="ax-podium">
+        {[1, 0, 2].map((i) => {
+          const e = top[i];
+          if (!e) return <span key={i} className={`ax-pod p${i + 1} empty`} />;
+          return (
+            <div key={i} className={`ax-pod p${i + 1} ${e.isMe ? "me" : ""}`}>
+              <Link to={`/u/${e.user.username}`} className="ax-pod-who clickable">
+                {i === 0 && (
+                  <span className="ax-pod-crown">
+                    <Crown size={20} fill="currentColor" />
+                  </span>
                 )}
-                <span
-                  className="arc-board-score"
-                  title={
-                    e.games != null
-                      ? `Record ${fmt(e.bestScore ?? 0)} · total ${fmt(e.score)} sur ${
-                          e.games
-                        } partie${e.games > 1 ? "s" : ""}`
-                      : undefined
-                  }
-                >
-                  {fmt(active.pick(e))}
-                </span>
-              </li>
-            );
-          })}
+                <Avatar user={e.user} size={i === 0 ? 64 : 52} />
+                <span className="ax-pod-name">{e.user.username}</span>
+              </Link>
+              <span className="ax-pod-score" title={title(e)}>
+                {fmt(active.pick(e))}
+                {fight(e)}
+              </span>
+              <span className="ax-pod-step">{i + 1}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {top.length > 3 && (
+        <ol className="ax-lb-list">
+          {top.slice(3).map((e, j) => (
+            <li key={game.idOf(e) || e.user.id} className={e.isMe ? "me" : ""}>
+              <span className="ax-lb-rank">{j + 4}</span>
+              <Link to={`/u/${e.user.username}`} className="ax-lb-user clickable">
+                <Avatar user={e.user} size={30} />
+                <span>{e.user.username}</span>
+              </Link>
+              {fight(e)}
+              <span className="ax-lb-score" title={title(e)}>
+                {fmt(active.pick(e))}
+              </span>
+            </li>
+          ))}
         </ol>
       )}
-    </section>
+    </div>
   );
 }

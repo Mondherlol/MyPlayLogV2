@@ -55,6 +55,8 @@ const VERSUS_EVENTS = [
   // l'autre indéfiniment (seul le filet de 4 s ferait avancer la partie).
   "cardteam", // Le 2 contre 2 aux cartes (lib/cardTeam.js) : la table qui se
   // remplit, « go », les cartes posées sur chaque voie, le verdict.
+  "party", // La Party (routes/party.js) : le dé, les pions, les mini-jeux.
+  // Sans cette ligne, personne ne voit avancer les autres.
   "bombe", // La Bombe (routes/bomb.js) : la frappe en direct, la bombe qui
   // passe, l'explosion. Sans cette ligne, la table reste figée sur le premier
   // défi et personne ne voit taper celui qui tient la bombe.

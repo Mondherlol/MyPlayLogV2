@@ -114,6 +114,7 @@ function listMini(l) {
     id: String(l._id),
     title: l.title,
     type: l.type,
+    board: l.board || null, // grille « un jeu par case » (carte de joueur)
     cover: l.cover || null, // pochette (CD des mini-cartes playlist)
     itemKind: l.type === "playlist" ? "ost" : itemKind,
     itemCount: items.length,
@@ -400,7 +401,7 @@ async function buildTimeline(
               .limit(size)
               .populate("actor", "username avatar")
               .populate("target", "username avatar")
-              .populate("list", "title type cover visibility items likes comments")
+              .populate("list", "title type board cover visibility items likes comments")
               .lean(),
           {
             dateField: "createdAt",
@@ -791,7 +792,13 @@ async function buildTimeline(
         const added = (a.list.items || [])
           .filter((i) => refIds.has(String(i.refId)))
           .slice(0, 6)
-          .map((i) => ({ ...trackMini(i), kind: i.kind }));
+          .map((i) => ({
+            ...trackMini(i),
+            kind: i.kind,
+            slot: i.slot || null,
+            charName: i.charName || null,
+            charImage: i.charImage || null,
+          }));
         events.push({
           type: "listadd",
           id: `a-${a._id}`,
@@ -920,7 +927,8 @@ async function buildTimeline(
       a.type === "pxversus" ||
       a.type === "pqversus" ||
       a.type === "impversus" ||
-      a.type === "quizversus"
+      a.type === "quizversus" ||
+      a.type === "bombe"
     ) {
       if (!a.meta?.versusId) continue;
       if (versusSeen.has(a.meta.versusId)) continue;
@@ -933,7 +941,12 @@ async function buildTimeline(
         // L'auteur de la carte est le VAINQUEUR, pas celui dont l'activité a
         // été lue en premier : « X a gagné un versus » est l'information, et
         // elle doit être la même pour tout le monde qui voit passer la carte.
-        user: table.find((p) => p.rank === 1) || person(a.actor),
+        // La Bombe se joue aussi contre des bots : la carte reste signée par
+        // le meilleur HUMAIN (un bot n'a pas de profil).
+        user:
+          (a.type === "bombe"
+            ? [...table].filter((p) => !p.bot).sort((x, y) => x.rank - y.rank)[0]
+            : table.find((p) => p.rank === 1)) || person(a.actor),
         versusId: a.meta.versusId,
         mode: a.meta.mode || "classic",
         total: a.meta.total || 0,
@@ -1513,6 +1526,8 @@ async function buildTimeline(
           total: cards.length,
           // Les cinq plus belles : c'est ce que la carte du fil montre.
           cards: cards.slice(0, 5),
+          // Et tout le reste (borné), pour la fenêtre « +N cartes ».
+          all: cards.length > 5 ? cards.slice(0, 60) : undefined,
         });
       }
     }
@@ -1564,29 +1579,65 @@ async function buildTimeline(
       });
     }
 
+    // Une ligne par joueur et par duel : d'abord UN résultat par duel…
     const duels = new Map();
     for (const b of cardbattles) {
       if (b.mode !== "duel" || !b.duelId) continue;
       if (!duels.has(b.duelId)) duels.set(b.duelId, []);
       duels.get(b.duelId).push(b);
     }
+    const results = [];
     for (const rows of duels.values()) {
       // Le point de vue du vainqueur (ou de n'importe qui en cas de nul).
       const main = rows.find((b) => b.result === "win") || rows[0];
       const other = rows.find((b) => b !== main);
-      events.push({
-        type: "cardbattle",
-        id: `cd-${main.duelId}`,
+      const foe = main.foe || other?.user || null;
+      results.push({
+        ...main,
+        foe,
         date: rows.reduce((d, b) => (new Date(b.date) > new Date(d) ? b.date : d), main.date),
-        user: main.user,
-        foe: main.foe || other?.user || null,
-        mode: "duel",
-        games: 1,
-        result: main.result,
-        score: main.score,
-        forfeit: main.forfeit,
-        cards: cardsOf(main.cards),
+        pair: [main.user?.id, foe?.id].sort().join("|"),
       });
+    }
+    // …puis les duels rapprochés entre les DEUX MÊMES joueurs font UNE carte
+    // (« X a battu Y 3 fois »), au lieu d'une carte par revanche.
+    const byPair = new Map();
+    for (const r of results) {
+      if (!byPair.has(r.pair)) byPair.set(r.pair, []);
+      byPair.get(r.pair).push(r);
+    }
+    for (const list of byPair.values()) {
+      list.sort((x, y) => new Date(y.date) - new Date(x.date));
+      const runs = [];
+      for (const r of list) {
+        const cur = runs[runs.length - 1];
+        if (cur && new Date(cur[cur.length - 1].date) - new Date(r.date) <= GROUP_GAP) cur.push(r);
+        else runs.push([r]);
+      }
+      for (const run of runs) {
+        const latest = run[0];
+        // Signée par celui qui a gagné le plus de duels de la série.
+        const winsOf = (id) => run.filter((r) => r.result === "win" && r.user?.id === id).length;
+        const a = latest.user;
+        const b = latest.foe;
+        const lead = b && winsOf(b.id) > winsOf(a?.id) ? b : a;
+        const other = lead === a ? b : a;
+        events.push({
+          type: "cardbattle",
+          id: `cd-${latest.duelId}`,
+          date: latest.date,
+          user: lead,
+          foe: other,
+          mode: "duel",
+          games: run.length,
+          wins: winsOf(lead?.id),
+          losses: other ? winsOf(other.id) : 0,
+          result: latest.user?.id === lead?.id ? latest.result : latest.result === "win" ? "loss" : latest.result,
+          score: latest.user?.id === lead?.id ? latest.score : [...latest.score].reverse(),
+          forfeit: run.length === 1 && latest.forfeit,
+          cards: cardsOf(run.filter((r) => r.user?.id === lead?.id).flatMap((r) => r.cards)),
+        });
+      }
     }
   }
 

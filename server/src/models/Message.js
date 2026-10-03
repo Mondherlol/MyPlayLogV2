@@ -122,7 +122,7 @@ const versusCardSchema = new mongoose.Schema(
   {
     kind: {
       type: String,
-      enum: ["geo", "blindtest", "pixel", "quiz", "perroquet", "imposteur", "cards", "bombe"],
+      enum: ["geo", "blindtest", "pixel", "quiz", "perroquet", "imposteur", "cards", "bombe", "party"],
       default: "geo",
     },
     code: { type: String, required: true },

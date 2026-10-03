@@ -29,6 +29,7 @@ import {
   Grid2x2,
   Layers,
   Bomb,
+  Dices,
   Trophy,
   Swords,
   Zap,
@@ -1582,6 +1583,8 @@ function useVersusRoom(code, game, token) {
                   ? `/cards/duel/${code}/card`
                   : game === "bb"
                     ? `/bombe/${code}/card`
+                    : game === "pa"
+                    ? `/party/${code}/card`
                     : `/geo/versus/${code}/card`;
 
     async function pull() {
@@ -1646,7 +1649,8 @@ function VersusCard({ versus }) {
   const cd = versus.kind === "cards";
   // La Bombe : une table de 8, des vies plutôt que des manches.
   const bb = versus.kind === "bombe";
-  const game = bt ? "bt" : px ? "px" : qz ? "qz" : pq ? "pq" : im ? "im" : cd ? "cd" : bb ? "bb" : "geo";
+  const pa = versus.kind === "party";
+  const game = bt ? "bt" : px ? "px" : qz ? "qz" : pq ? "pq" : im ? "im" : cd ? "cd" : bb ? "bb" : pa ? "pa" : "geo";
   const live = useVersusRoom(versus.code, game, token);
 
   // Trois sources, dans cet ordre : le salon s'il a répondu, sinon ce que porte
@@ -1658,7 +1662,7 @@ function VersusCard({ versus }) {
   const rounds = known ? live.rounds : versus.rounds || 8;
   const faces = known ? live.players || [] : [];
   const buzzer =
-    !bt && !px && !qz && !pq && !im && !cd && !bb && (known ? live.mode : versus.mode) === "buzzer";
+    !bt && !px && !qz && !pq && !im && !cd && !bb && !pa && (known ? live.mode : versus.mode) === "buzzer";
   const mine = !!live?.mine;
 
   // Une porte n'est ouverte que si le serveur laisserait vraiment entrer : le
@@ -1705,7 +1709,9 @@ function VersusCard({ versus }) {
           qz ? "qz" : ""
         } ${im ? "im" : ""} ${cd ? "cd" : ""}`}
       >
-        {bb ? (
+        {pa ? (
+          <Dices size={22} />
+        ) : bb ? (
           <Bomb size={22} />
         ) : cd ? (
           <Layers size={22} />
@@ -1740,9 +1746,13 @@ function VersusCard({ versus }) {
                       ? "Duel de cartes"
                       : bb
                         ? "La Bombe"
+                        : pa
+                        ? "La Party"
                         : "GeoGamer"}
           <i className="gv-card-mode">
-            {bb
+            {pa
+              ? "plateau"
+              : bb
               ? "table"
               : cd
               ? "1 contre 1"
@@ -1772,7 +1782,9 @@ function VersusCard({ versus }) {
             {count}/{max}
           </b>
           <em>
-            {bb
+            {pa
+              ? `${rounds} manches`
+              : bb
               ? `${rounds} vie${rounds > 1 ? "s" : ""}`
               : cd
                 ? `premier à ${rounds}`
@@ -1808,6 +1820,8 @@ function VersusCard({ versus }) {
                     ? `/cartes/duel/${versus.code}`
                     : bb
                       ? `/bombe/${versus.code}`
+                      : pa
+                      ? `/party/${versus.code}`
                       : `/geo/versus/${versus.code}`
       }
       className={`${cls} clickable`}

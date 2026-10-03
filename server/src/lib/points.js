@@ -26,6 +26,10 @@ export const ARCADE_RATE = {
   perroquetversus: 13,
   imposteur: 5, // 60-100 par manche, 3 manches par défaut
   mot: 0.6, // 1 000-3 000, une fois par jour
+  // Barème brut : 8 par bonne réponse, 60 + 15 par adversaire au gagnant, 25
+  // au deuxième. Sans taux, une victoire payait ~50 points, invisible à côté
+  // des autres jeux ; au taux 4, une belle partie entre amis rapporte ~700.
+  bombe: 4,
 };
 
 export function arcadePoints(source, score) {

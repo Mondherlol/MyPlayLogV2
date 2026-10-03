@@ -1,0 +1,1491 @@
+/* ======================================================================
+   La Party — pages/Party.jsx
+   ======================================================================
+   Même idiome que La Bombe et les combats de cartes : plein écran sombre,
+   plaques #1d1d23, Lilita en capitales, l'or pour l'essentiel. Chaque joueur
+   a SA couleur (--c) : son anneau, son pion, sa ligne au classement. */
+
+.pty {
+  --acc: #f2b70b;
+  --hot: #ff5470;
+  --ok: #3ddc97;
+  --blue: #2f7de1;
+  --plate: #1d1d23;
+  --plate-2: #26262c;
+  --line: rgba(255, 255, 255, 0.08);
+  --soft: rgba(255, 255, 255, 0.55);
+  --ink: #161618;
+  position: fixed;
+  inset: 0;
+  z-index: 460;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  background: #0d0d10;
+  color: #fff;
+  font-family: var(--font-body);
+  overflow: hidden;
+  animation: ptFade 0.25s ease both;
+}
+.pty.chat-open {
+  grid-template-columns: minmax(0, 1fr) 330px;
+}
+.pty::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--app-motif);
+  background-size: 182px 182px;
+  -webkit-mask-image: linear-gradient(to top, #000, transparent 55%);
+  mask-image: linear-gradient(to top, #000, transparent 55%);
+}
+@keyframes ptFade {
+  from {
+    opacity: 0;
+  }
+}
+.pty-wait {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1rem;
+}
+.pty-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.pty-err {
+  margin: 0;
+  color: var(--hot);
+  font-weight: 700;
+}
+
+/* ---------- Barre du haut ---------- */
+.pty-hud {
+  position: relative;
+  z-index: 6;
+  flex: none;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.6rem;
+}
+.pty-icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+}
+.pty-icon:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.pty-icon.on {
+  background: rgba(242, 183, 11, 0.16);
+  color: var(--acc);
+}
+.pty-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.pty-hud-right {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+.pty-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--hot);
+  color: #fff;
+  font: 400 0.7rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+}
+.pty-round {
+  font: 400 1.1rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.pty-round b {
+  font-weight: 400;
+  color: var(--acc);
+  font-size: 1.35rem;
+}
+
+/* ---------- Boutons ---------- */
+.pty-big {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: min(320px, 100%);
+  padding: 0.95rem 1.8rem;
+  border: 0;
+  border-radius: 16px;
+  font: 400 1.45rem/1 "Lilita One", var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform 0.12s,
+    background 0.15s,
+    opacity 0.2s;
+}
+.pty-big svg {
+  width: 22px;
+  height: 22px;
+}
+.pty-big:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.pty-big:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.pty-big.gold {
+  background: var(--acc);
+  color: var(--ink);
+}
+.pty-big.pink {
+  background: var(--hot);
+  color: #fff;
+}
+.pty-line {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: min(320px, 100%);
+  padding: 0.7rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  font: 700 0.95rem/1 var(--font-display);
+  cursor: pointer;
+}
+.pty-line:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ---------- Les joueurs ---------- */
+.pty-face {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--plate-2);
+  box-shadow: 0 0 0 3px var(--c, var(--acc));
+}
+.pty-face img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.pty-face i {
+  font: 400 1.1rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+  color: #fff;
+}
+.pty-players {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 1rem 0.6rem;
+}
+.pty-player {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 170px;
+  padding: 0.5rem 0.9rem 0.5rem 0.6rem;
+  border-radius: 16px;
+  background: var(--plate);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition:
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s;
+}
+.pty-player.turn {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 0 0 2px var(--c),
+    0 10px 26px color-mix(in srgb, var(--c) 30%, transparent);
+}
+.pty-player.left {
+  opacity: 0.35;
+}
+.pty-player-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.pty-player-txt b {
+  font: 700 0.88rem/1.1 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pty-player-stats {
+  display: flex;
+  gap: 0.7rem;
+}
+.pty-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font: 400 1rem/1 "Lilita One", var(--font-display);
+  animation: ptStat 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.pty-stat.tro {
+  color: var(--acc);
+}
+.pty-stat.coin {
+  color: #ffd97a;
+}
+@keyframes ptStat {
+  from {
+    transform: scale(1.5);
+  }
+}
+
+/* ---------- Le plateau ---------- */
+.pty-stage {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 0.4rem 1.4rem 1.4rem;
+}
+.pty-board {
+  position: relative;
+  width: min(100%, calc((100dvh - 200px) * 100 / 62), 1100px);
+  container-type: inline-size;
+}
+.pty-path {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.pty-path polygon {
+  fill: rgba(255, 255, 255, 0.02);
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 2.6;
+  stroke-linejoin: round;
+}
+.pty-space {
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 4.6cqw;
+  height: 4.6cqw;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  font: 400 1.6cqw/1 "Lilita One", var(--font-display);
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 0 0 0.35cqw #0d0d10,
+    0 0.5cqw 1cqw rgba(0, 0, 0, 0.5);
+}
+.pty-space.blue {
+  background: var(--blue);
+}
+.pty-space.red {
+  background: var(--hot);
+}
+.pty-space.chance {
+  background: var(--acc);
+  color: var(--ink);
+}
+.pty-space.start {
+  width: 5.6cqw;
+  height: 5.6cqw;
+  background: #fff;
+  color: var(--ink);
+}
+.pty-space svg {
+  width: 2cqw;
+  height: 2cqw;
+}
+.pty-trophy {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 4.4cqw;
+  height: 4.4cqw;
+  margin-top: -4.6cqw;
+  border-radius: 50%;
+  background: var(--acc);
+  color: var(--ink);
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 0.35cqw #0d0d10,
+    0 0 2.4cqw rgba(242, 183, 11, 0.7);
+  animation:
+    ptTrophyIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    ptBob 1.6s ease-in-out 0.6s infinite;
+}
+.pty-trophy svg {
+  width: 2.4cqw;
+  height: 2.4cqw;
+}
+@keyframes ptTrophyIn {
+  from {
+    transform: translate(-50%, -50%) scale(0) rotate(-40deg);
+  }
+}
+@keyframes ptBob {
+  50% {
+    transform: translate(-50%, calc(-50% - 0.8cqw));
+  }
+}
+
+/* ---- Les pions ---- */
+.pty-pawn {
+  position: absolute;
+  z-index: 4;
+  transform: translate(-50%, -85%);
+  transition:
+    left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pty-pawn .pty-face {
+  width: 4.4cqw !important;
+  height: 4.4cqw !important;
+  min-width: 30px;
+  min-height: 30px;
+  box-shadow:
+    0 0 0 0.4cqw var(--c),
+    0 0.8cqw 1.4cqw rgba(0, 0, 0, 0.6);
+}
+.pty-pawn.turn {
+  z-index: 5;
+}
+.pty-pawn.turn .pty-face {
+  box-shadow:
+    0 0 0 0.4cqw var(--c),
+    0 0 2.2cqw var(--c);
+}
+.pty-pawn-in {
+  display: block;
+}
+/* Chaque case franchie : un petit bond. */
+.pty-pawn.hop .pty-pawn-in {
+  animation: ptHop 0.3s cubic-bezier(0.3, 0, 0.3, 1);
+}
+@keyframes ptHop {
+  45% {
+    transform: translateY(-1.8cqw) scale(1.06, 0.96);
+  }
+  85% {
+    transform: translateY(0) scale(1.1, 0.88);
+  }
+}
+/* Ce que rapporte la case : ça jaillit au-dessus du pion. */
+.pty-fx {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.4rem);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 10px;
+  white-space: nowrap;
+  font: 400 1.05rem/1 "Lilita One", var(--font-display);
+  background: var(--plate);
+  box-shadow: 0 0 0 2px var(--blue);
+  animation: ptFx 1.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.pty-fx.red {
+  box-shadow: 0 0 0 2px var(--hot);
+  color: #ff8fa3;
+}
+.pty-fx.blue,
+.pty-fx.start {
+  color: #8ec2ff;
+}
+.pty-fx.chance {
+  box-shadow: 0 0 0 2px var(--acc);
+  color: var(--acc);
+}
+.pty-fx.trophy {
+  background: var(--acc);
+  color: var(--ink);
+  box-shadow: 0 0 24px rgba(242, 183, 11, 0.7);
+}
+@keyframes ptFx {
+  0% {
+    transform: translate(-50%, 14px) scale(0.5);
+    opacity: 0;
+  }
+  14% {
+    transform: translate(-50%, 0) scale(1.08);
+    opacity: 1;
+  }
+  22% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -26px);
+    opacity: 0;
+  }
+}
+
+/* ---- Le centre : dé, trophée à acheter, case d'arrivée ---- */
+.pty-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 62%;
+  pointer-events: none;
+}
+.pty-panel {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 1.2rem 1.6rem 1.3rem;
+  border-radius: 24px;
+  background: var(--plate);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 24px 50px rgba(0, 0, 0, 0.55);
+  text-align: center;
+  animation: ptPanel 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes ptPanel {
+  from {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+}
+.pty-panel.dice {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+.pty-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font: 400 clamp(1.3rem, 2.6cqw, 2rem) / 1.05 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.pty-panel-sub {
+  margin: 0;
+  color: var(--soft);
+  font-weight: 700;
+}
+.pty-panel-sub b {
+  color: var(--acc);
+}
+.pty-panel-ico {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--blue);
+  color: #fff;
+}
+.pty-panel-ico.gold,
+.pty-panel-ico.chance {
+  background: var(--acc);
+  color: var(--ink);
+}
+.pty-panel-ico.red {
+  background: var(--hot);
+}
+.pty-panel.land.red .pty-panel-title {
+  color: #ff8fa3;
+}
+.pty-panel.land.chance .pty-panel-title {
+  color: var(--acc);
+}
+.pty-panel-go {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* ---- Le dé : un gros bloc qu'on tape ---- */
+.pty-die {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(96px, 13cqw, 150px);
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 26%;
+  background: #fff;
+  color: var(--ink);
+  box-shadow:
+    inset 0 -0.9cqw 0 #d9d9de,
+    0 1.2cqw 2.6cqw rgba(0, 0, 0, 0.55);
+  cursor: default;
+}
+.pty-die b {
+  font: 400 clamp(3rem, 7cqw, 5rem) / 1 "Lilita One", var(--font-display);
+}
+.pty-die.mine {
+  cursor: pointer;
+  background: var(--acc);
+  box-shadow:
+    inset 0 -0.9cqw 0 #c48f00,
+    0 0 0 0.5cqw rgba(242, 183, 11, 0.25),
+    0 1.2cqw 2.6cqw rgba(0, 0, 0, 0.55);
+  animation: ptDieWait 0.9s ease-in-out infinite;
+}
+.pty-die.mine:hover {
+  transform: scale(1.05);
+}
+@keyframes ptDieWait {
+  50% {
+    transform: translateY(-0.8cqw) rotate(-3deg);
+  }
+}
+.pty-die.settled {
+  animation: ptDieHit 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes ptDieHit {
+  0% {
+    transform: scale(1.4) rotate(-14deg);
+  }
+  60% {
+    transform: scale(0.94) rotate(3deg);
+  }
+}
+
+/* ---------- Les mini-jeux ---------- */
+.pty-mini {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 8, 10, 0.82);
+  animation: ptFade 0.3s ease both;
+}
+.pty-mini-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  width: min(520px, 100%);
+  padding: 1.6rem 1.4rem 1.4rem;
+  border-radius: 24px;
+  background: #16161a;
+  box-shadow:
+    0 0 0 2px var(--acc),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+  text-align: center;
+  animation: ptPanel 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.pty-mini-card.wide {
+  width: min(760px, 100%);
+}
+.pty-mini-kicker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--acc);
+}
+.pty-mini-title {
+  margin: 0;
+  font: 400 clamp(2rem, 5vw, 3rem) / 1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.pty-mini-rules {
+  margin: 0;
+  max-width: 380px;
+  color: var(--soft);
+  line-height: 1.4;
+}
+.pty-mini-count {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--acc);
+  color: var(--ink);
+  font: 400 2.2rem/1 "Lilita One", var(--font-display);
+  animation: ptPanel 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.pty-mini-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.pty-mini-time {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: conic-gradient(var(--acc) calc(var(--f) * 360deg), rgba(255, 255, 255, 0.08) 0);
+  font: 400 1.2rem/1 "Lilita One", var(--font-display);
+  position: relative;
+}
+.pty-mini-time::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #16161a;
+}
+.pty-mini-time {
+  isolation: isolate;
+}
+.pty-mini-time::before {
+  z-index: -1;
+}
+.pty-blur {
+  width: min(260px, 60vw);
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--plate-2);
+}
+.pty-blur img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.12);
+  transition: filter 0.2s linear;
+}
+.pty-trailer {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #000;
+}
+.pty-trailer iframe {
+  position: absolute;
+  inset: -12% -6%;
+  width: 112%;
+  height: 124%;
+  border: 0;
+  filter: blur(var(--b));
+  transition: filter 0.2s linear;
+  pointer-events: none;
+}
+/* Le titre de la vidéo (en haut) et les boutons YouTube : masqués. */
+.pty-trailer-mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 18%;
+  background: #000;
+}
+.pty-trailer-shield {
+  position: absolute;
+  inset: 0;
+}
+.pty-price-game {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  text-align: left;
+}
+.pty-price-game img {
+  width: 110px;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.pty-price-game span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.pty-price-game b {
+  font: 400 1.6rem/1.05 "Lilita One", var(--font-display);
+}
+.pty-price-game em {
+  font-style: normal;
+  color: var(--soft);
+  font-weight: 700;
+}
+.pty-price-game small {
+  color: var(--acc);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.pty-answer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: min(460px, 100%);
+}
+.pty-answer input {
+  flex: 1;
+  min-width: 0;
+  height: 54px;
+  padding: 0 1rem;
+  border: 2px solid var(--acc);
+  border-radius: 14px;
+  background: var(--plate);
+  color: #fff;
+  font: 700 1.1rem/1 var(--font-body);
+  outline: none;
+  box-shadow: 0 0 0 5px rgba(242, 183, 11, 0.12);
+}
+.pty-send {
+  display: grid;
+  place-items: center;
+  flex: 0 0 54px;
+  height: 54px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--acc);
+  color: var(--ink);
+  font: 400 1.4rem/1 "Lilita One", var(--font-display);
+  cursor: pointer;
+}
+.pty-send:disabled {
+  opacity: 0.35;
+}
+.pty-tries {
+  display: inline-flex;
+  gap: 4px;
+}
+.pty-tries i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+}
+.pty-tries i.on {
+  background: var(--hot);
+}
+.pty-mini-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  background: rgba(61, 220, 151, 0.14);
+  color: var(--ok);
+  font: 400 1.1rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.pty-mini-done.bad {
+  background: rgba(255, 84, 112, 0.14);
+  color: var(--hot);
+}
+.pty-mini-who {
+  display: flex;
+  gap: 10px;
+}
+.pty-who {
+  position: relative;
+  opacity: 0.45;
+  transition: opacity 0.2s;
+}
+.pty-who.done {
+  opacity: 1;
+  animation: ptPanel 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.pty-who em {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--ok);
+  color: var(--ink);
+  font: 400 0.72rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+}
+.pty-reveal {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  text-align: left;
+}
+.pty-reveal img {
+  width: 96px;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  object-fit: cover;
+  animation: ptPanel 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.pty-reveal span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.pty-reveal b {
+  font: 400 1.5rem/1.05 "Lilita One", var(--font-display);
+}
+.pty-reveal em {
+  font-style: normal;
+  color: var(--soft);
+  font-weight: 700;
+}
+.pty-reveal em.pty-price {
+  color: var(--acc);
+  font: 400 2rem/1 "Lilita One", var(--font-display);
+}
+.pty-mini-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pty-mini-rank li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 700;
+  animation: ptPanel 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.pty-mini-rank li:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.pty-mini-rank li:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.pty-mini-rank li > b {
+  width: 1.2rem;
+  font: 400 1.1rem/1 "Lilita One", var(--font-display);
+  color: var(--acc);
+}
+.pty-mini-rank-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.pty-mini-rank li em {
+  font-style: normal;
+  color: var(--soft);
+}
+.pty-mini-rank li strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: #ffd97a;
+  font: 400 1rem/1 "Lilita One", var(--font-display);
+}
+.pty-mini-rank li.none {
+  justify-content: center;
+  color: var(--soft);
+}
+
+/* ---------- Le salon d'attente ---------- */
+.ptl {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem 2rem;
+}
+.ptyl-card {
+  margin: auto 0;
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.6rem 1.4rem 1.4rem;
+  border-radius: 24px;
+  background: #16161a;
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 30px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.ptyl-hero {
+  position: relative;
+  width: 150px;
+  height: 120px;
+}
+.ptyl-die {
+  position: absolute;
+  left: 18px;
+  top: 14px;
+  display: grid;
+  place-items: center;
+  width: 86px;
+  height: 86px;
+  border-radius: 24px;
+  background: var(--acc);
+  color: var(--ink);
+  box-shadow: inset 0 -7px 0 #c48f00;
+  transform: rotate(-10deg);
+  animation: ptDieWait 1.4s ease-in-out infinite;
+}
+.ptyl-die b {
+  font: 400 3.4rem/1 "Lilita One", var(--font-display);
+}
+.ptyl-trophy {
+  position: absolute;
+  right: 10px;
+  bottom: 4px;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--hot);
+  color: #fff;
+  box-shadow: 0 0 0 4px #16161a;
+}
+.ptyl-title {
+  margin: 0;
+  font: 400 2.5rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.ptyl-pitch {
+  margin: -0.3rem 0 0;
+  max-width: 360px;
+  color: var(--soft);
+  line-height: 1.4;
+}
+.ptyl-seats {
+  display: flex;
+  gap: 14px;
+  margin: 0.4rem 0;
+}
+.ptyl-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 76px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  animation: ptPanel 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.ptyl-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--plate-2);
+  box-shadow: 0 0 0 3px var(--c, var(--acc));
+}
+.ptyl-face img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.ptyl-face > i {
+  font: 400 1.4rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+}
+.ptyl-seat > b {
+  max-width: 100%;
+  font: 700 0.8rem/1.1 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ptyl-seat.empty {
+  cursor: pointer;
+}
+.ptyl-seat.empty .ptyl-face {
+  box-shadow: none;
+  border: 2px dashed rgba(255, 255, 255, 0.22);
+  background: transparent;
+  color: var(--soft);
+}
+.ptyl-seat.empty:hover .ptyl-face {
+  border-color: var(--acc);
+  color: var(--acc);
+}
+.ptyl-seat.empty > b {
+  color: var(--soft);
+}
+.ptyl-crown {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-8deg);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--acc);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px #16161a;
+}
+.ptyl-kick {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: #3a3a40;
+  color: #fff;
+  cursor: pointer;
+}
+.ptyl-rule {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.ptyl-rule > span {
+  padding: 0 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.ptyl-rule button {
+  min-width: 42px;
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--soft);
+  font: 400 1.05rem/1 "Lilita One", var(--font-display);
+  cursor: pointer;
+}
+.ptyl-rule button.on {
+  background: var(--acc);
+  color: var(--ink);
+}
+.ptyl-go {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  margin-top: 0.3rem;
+}
+.ptyl-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0;
+  color: var(--soft);
+  font-weight: 700;
+}
+.ptyl-hint {
+  margin: 0;
+  color: var(--soft);
+  font-size: 0.82rem;
+}
+.ptyl-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem;
+  border: 0;
+  background: transparent;
+  color: var(--soft);
+  font: 700 0.82rem/1 var(--font-body);
+  cursor: pointer;
+}
+.ptyl-link:hover {
+  color: #fff;
+}
+
+/* ---------- Fin de partie ---------- */
+.pty-results {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 8, 10, 0.78);
+  animation: ptFade 0.3s ease both;
+}
+.pty-results-card {
+  width: min(480px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.8rem 1.3rem 1.3rem;
+  border-radius: 24px;
+  background: #16161a;
+  box-shadow:
+    0 0 0 2px var(--acc),
+    0 30px 60px rgba(0, 0, 0, 0.6);
+  animation: ptPanel 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.pty-winner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+}
+.pty-winner-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--plate-2);
+  box-shadow:
+    0 0 0 4px #16161a,
+    0 0 0 7px var(--c, var(--acc));
+}
+.pty-winner-face img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.pty-winner-face > i {
+  font: 400 2.6rem/1 "Lilita One", var(--font-display);
+  font-style: normal;
+}
+.pty-winner-crown {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  color: var(--acc);
+  fill: var(--acc);
+  transform: translateX(-50%) rotate(-10deg);
+}
+.pty-winner h2 {
+  margin: 0;
+  font: 400 2rem/1 "Lilita One", var(--font-display);
+  text-transform: uppercase;
+}
+.pty-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  margin: 1.2rem 0 1.1rem;
+  padding: 0;
+  list-style: none;
+}
+.pty-rank li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 3px 0 0 var(--c);
+}
+.pty-rank li.me {
+  box-shadow:
+    inset 0 0 0 2px var(--acc),
+    inset 3px 0 0 var(--c);
+}
+.pty-rank li > b {
+  width: 1.3rem;
+  font: 400 1.2rem/1 "Lilita One", var(--font-display);
+  color: var(--soft);
+}
+.pty-rank li:first-child > b {
+  color: var(--acc);
+}
+.pty-rank-face {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--plate-2);
+}
+.pty-rank-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pty-rank-face i {
+  font-style: normal;
+}
+.pty-rank-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pty-rank strong {
+  min-width: 3.2rem;
+  text-align: right;
+  color: var(--acc);
+  font: 400 1rem/1 "Lilita One", var(--font-display);
+}
+.pty-results-go {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+/* ---------- Toast & chat ---------- */
+.pty-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 1.2rem;
+  z-index: 10;
+  transform: translateX(-50%);
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 12px;
+  background: var(--plate);
+  color: #fff;
+  box-shadow:
+    0 0 0 2px var(--acc),
+    0 14px 30px rgba(0, 0, 0, 0.5);
+  font: 700 0.88rem/1.2 var(--font-display);
+  cursor: pointer;
+}
+.pty-toast.bad {
+  box-shadow:
+    0 0 0 2px var(--hot),
+    0 14px 30px rgba(0, 0, 0, 0.5);
+}
+.pty-chat {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  min-height: 0;
+  background: #121216;
+  box-shadow: inset 1px 0 0 var(--line);
+}
+body.pty-on .gc-dock {
+  z-index: 470;
+  top: 64px;
+  right: 0.75rem;
+  bottom: auto;
+  left: auto;
+}
+
+@media (max-width: 760px) {
+  .pty-player {
+    min-width: 0;
+    padding: 0.4rem 0.6rem 0.4rem 0.4rem;
+  }
+  .pty-player .pty-face {
+    width: 30px !important;
+    height: 30px !important;
+  }
+  .pty-player-txt b {
+    font-size: 0.72rem;
+    max-width: 70px;
+  }
+  .pty-stat {
+    font-size: 0.85rem;
+  }
+  .pty-stage {
+    padding: 0.4rem 0.4rem 1rem;
+  }
+  .pty-board {
+    width: 100%;
+  }
+  .pty-center {
+    width: 74%;
+  }
+  .pty-panel {
+    padding: 0.8rem 1rem 0.9rem;
+    gap: 0.45rem;
+  }
+  .pty-panel-ico {
+    width: 44px;
+    height: 44px;
+  }
+  .pty-big {
+    font-size: 1.2rem;
+    padding: 0.8rem 1.2rem;
+  }
+}
+
+/* ---------- La tuile de l'Arcade (à la une : toute la largeur) ---------- */
+.arc-game.g-party {
+  --g-1: #2f7de1;
+  --g-2: #f2b70b;
+}
+.ar2 .arc-game.g-party {
+  grid-column: 1 / -1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+  grid-template-rows: 1fr auto;
+}
+/* L'art à gauche sur toute la hauteur ; le texte et le pied à droite. */
+.ar2 .arc-game.g-party .arc-game-top {
+  display: contents;
+}
+.ar2 .arc-game.g-party .ar2-stage {
+  grid-row: 1 / span 2;
+  height: auto;
+  min-height: 210px;
+  border-bottom: 0;
+  border-right: 1px solid var(--border);
+}
+.ar2 .arc-game.g-party .arc-game-head {
+  justify-content: center;
+  padding: 1.4rem 1.6rem 0.3rem;
+}
+.ar2 .arc-game.g-party .arc-game-name {
+  font-size: 2.1rem;
+}
+.ar2 .arc-game.g-party .arc-game-foot {
+  padding: 0.6rem 1.6rem 1.2rem;
+}
+.arc-game-kicker {
+  align-self: flex-start;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: #f2b70b;
+  color: #161618;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.arc-art-party {
+  position: relative;
+  width: 96px;
+  height: 90px;
+}
+.arc-party-path {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+.arc-party-path i {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #2f7de1;
+  box-shadow: 0 0 0 2px #0d0d10;
+}
+.arc-party-path i.r {
+  background: #ff5470;
+}
+.arc-party-path i.c {
+  background: #f2b70b;
+}
+.arc-party-die {
+  position: absolute;
+  left: 14px;
+  top: 4px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #f2b70b;
+  color: #161618;
+  box-shadow: inset 0 -4px 0 #c48f00;
+  transform: rotate(-10deg);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.arc-party-die b {
+  font: 400 1.7rem/1 "Lilita One", var(--font-display);
+}
+.arc-party-trophy {
+  position: absolute;
+  right: 14px;
+  top: 10px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ff5470;
+  color: #fff;
+  box-shadow: 0 0 0 3px #0d0d10;
+}
+.arc-game.g-party:hover .arc-party-die {
+  transform: rotate(12deg) translateY(-6px);
+}
+@media (max-width: 760px) {
+  .ar2 .arc-game.g-party {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+  .ar2 .arc-game.g-party .ar2-stage {
+    grid-row: auto;
+    min-height: 160px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}

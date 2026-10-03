@@ -677,7 +677,34 @@ export async function battleHome(userId) {
     const cat = await catalogReady();
     live = view(doc._id, doc.state, cat);
   }
-  return { stats: statView(stat), pass: passView(stat), live, cards, minCards: MIN_CARDS };
+  return {
+    stats: statView(stat),
+    pass: passView(stat),
+    live,
+    cards,
+    minCards: MIN_CARDS,
+    showcase: cards ? await showcaseCards(userId) : [],
+  };
+}
+
+// Les deux plus belles cartes du classeur (les plus rares, puis les plus
+// récentes) : la tuile « Combat de cartes » de l'Arcade les montre en vrai.
+async function showcaseCards(userId) {
+  try {
+    const [cat, owned] = await Promise.all([
+      getCatalog(),
+      CardOwn.find({ user: userId }).select("card firstAt").lean(),
+    ]);
+    const rank = (c) => RARITY_ORDER.indexOf(c.rarity);
+    return owned
+      .map((o) => ({ c: cat.byId.get(o.card), at: +new Date(o.firstAt || 0) }))
+      .filter((x) => x.c)
+      .sort((a, b) => rank(b.c) - rank(a.c) || b.at - a.at)
+      .slice(0, 2)
+      .map((x) => x.c);
+  } catch {
+    return []; // purement décoratif : la tuile retombe sur des dos de cartes
+  }
 }
 
 /**

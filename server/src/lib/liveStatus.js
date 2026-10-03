@@ -47,6 +47,7 @@ const ACTIVITIES = {
   perroquet: { label: "Joue au Perroquet", family: "play" },
   imposteur: { label: "Joue à L'Imposteur", family: "play" },
   bombe: { label: "Joue à La Bombe", family: "play" },
+  party: { label: "Joue à La Party", family: "play" },
   arcade: { label: "Traîne à l'arcade", family: "play" },
   gba: { label: "Joue sur Game Boy Advance", family: "play" },
   watchparty: { label: "Regarde une séance", family: "watch" },

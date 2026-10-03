@@ -1,0 +1,217 @@
+/* ======================================================================
+   Fil d'activité — compléments (components/FeedCards.jsx, octobre 2026)
+   ======================================================================
+   La case « +N cartes » des boosters et sa fenêtre, le repli « Voir les N
+   autres » des séries de Pixel Rush, et la rangée de jaquettes des ajouts à
+   une liste (avec les cases de la carte de joueur). */
+
+/* ---------- Boosters : la sixième case, floutée ---------- */
+.hf-cardpack .hf-cp-cards:has(.hf-cp-more) {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  max-width: 564px;
+}
+.hf-cp-more {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.hf-cp-more-blur {
+  display: block;
+  filter: blur(5px) brightness(0.55);
+  transform: scale(1.06);
+  pointer-events: none;
+}
+.hf-cp-more-txt {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+.hf-cp-more-txt b {
+  font: 400 1.6rem/1 "Lilita One", var(--font-display);
+}
+.hf-cp-more-txt em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.hf-cp-more:hover .hf-cp-more-txt b {
+  color: #f2b70b;
+}
+
+/* La fenêtre de toute l'ouverture. */
+.hf-cpall {
+  width: min(860px, 100%);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg, 20px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.hf-cpall-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+}
+.hf-cpall-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.hf-cpall-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 0.7rem;
+  padding: 1.1rem 1.2rem 1.3rem;
+  overflow-y: auto;
+}
+.hf-cpall-grid .hf-cp-card {
+  position: relative;
+}
+
+/* ---------- Séries : « Voir les N autres » ---------- */
+.hf-btg-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  align-self: flex-start;
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.8rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 700 0.8rem/1 var(--font-display);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.hf-btg-more:hover {
+  color: #f2b70b;
+}
+.hf-btg-more svg {
+  transition: transform 0.2s ease;
+}
+.hf-btg-more.open svg {
+  transform: rotate(180deg);
+}
+
+/* ---------- Ajouts à une liste : une rangée de jaquettes ---------- */
+.hf-strip {
+  display: flex;
+  gap: 8px;
+  margin: 0.75rem 0 0.7rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hf-strip::-webkit-scrollbar {
+  display: none;
+}
+.hf-strip-tile {
+  flex: none;
+  width: 76px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text);
+  text-decoration: none;
+}
+.hf-strip-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition: transform 0.2s ease;
+}
+.hf-strip-art > img:first-child {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hf-strip-tile:hover .hf-strip-art {
+  transform: translateY(-2px);
+}
+.hf-strip-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.hf-strip-more .hf-strip-art {
+  color: var(--text);
+  font: 400 1.2rem/1 "Lilita One", var(--font-display);
+}
+
+/* Carte de joueur : la case au-dessus de chaque jaquette, et le médaillon du
+   personnage pour les cases qui en prennent un. */
+.hf-strip.board .hf-strip-tile {
+  width: 92px;
+}
+.hf-strip-slot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  color: #f2b70b;
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.hf-strip-slot svg {
+  flex: none;
+}
+.hf-strip-slot span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hf-strip-char {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #f2b70b;
+  background: var(--surface);
+}
+
+@media (max-width: 560px) {
+  .hf-cardpack .hf-cp-cards:has(.hf-cp-more) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* La croix reste dans l'en-tête de la fenêtre (le style global la cloue au
+   coin de l'écran). */
+.hf-cpall .modal-close {
+  position: static;
+}
+
+/* Derrière la fenêtre des cartes : un voile gris, sans flou. */
+.modal-overlay.hf-cpall-overlay {
+  background: rgba(10, 10, 14, 0.72);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
